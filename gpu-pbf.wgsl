@@ -383,6 +383,19 @@ fn projectBoundary(position: vec2<f32>) -> vec2<f32> {
   );
 }
 
+fn driftingCloudOffset(
+  phase: f32,
+  amplitude: f32,
+) -> vec2<f32> {
+  let time = params.motion.x;
+  return vec2<f32>(
+    sin(time * 0.075 + phase) * amplitude,
+    sin(time * 0.11 + phase * 1.71) *
+      amplitude *
+      0.24,
+  );
+}
+
 fn weatherImpactAtGlyph(
   glyphPosition: vec2<f32>,
   weatherIndex: u32,
@@ -531,7 +544,12 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
       perCloudCount,
     );
     var cloudCorrection = corrections[index];
-    let cloudTarget = cloudCorrection.vectors.xy;
+    let cloudTarget =
+      cloudCorrection.vectors.xy +
+      driftingCloudOffset(
+        cloudCorrection.glyphLifecycle.y,
+        cloudCorrection.glyphLifecycle.z,
+      );
     let cloudSource = cloudCorrection.vectors.zw;
     let leftCloud = side == 0u;
     var releaseAge =
@@ -719,11 +737,12 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
       params.viewport.x * (0.08 + secondarySeed * 0.4),
       goesLeft,
     );
-    let cloudCenterX = select(
-      params.weather.z,
-      params.climate.z,
-      goesLeft,
-    );
+    let cloudAnchor =
+      vaporCorrection.glyphLifecycle.xy +
+      driftingCloudOffset(
+        vaporCorrection.glyphLifecycle.z,
+        max(4.5, params.cloudLayout.w * 0.045),
+      );
     let arch =
       sin(progress * PI) *
       (10.0 + secondarySeed * 13.0);
@@ -732,8 +751,8 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
       (7.0 + secondarySeed * 7.0) *
       sin(progress * PI);
     let trackPosition = vec2<f32>(
-      mix(sourceX, cloudCenterX, easedProgress) + drift,
-      mix(params.vapor.w, params.weather.w, easedProgress) -
+      mix(sourceX, cloudAnchor.x, easedProgress) + drift,
+      mix(params.vapor.w, cloudAnchor.y, easedProgress) -
         arch,
     );
     interactionVelocity +=
@@ -814,15 +833,21 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
       if (u32(rainIndex) % 6u == 0u) {
         consumeCloudMoisture(1u);
       }
-      let spread = params.cloudLayout.w * 0.82;
+      let cloudAnchor =
+        rainCorrection.vectors.zw +
+        driftingCloudOffset(
+          f32(index) * 0.731,
+          max(4.5, params.cloudLayout.w * 0.045),
+        );
+      let spread = params.cloudLayout.w * 0.68;
       let seed = fract(
         sin((rainIndex + 1.37) * 12.9898) *
         43758.5453,
       );
       position = vec2<f32>(
-        params.cloudLayout.y +
+        cloudAnchor.x +
           (seed - 0.5) * spread,
-        params.cloudLayout.z,
+        cloudAnchor.y,
       );
       velocity = vec2<f32>(
         sin(rainIndex * 1.91) * 8.0,
@@ -881,15 +906,21 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
       if (u32(snowIndex) % 3u == 0u) {
         consumeCloudMoisture(0u);
       }
-      let spread = params.cloudLayout.w * 0.82;
+      let cloudAnchor =
+        snowCorrection.vectors.zw +
+        driftingCloudOffset(
+          f32(index) * 0.677,
+          max(4.5, params.cloudLayout.w * 0.045),
+        );
+      let spread = params.cloudLayout.w * 0.68;
       let seed = fract(
         sin((snowIndex + 2.71) * 12.9898) *
         43758.5453,
       );
       position = vec2<f32>(
-        params.cloudLayout.x +
+        cloudAnchor.x +
           (seed - 0.5) * spread,
-        params.cloudLayout.z,
+        cloudAnchor.y,
       );
       velocity = vec2<f32>(
         sin(snowIndex * 1.41) * 18.0,
