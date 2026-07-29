@@ -11,6 +11,8 @@ struct Params {
   vapor: vec4<f32>,
   cloud: vec4<f32>,
   cloudLayout: vec4<f32>,
+  boat: vec4<f32>,
+  boatShape: vec4<f32>,
 }
 
 struct ParticleCorrection {
@@ -70,6 +72,11 @@ struct GlyphAttachmentQuery {
   baseTarget: vec2<f32>,
   animatedTarget: vec2<f32>,
   distance: f32,
+}
+
+struct BoatContact {
+  normal: vec2<f32>,
+  influence: f32,
 }
 
 fn isGlyphParticle(state: f32) -> bool {
@@ -396,6 +403,113 @@ fn driftingCloudOffset(
   );
 }
 
+fn ellipseBoatContact(
+  localPosition: vec2<f32>,
+  center: vec2<f32>,
+  radii: vec2<f32>,
+) -> BoatContact {
+  let offset = localPosition - center;
+  let normalizedOffset = offset / radii;
+  let normalizedDistance = length(normalizedOffset);
+  let influence =
+    1.0 - smoothstep(0.72, 1.18, normalizedDistance);
+  var normal = vec2<f32>(0.0, 1.0);
+  let gradient = vec2<f32>(
+    offset.x / (radii.x * radii.x),
+    offset.y / (radii.y * radii.y),
+  );
+  if (length(gradient) > 0.0001) {
+    normal = normalize(gradient);
+  }
+  return BoatContact(normal, influence);
+}
+
+fn applyBoatInteraction(
+  position: vec2<f32>,
+  velocity: vec2<f32>,
+) -> vec2<f32> {
+  let halfWidth = params.boatShape.x;
+  let hullHalfHeight = params.boatShape.y;
+  if (halfWidth <= 0.0 || hullHalfHeight <= 0.0) {
+    return velocity;
+  }
+
+  let relative = position - params.boat.xy;
+  let broadRadius =
+    halfWidth * 1.65 + hullHalfHeight * 2.2;
+  if (dot(relative, relative) > broadRadius * broadRadius) {
+    return velocity;
+  }
+
+  let angle = params.boatShape.z;
+  let cosine = cos(angle);
+  let sine = sin(angle);
+  let localPosition = vec2<f32>(
+    relative.x * cosine + relative.y * sine,
+    -relative.x * sine + relative.y * cosine,
+  );
+  let hullContact = ellipseBoatContact(
+    localPosition,
+    vec2<f32>(0.0, -hullHalfHeight * 0.42),
+    vec2<f32>(halfWidth, hullHalfHeight),
+  );
+  let sailContact = ellipseBoatContact(
+    localPosition,
+    vec2<f32>(0.0, -hullHalfHeight * 2.72),
+    vec2<f32>(
+      halfWidth * 0.58,
+      hullHalfHeight * 2.18,
+    ),
+  );
+  var contact = hullContact;
+  if (sailContact.influence > contact.influence) {
+    contact = sailContact;
+  }
+  if (contact.influence <= 0.0) {
+    return velocity;
+  }
+
+  let worldNormal = vec2<f32>(
+    contact.normal.x * cosine -
+      contact.normal.y * sine,
+    contact.normal.x * sine +
+      contact.normal.y * cosine,
+  );
+  let angularVelocity = params.boatShape.w;
+  let surfaceVelocity =
+    params.boat.zw +
+    vec2<f32>(
+      -angularVelocity * relative.y,
+      angularVelocity * relative.x,
+    );
+  let response =
+    (
+      1.0 -
+      exp(
+        -params.viewport.w *
+          (8.0 + contact.influence * 18.0)
+      )
+    ) *
+    contact.influence *
+    0.78;
+  var result = mix(velocity, surfaceVelocity, response);
+  let inwardSpeed =
+    dot(result - surfaceVelocity, worldNormal);
+  if (inwardSpeed < 0.0) {
+    result -= worldNormal * inwardSpeed * 0.92;
+  }
+  result +=
+    worldNormal *
+    (220.0 + contact.influence * 1680.0) *
+    params.viewport.w *
+    contact.influence;
+  let speed = length(result);
+  if (speed > params.grid.w) {
+    result *= params.grid.w / speed;
+  }
+  return result;
+}
+
 fn weatherImpactAtGlyph(
   glyphPosition: vec2<f32>,
   weatherIndex: u32,
@@ -596,6 +710,10 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
         velocity.y,
         mix(76.0, 250.0, rainBlend),
       );
+      velocity = applyBoatInteraction(
+        position,
+        velocity,
+      );
       position += velocity * dt;
       if (
         releaseAge >= CLOUD_RELEASE_SECONDS ||
@@ -689,6 +807,10 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
       velocity +=
         (cloudTarget - position) * 10.0 * dt;
       velocity *= exp(-4.2 * dt);
+      velocity = applyBoatInteraction(
+        position,
+        velocity,
+      );
       position += velocity * dt;
       positions[index] = position;
       velocities[index] = velocity;
@@ -758,9 +880,9 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
     interactionVelocity +=
       -interactionOffset * 5.2 * dt;
     interactionVelocity *= exp(-2.6 * dt);
+    let interactionPosition =
+      trackPosition + interactionOffset;
     if (params.interaction.z > 0.5) {
-      let interactionPosition =
-        trackPosition + interactionOffset;
       let interactionRadius =
         params.interaction.x * 1.15;
       let fromPointer =
@@ -786,6 +908,10 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
           weightedFalloff;
       }
     }
+    interactionVelocity = applyBoatInteraction(
+      interactionPosition,
+      interactionVelocity,
+    );
     let interactionSpeed =
       length(interactionVelocity);
     if (interactionSpeed > 360.0) {
@@ -1067,6 +1193,10 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
         attraction *
         dt;
       velocity *= exp(-damping * dt);
+      velocity = applyBoatInteraction(
+        position,
+        velocity,
+      );
       position += velocity * dt;
       positions[index] = projectBoundary(position);
       velocities[index] = velocity;
@@ -1227,6 +1357,7 @@ fn integrate(@builtin(global_invocation_id) invocation: vec3<u32>) {
     }
   }
 
+  velocity = applyBoatInteraction(position, velocity);
   position += velocity * dt;
   if (
     airborneSnow &&
