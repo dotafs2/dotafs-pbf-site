@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="NaLA 论文可视化入门：介绍 3D 点云输入、粗到细 Pose 预测、实验结果及其与 Three.js 的对应关系。" />
+    <meta property="og:title" content="NaLA: A 3D Native LLM Layout Agent for High-quality 3D Scene Generation" />
+    <meta property="og:description" content="通过 3D 示例和论文原图学习 NaLA 的输入、方法、输出、实验结果与限制。" />
+    <meta property="og:type" content="article" />
+    <meta property="og:image" content="/og-nala.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/og-nala.png" />
+    <title>NaLA: A 3D Native LLM Layout Agent for High-quality 3D Scene Generation — DOTAFS 学习笔记</title>
+    <link rel="icon" href="data:," />
+    <script type="module" crossorigin src="/assets/nalaPaper-CrUDETwa.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+    <link rel="modulepreload" crossorigin href="/assets/three.module-Byxd6ypc.js">
+    <link rel="stylesheet" crossorigin href="/assets/nalaPaper-CbY6rdKw.css">
+  </head>
+  <body>
+    <div class="read-progress" aria-hidden="true"><i id="read-progress-fill"></i></div>
+
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="回到页面顶部">
+        <span class="brand-mark">N</span>
+        <span><b>NaLA / 可视化入门</b><small>ARXIV 2606.29395</small></span>
+      </a>
+      <nav aria-label="页面目录">
+        <a href="/home/">个人主页</a>
+        <a href="#three-example">3D 例子</a>
+        <a href="#idea">问题定义</a>
+        <a href="#lab">方法演示</a>
+        <a href="#results">结果</a>
+        <a href="#stack">技术映射</a>
+      </nav>
+      <a class="paper-link" href="https://arxiv.org/pdf/2606.29395" target="_blank" rel="noreferrer">原论文 ↗</a>
+    </header>
+
+    <main id="top">
+      <section class="hero section-shell">
+        <div class="hero-copy reveal">
+          <p class="eyebrow">MY STUDY NOTES · ARXIV 2606.29395</p>
+          <h1>NaLA: A 3D Native<br /><em>LLM Layout Agent</em><br />for High-quality 3D Scene Generation</h1>
+          <p class="hero-lede">本页通过交互式 3D 示例和论文原图，介绍 NaLA 如何读取房间与资产点云，并为每件资产预测 <b>位置、缩放和水平朝向</b>。</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#three-example">开始：3D 示例</a>
+            <a class="button" href="#idea">查看问题定义</a>
+          </div>
+          <div class="paper-facts" aria-label="学习目录">
+            <span><b>01 输入</b> 房间与资产点云</span>
+            <span><b>02 方法</b> 自回归 + 粗到细预测</span>
+            <span><b>03 输出</b> 每件资产的 Pose</span>
+            <span><b>04 评估</b> 物理、语义与美学</span>
+          </div>
+        </div>
+
+        <div class="hero-demo reveal" aria-label="NaLA 输入输出示意">
+          <div class="demo-toolbar">
+            <span><i></i> LIVE CONCEPT</span>
+            <b>TOP VIEW / BEDROOM</b>
+          </div>
+          <div class="room-visual">
+            <canvas id="point-cloud" aria-label="房间和家具点云动画"></canvas>
+            <div class="room-label">输入：房间 + 资产点云</div>
+            <div class="furniture bed"><span>BED</span></div>
+            <div class="furniture desk"><span>DESK</span></div>
+            <div class="furniture chair"><span>CHAIR</span></div>
+            <div class="transform-card">
+              <span>输出 / Transform</span>
+              <code>position  [ 1.8, 0, -2.1 ]</code>
+              <code>scale&nbsp;&nbsp;&nbsp;&nbsp; [ 1.0, 1.0, 1.0 ]</code>
+              <code>rotation&nbsp; [ 0, 1.57, 0 ]</code>
+            </div>
+          </div>
+          <p class="demo-caption"><b>任务范围：</b>从已有资产库中选择摆放参数，不负责生成新的 3D 模型。</p>
+        </div>
+      </section>
+
+      <section class="summary-strip" aria-label="NaLA 的输入处理与输出">
+        <article><small>01 / 输入数据</small><b>房间与资产几何</b><span>房间边界点云 + 每个 3D 资产的点云</span></article>
+        <i>→</i>
+        <article><small>02 / 模型处理</small><b>编码并逐件规划</b><span>先摆大件，再摆依赖它的小件</span></article>
+        <i>→</i>
+        <article><small>03 / 输出结果</small><b>每件资产的 Pose</b><span>position + scale + yaw rotation</span></article>
+      </section>
+
+      <section id="three-example" class="three-demo-section">
+        <div class="section-shell">
+          <header class="section-heading light reveal">
+            <p class="eyebrow">学习 01 / 3D 示例</p>
+            <h2>比较文本描述输入<br />与<em>点云输入</em></h2>
+            <p>下面使用 Three.js 演示三类空间关系：朝向、包含与房间边界。它用于解释方法差异，不是作者实验的逐帧复现；作者原图列在演示之后。</p>
+          </header>
+
+          <div class="three-demo-app reveal">
+            <div class="three-demo-toolbar">
+              <div>
+                <small>INTERACTIVE THREE.JS EXAMPLE</small>
+                <b id="three-scene-title">例子 1 · 圆桌与椅子朝向</b>
+              </div>
+              <div class="view-switch" aria-label="切换显示形式">
+                <button class="is-active" type="button" data-visual="solid">实体</button>
+                <button type="button" data-visual="points">点云输入</button>
+              </div>
+            </div>
+
+            <div class="three-demo-body">
+              <div class="three-canvas-wrap">
+                <canvas id="layout-3d" aria-label="可旋转的 3D 布局对比演示"></canvas>
+                <div class="canvas-corner-label"><span id="three-mode-label">NaLA / POINT-CLOUD INPUT</span><i></i></div>
+                <div class="canvas-help">拖动旋转 · 滚轮缩放 · 点击物体看 Transform</div>
+                <div id="scene-verdict" class="scene-verdict is-good"><b>6 / 6 朝向圆桌</b><span>每把椅子的朝向都参考了桌面几何</span></div>
+              </div>
+
+              <aside class="three-demo-panel">
+                <div class="method-switch" aria-label="切换布局方案">
+                  <button type="button" data-layout-mode="baseline"><span>对比方法</span><b>文本 / 关系输入</b></button>
+                  <button class="is-active" type="button" data-layout-mode="nala"><span>NaLA</span><b>3D 点云输入</b></button>
+                </div>
+
+                <div class="scenario-picker" aria-label="切换 3D 演示场景">
+                  <button class="is-active" type="button" data-three-scene="table"><small>01</small><b>圆桌与椅子</b><span>朝向关系</span></button>
+                  <button type="button" data-three-scene="cabinet"><small>02</small><b>柜子与盒子</b><span>包含 / 支撑</span></button>
+                  <button type="button" data-three-scene="irregular"><small>03</small><b>异形房间</b><span>边界理解</span></button>
+                </div>
+
+                <div class="three-explainer">
+                  <span id="three-ref">对应原文 · Fig. 3 右半</span>
+                  <h3 id="three-explainer-title">椅子不是“放在桌子附近”就够了</h3>
+                  <p id="three-explainer-copy">模型要看懂圆桌的真实中心和每把椅子的朝向，才能让它们围成可使用的一圈。</p>
+                </div>
+
+                <div class="transform-inspector">
+                  <span>你刚选中的物体</span>
+                  <b id="selected-asset-name">CHAIR_01 / 椅子</b>
+                  <code id="selected-transform">position [ 0.00, 0.48, 2.40 ]<br />rotation.y 3.14 rad</code>
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <section class="paper-proof reveal" aria-labelledby="paper-proof-title">
+            <header>
+              <div>
+                <p class="eyebrow">ORIGINAL PAPER RESULTS</p>
+                <h3 id="paper-proof-title">论文原图：对照上面的三类空间关系</h3>
+              </div>
+              <span>图片来自论文原页，仅裁边；点击可放大</span>
+            </header>
+
+            <div class="paper-figure-tabs" role="tablist" aria-label="选择论文原图">
+              <button class="is-active" type="button" data-paper-figure="3"><small>FIG. 3</small><b>几何关系</b></button>
+              <button type="button" data-paper-figure="4"><small>FIG. 4</small><b>粗 + 细输出</b></button>
+              <button type="button" data-paper-figure="6"><small>FIG. 6</small><b>整体场景</b></button>
+              <button type="button" data-paper-figure="7"><small>FIG. 7</small><b>异形房间</b></button>
+              <button type="button" data-paper-figure="9"><small>FIG. 9</small><b>失败案例</b></button>
+            </div>
+
+            <div class="paper-figure-viewer">
+              <button id="paper-figure-zoom" class="paper-image-button" type="button" aria-label="放大当前论文图">
+                <img id="paper-figure-image" src="/paper/nala/figure-3.png" alt="论文 Fig. 3：NaLA 与基线在柜子和圆桌布局上的对比" />
+                <span>点击放大 ↗</span>
+              </button>
+              <div class="paper-figure-guide" aria-live="polite">
+                <span id="paper-figure-kicker">FIG. 3 / FINE-GRAINED GEOMETRY</span>
+                <h4 id="paper-figure-title">左看“放进柜子”，右看“椅子朝向圆桌”</h4>
+                <p id="paper-figure-copy">NaLA 能利用层板与圆桌的实际形状：盒子落在柜内层板上，椅子围绕圆桌朝向中心。基线只知道粗略语义关系，容易把盒子放到柜顶或把椅子朝向统一成错误方向。</p>
+                <ul id="paper-figure-points">
+                  <li>柜子示例体现 containment / supporting surface</li>
+                  <li>圆桌示例体现几何中心与 orientation</li>
+                  <li>这正是点云输入相对文字描述的价值</li>
+                </ul>
+                <a id="paper-page-link" href="https://arxiv.org/pdf/2606.29395#page=6" target="_blank" rel="noreferrer">在原论文中打开这一页 ↗</a>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <dialog id="paper-dialog" class="paper-dialog">
+        <button id="paper-dialog-close" type="button" aria-label="关闭放大图片">关闭 ×</button>
+        <img id="paper-dialog-image" src="/paper/nala/figure-3.png" alt="放大的论文原图" />
+      </dialog>
+
+      <section id="idea" class="section-shell content-section">
+        <header class="section-heading reveal">
+          <p class="eyebrow">学习 02 / 问题定义</p>
+          <h2>文字或二维图像<br />不能完整表示<em>3D 几何</em></h2>
+          <p>常见方法先把 3D 模型转换成文字描述、包围盒或二维图片。这个过程会丢失层板、凹槽、支撑面和异形房间边界等细节。</p>
+        </header>
+
+        <div class="compare-grid">
+          <article class="compare-card old-way reveal">
+            <header><span>常见基线</span><b>TEXT-FIRST</b></header>
+            <div class="compare-flow">
+              <div class="wire-object"><i></i><i></i><i></i></div>
+              <span>→</span>
+              <code>“一张圆桌，大约 1 米宽”</code>
+              <span>→</span>
+              <code>x: “1.23”</code>
+            </div>
+            <ul>
+              <li>不能直接表示桌面的曲率与可支撑区域</li>
+              <li>连续坐标被拆成文字 token，不利于保持数值结构</li>
+              <li>可能出现：碰撞、悬空或越过房间边界</li>
+            </ul>
+          </article>
+
+          <article class="compare-card new-way reveal">
+            <header><span>NaLA</span><b>POINT-CLOUD INPUT</b></header>
+            <div class="compare-flow">
+              <div class="dot-object" aria-hidden="true"></div>
+              <span>→</span>
+              <code>&lt;ASSET_FEATURE&gt;</code>
+              <span>→</span>
+              <code>Pose = 粗格子 + 微调</code>
+            </div>
+            <ul>
+              <li>直接编码房间和资产点云，保留几何细节</li>
+              <li>先选大概格子，再回归连续的精确偏移</li>
+              <li>一次生成完整布局，不依赖后置优化器反复修</li>
+            </ul>
+          </article>
+        </div>
+
+        <aside class="plain-language reveal">
+          <span>对比总结</span>
+          <blockquote>基线使用几何的简化描述；NaLA 将房间和资产点云直接编码为 LLM 的输入 Token。</blockquote>
+        </aside>
+      </section>
+
+      <section id="lab" class="lab-section">
+        <div class="section-shell">
+          <header class="section-heading light reveal">
+            <p class="eyebrow">学习 03 / 核心方法</p>
+            <h2>先预测粗位置，<br />再回归<em>连续偏移</em></h2>
+            <p>离散锚点用于确定大致网格和主朝向，连续残差用于补充精确位置、缩放与朝向偏移。</p>
+          </header>
+
+          <div class="lab-grid reveal">
+            <div class="placement-lab">
+              <div class="lab-topbar">
+                <div>
+                  <small>COARSE-TO-FINE LAB</small>
+                  <b>拖动滑块，看看两步如何合成最终位置</b>
+                </div>
+                <span>演示网格为 10 × 8<br />论文标准设置 B = 20 / 轴</span>
+              </div>
+
+              <div class="lab-board-wrap">
+                <div id="lab-board" class="lab-board" aria-label="粗定位和精定位可视化房间">
+                  <div id="anchor-cell" class="anchor-cell"><span>粗定位</span></div>
+                  <div id="residual-line" class="residual-line" aria-hidden="true"></div>
+                  <div id="coarse-dot" class="coarse-dot" aria-hidden="true"></div>
+                  <div id="final-object" class="final-object asset-chair"><i></i><span>最终位置</span></div>
+                  <span class="axis axis-x">X →</span>
+                  <span class="axis axis-z">Z →</span>
+                </div>
+              </div>
+
+              <div class="lab-controls">
+                <label for="position-x"><span>目标 X</span><input id="position-x" type="range" min="3" max="97" value="72" /><b id="position-x-value">7.20</b></label>
+                <label for="position-z"><span>目标 Z</span><input id="position-z" type="range" min="3" max="97" value="61" /><b id="position-z-value">6.10</b></label>
+                <div class="asset-picker" aria-label="选择演示资产">
+                  <button class="is-active" type="button" data-asset="chair">椅子</button>
+                  <button type="button" data-asset="table">桌子</button>
+                  <button type="button" data-asset="bed">床</button>
+                </div>
+              </div>
+            </div>
+
+            <aside class="lab-readout">
+              <div class="step-card">
+                <span>STEP 1 · ANCHOR</span>
+                <b>先选最近的格子中心</b>
+                <p>像先决定“在哪个街区”，给自回归 LLM 一个稳定、可区分的空间锚点。</p>
+                <code id="anchor-output">&lt;POS_BIN_7&gt; &lt;POS_BIN_5&gt;</code>
+              </div>
+              <div class="step-card accent">
+                <span>STEP 2 · RESIDUAL</span>
+                <b>再走完最后几步</b>
+                <p>专门的回归头输出连续偏移、缩放和旋转，把物体贴到准确位置。</p>
+                <code id="residual-output">ΔP = [+0.20, +0.10]</code>
+              </div>
+              <div class="formula-card">
+                <span>最终结果</span>
+                <b>精确位置 = 格子中心 + 偏移量</b>
+                <p id="formula-output">[7.00, 6.00] + [+0.20, +0.10] = [7.20, 6.10]</p>
+              </div>
+            </aside>
+          </div>
+
+          <div class="three-ideas">
+            <article class="reveal"><span>①</span><div><b>点云输入</b><p>PointBERT 编码资产，SPFormer 编码房间，再由 Q-Former 压成 LLM 能读的 3D token。</p></div></article>
+            <article class="reveal"><span>②</span><div><b>大件先摆</b><p>训练答案按体积从大到小排序：先有桌子，再决定花瓶放哪里，因果更自然。</p></div></article>
+            <article class="reveal"><span>③</span><div><b>两阶段学习</b><p>先在 3D-FRONT 学大布局，再在 Imaginarium 学小物件和细节，比混在一起学更好。</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="pipeline" class="section-shell pipeline-section">
+        <header class="section-heading reveal">
+          <p class="eyebrow">学习 04 / 完整流程</p>
+          <h2>示例：一把椅子的<br />布局生成流程</h2>
+          <p>五个步骤依次展示：读取几何、编码 Token、确定摆放顺序、预测粗细 Pose，以及写入 Three.js 场景。</p>
+        </header>
+        <div class="pipeline-tabs" role="tablist" aria-label="NaLA 工作流程">
+          <button class="is-active" type="button" role="tab" aria-selected="true" data-pipeline="0"><small>01</small><b>扫描几何</b></button>
+          <button type="button" role="tab" aria-selected="false" data-pipeline="1"><small>02</small><b>压成 Token</b></button>
+          <button type="button" role="tab" aria-selected="false" data-pipeline="2"><small>03</small><b>逐件规划</b></button>
+          <button type="button" role="tab" aria-selected="false" data-pipeline="3"><small>04</small><b>粗 + 细 Pose</b></button>
+          <button type="button" role="tab" aria-selected="false" data-pipeline="4"><small>05</small><b>写入场景</b></button>
+        </div>
+        <div class="pipeline-display reveal" aria-live="polite">
+          <div class="pipeline-visual" id="pipeline-visual">
+            <div class="pipeline-scene-header">
+              <span id="pipeline-visual-label">现在：读取房间和椅子的真实形状</span>
+              <b>TOP VIEW / 同一把黄色椅子</b>
+            </div>
+            <div class="pipeline-story-stage">
+              <div class="story-room" aria-label="房间俯视图">
+                <span class="story-room-label">空房间</span>
+                <div class="story-bed"><i></i><span>床 / 大件 ①</span></div>
+                <div class="story-table"><i></i><span>桌 / 中件 ②</span></div>
+                <div class="story-anchor-cell"><span>先选这个格子</span></div>
+                <div class="story-coarse-chair"><i></i><span>粗位置</span></div>
+                <div class="story-residual-arrow"><i></i><span>再微调 0.23 m</span></div>
+                <div class="story-final-chair"><i></i><span>椅子 / ③</span></div>
+                <div class="story-success">✓ 布局完成</div>
+              </div>
+
+              <div class="story-asset-tray">
+                <span>待摆资产库</span>
+                <div class="tray-chair"><i></i><b>CHAIR_03</b></div>
+                <small>不是“椅子”两个字<br />而是椅子表面的 3D 点</small>
+              </div>
+
+              <div class="story-encoder">
+                <span>POINTBERT</span>
+                <b>把很多几何点<br />压成少量 Token</b>
+              </div>
+
+              <div class="story-token-output">
+                <span>&lt;ID_03&gt;</span><span>&lt;ASSET_FEATURE&gt;</span><span>&lt;POS_TOKEN&gt;</span>
+              </div>
+
+              <div class="story-order">
+                <span><b>①</b>先放床</span><i>→</i><span><b>②</b>再放桌</span><i>→</i><span class="active"><b>③</b>最后放椅子</span>
+              </div>
+
+              <div class="story-code-output">
+                <span>写入你的 Three.js 场景</span>
+                <code>chair.position.set(2.2, 0, -1.4)</code>
+                <code>chair.rotation.y = 1.57</code>
+              </div>
+            </div>
+            <div class="pipeline-plain-result">
+              <span>本步骤的作用</span>
+              <b id="pipeline-action">把房间、床、桌、椅子的真实表面采样成点云。</b>
+              <code id="pipeline-equation">输入 = 房间边界点 + 每件资产的表面点</code>
+            </div>
+          </div>
+          <div class="pipeline-copy">
+            <span id="pipeline-kicker">STEP 01 / GEOMETRY</span>
+            <h3 id="pipeline-title">先把房间和模型采样成点云</h3>
+            <p id="pipeline-copy">输入不是一段“这是一张床”的描述，而是物体表面真实的 3D 点，以及地面、墙、天花板的边界。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="results" class="results-section">
+        <div class="section-shell">
+          <header class="section-heading light reveal">
+            <p class="eyebrow">学习 05 / 实验结果</p>
+            <h2>从四类指标查看<br />模型的<em>实验结果</em></h2>
+            <p>论文测试 20 类场景，每类 3 个案例，平均每个场景约 20 件资产；还用了 20 名研究生和 AI 评分。</p>
+          </header>
+
+          <div class="score-grid reveal">
+            <article class="score-card hero-score">
+              <span>越低越好 · 越界率 OOB</span>
+              <strong>1.16<small>%</small></strong>
+              <p>LayoutGPT 为 18.19%。点云输入保留了房间边界的几何信息。</p>
+              <div class="bar-pair"><i style="--value: 6.4%"><b>NaLA 1.16</b></i><i class="muted" style="--value: 100%"><b>LayoutGPT 18.19</b></i></div>
+            </article>
+            <article class="score-card">
+              <span>越高越好 · 人类总体评分 / 5</span>
+              <strong>3.69</strong>
+              <p>该组四种方法中数值最高；LayoutVLM 为 3.47。</p>
+              <div class="meter"><i style="--value: 73.8%"></i></div>
+            </article>
+            <article class="score-card">
+              <span>越高越好 · 人类语义合理性 / 5</span>
+              <strong>3.48</strong>
+              <p>椅子朝桌子、盒子进柜子——不是只做到“不穿模”。</p>
+              <div class="meter"><i style="--value: 69.6%"></i></div>
+            </article>
+            <article class="score-card">
+              <span>越高越好 · 人类美学评分 / 5</span>
+              <strong>3.42</strong>
+              <p>该组对比中数值最高，反映语义与视觉评价较好。</p>
+              <div class="meter"><i style="--value: 68.4%"></i></div>
+            </article>
+          </div>
+
+          <div class="honesty-box reveal">
+            <div><span>指标说明</span><h3>物理合理性需要分别比较</h3></div>
+            <p>碰撞率上 Holodeck 更低（0.10% vs 0.86%），悬空率上 Holodeck 也是 0%。Holodeck / LayoutVLM 使用约束进行多轮后处理，NaLA 则采用单次端到端生成。论文主要比较的是：<b>速度、边界理解、语义和视觉评价之间的综合表现</b>。</p>
+          </div>
+
+          <p class="source-note">数据来自论文 Table 1；标准误和完整评测设置请以原文为准。<a href="https://arxiv.org/pdf/2606.29395#page=12" target="_blank" rel="noreferrer">查看表格 ↗</a></p>
+        </div>
+      </section>
+
+      <section id="stack" class="section-shell stack-section">
+        <header class="section-heading reveal">
+          <p class="eyebrow">学习 06 / 与你的技术栈对应</p>
+          <h2>NaLA 输出与 Three.js<br /><em>Transform</em> 的对应关系</h2>
+          <p>在 Vite + 原生 JavaScript + Three.js 项目中，模型输出可以映射到 Object3D 的 position、scale 和 rotation.y。</p>
+        </header>
+
+        <div class="stack-map reveal">
+          <div class="stack-list" role="tablist" aria-label="论文概念到 Three.js 的映射">
+            <button class="is-active" type="button" data-stack="0"><span>论文输入</span><b>Room / Asset Point Cloud</b><small>↔ BufferGeometry 采样点</small></button>
+            <button type="button" data-stack="1"><span>资产身份</span><b>&lt;ID_0&gt; … &lt;ID_K&gt;</b><small>↔ mesh.uuid / assetId</small></button>
+            <button type="button" data-stack="2"><span>粗定位</span><b>POS_BIN + ROT_BIN</b><small>↔ 世界网格 + 四个主朝向</small></button>
+            <button type="button" data-stack="3"><span>精确输出</span><b>ΔP + Scale + ΔYaw</b><small>↔ position / scale / rotation.y</small></button>
+          </div>
+          <div class="code-panel">
+            <div class="code-header"><span>nala-layout-adapter.js</span><button id="copy-code" type="button">复制代码</button></div>
+            <pre><code id="stack-code">const roomPoints = sampleSceneBounds(scene);
+const assetPoints = sampleGeometry(mesh.geometry);
+
+const input = {
+  roomPoints,
+  assets: [{ id: mesh.uuid, points: assetPoints }]
+};</code></pre>
+            <p id="stack-note">论文使用专门的点云编码器。对你的场景，数据源可以从 BufferGeometry 和房间碰撞边界离线采样。</p>
+          </div>
+        </div>
+
+        <div class="mvp-path reveal">
+          <span>在当前项目中的建议落地顺序</span>
+          <ol>
+            <li><b>01 / 离线编辑器原型</b><small>让 Agent 生成 JSON transform，先验证输入与输出格式。</small></li>
+            <li><b>02 / 几何校验</b><small>使用 Three.js Box3 或物理引擎检查碰撞和越界。</small></li>
+            <li><b>03 / 模型训练评估</b><small>论文依赖点云编码器、7B LLM、布局数据集与训练流程，需要单独评估复现成本。</small></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="limits-section">
+        <div class="section-shell">
+          <header class="section-heading light reveal">
+            <p class="eyebrow">学习 07 / 适用范围与限制</p>
+            <h2>当前主要面向<br />室内资产布局</h2>
+          </header>
+          <div class="limits-grid">
+            <article class="reveal"><span>01 / 任务边界</span><b>布局已有资产</b><p>资产库需要预先存在；材质、建模、灯光和玩法逻辑不属于该方法的核心任务。</p></article>
+            <article class="reveal"><span>02 / 数据范围</span><b>稀有场景数据较少</b><p>论文中的电脑房和诊所案例显示：稀有物件关系学习不足时，可能出现悬空或比例异常。</p></article>
+            <article class="reveal"><span>03 / 姿态自由度</span><b>仅预测绕 y 轴旋转</b><p>设定为 y-up，暂不覆盖贴墙画框、倾斜道具等完整 6DoF 姿态。</p></article>
+            <article class="reveal"><span>04 / 评测范围</span><b>实验集中于室内布局</b><p>卧室、客厅和会议室等结果，不能直接推断到复杂地形、动态机关或战斗关卡。</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="final-takeaway section-shell reveal">
+        <p class="eyebrow">课程小结</p>
+        <blockquote>NaLA 直接编码房间与资产点云，并通过“离散锚点 + 连续残差”预测每件资产的 Pose。</blockquote>
+        <div>
+          <a class="button primary" href="https://arxiv.org/pdf/2606.29395" target="_blank" rel="noreferrer">打开原论文 ↗</a>
+          <a class="button" href="/home/#articles">返回我的学习笔记</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>NaLA PAPER WALKTHROUGH · MADE FOR VITE + THREE.JS</span>
+      <a href="#top">回到顶部 ↑</a>
+    </footer>
+
+  </body>
+</html>
