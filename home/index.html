@@ -3,85 +3,149 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="DOTAFS 的个人主页、项目记录与图形学文章。" />
-    <meta name="theme-color" content="#f2f1ec" />
-    <title>DOTAFS — 个人主页</title>
+    <meta name="description" content="DOTAFS 的个人学习笔记：图形学、3D 生成与交互论文解读。" />
+    <meta name="theme-color" content="#f4f5f9" />
+    <meta property="og:title" content="DOTAFS — 我的学习笔记" />
+    <meta property="og:description" content="把正在理解的东西，做成可以操作的笔记。" />
+    <meta property="og:type" content="website" />
+    <title>DOTAFS — 我的学习笔记</title>
     <script src="/journal.js" defer></script>
     <link rel="stylesheet" href="/journal.css" />
   </head>
   <body class="home-body">
-    <main class="journal-shell" id="journal">
-      <header class="journal-header">
-        <a class="journal-brand" href="/home/" aria-label="DOTAFS 个人主页">
-          DOTAFS<span>.</span>
+    <div class="page-ambient" aria-hidden="true">
+      <i></i><i></i><i></i>
+    </div>
+
+    <header class="blog-navbar">
+      <div class="navbar-inner">
+        <a class="blog-brand" href="/home/" aria-label="DOTAFS 个人主页">
+          <span class="brand-glyph">D</span>
+          <span>DOTAFS</span>
         </a>
-        <nav aria-label="个人网站导航">
-          <a href="/">PBF LAB</a>
-          <a href="#articles">ARCHIVE</a>
-          <a href="https://github.com/dotafs2" target="_blank" rel="noreferrer">GITHUB ↗</a>
+
+        <nav class="main-nav" aria-label="个人网站导航">
+          <a class="is-active" href="/home/"><span aria-hidden="true">⌂</span>首页</a>
+          <a href="#articles"><span aria-hidden="true">◫</span>学习笔记</a>
+          <a href="/"><span aria-hidden="true">◉</span>PBF LAB</a>
+          <a href="https://github.com/dotafs2" target="_blank" rel="noreferrer"><span aria-hidden="true">↗</span>GitHub</a>
         </nav>
-      </header>
 
-      <div class="journal-layout">
-        <section class="article-feed" id="articles">
-          <div class="feed-heading">
-            <p>STUDY NOTES / 学习笔记</p>
-            <h1>我的学习笔记。</h1>
-            <span>记录正在读的论文、交互实验，以及还没有结束的问题。</span>
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换到深色模式" title="切换主题">
+          <span aria-hidden="true">☾</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="blog-shell" id="journal">
+      <section class="blog-hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="hero-kicker"><span></span> DOTAFS / LEARNING JOURNAL</p>
+          <h1 id="hero-title">把正在理解的东西，<br /><em>做成可以操作的笔记。</em></h1>
+          <p class="hero-description">这里记录图形学、3D 生成、Agent 与实验过程。不是答案仓库，而是一张持续生长的学习地图。</p>
+          <div class="hero-topics" aria-label="关注主题">
+            <span>Computer Graphics</span>
+            <span>3D Generation</span>
+            <span>Interactive Notes</span>
           </div>
+        </div>
 
-          <div class="article-list">
-            <a class="article-row" href="/articles/worldclaw.html">
-              <div class="article-date">
-                <b>11</b>
-                <span>AUG / 2026</span>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="visual-window">
+            <div class="visual-window-bar"><i></i><i></i><i></i><span>notes.dotafs</span></div>
+            <div class="visual-orbit orbit-one"></div>
+            <div class="visual-orbit orbit-two"></div>
+            <div class="visual-core"><b>D</b><span>LEARN<br />BUILD<br />RECORD</span></div>
+            <div class="visual-particle particle-a"></div>
+            <div class="visual-particle particle-b"></div>
+            <div class="visual-particle particle-c"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="content-layout">
+        <section class="post-feed" id="articles" aria-labelledby="articles-title">
+          <header class="section-title">
+            <div>
+              <p>RECENT POSTS</p>
+              <h2 id="articles-title">最新学习笔记</h2>
+            </div>
+            <span>2 篇交互长文</span>
+          </header>
+
+          <div class="post-list">
+            <a class="post-card" href="/articles/worldclaw.html">
+              <div class="post-cover cover-worldclaw" aria-hidden="true">
+                <div class="cover-grid"></div>
+                <div class="world-ring ring-one"></div>
+                <div class="world-ring ring-two"></div>
+                <div class="world-core"><span></span></div>
+                <div class="terrain terrain-one"></div>
+                <div class="terrain terrain-two"></div>
+                <p>WORLD<br />GENERATION</p>
+                <small>ARXIV 2608.05248</small>
               </div>
-              <div class="article-summary">
-                <p>PAPER NOTE 02 · ARXIV 2608.05248</p>
-                <h2>WorldClaw: Agentic 3D Open-World Generation at Scale</h2>
-                <span>用可操作的 3D 世界沙盘理解 Agent 规划、程序化地形、对象生成与渲染反馈如何组成开放世界生产管线。</span>
-                <div class="article-tags"><i>#world-generation</i><i>#agentic-ai</i></div>
+              <div class="post-copy">
+                <div class="post-meta"><span>2026-08-11</span><i></i><span>PAPER NOTE 02</span></div>
+                <h3>WorldClaw: Agentic 3D Open-World Generation at Scale</h3>
+                <p>用可操作的 3D 世界沙盘理解 Agent 规划、程序化地形、对象生成与渲染反馈如何组成开放世界生产管线。</p>
+                <div class="post-tags"><span># world-generation</span><span># agentic-ai</span></div>
+                <div class="post-action"><span>阅读全文</span><b aria-hidden="true">→</b></div>
               </div>
-              <span class="article-arrow" aria-hidden="true">→</span>
             </a>
 
-            <a class="article-row" href="/articles/nala.html">
-              <div class="article-date">
-                <b>11</b>
-                <span>AUG / 2026</span>
+            <a class="post-card" href="/articles/nala.html">
+              <div class="post-cover cover-nala" aria-hidden="true">
+                <div class="cover-grid"></div>
+                <div class="room-plane">
+                  <i class="room-bed"></i>
+                  <i class="room-table"></i>
+                  <i class="room-chair chair-one"></i>
+                  <i class="room-chair chair-two"></i>
+                  <i class="room-chair chair-three"></i>
+                </div>
+                <div class="point-cloud cloud-one"></div>
+                <div class="point-cloud cloud-two"></div>
+                <p>3D NATIVE<br />LAYOUT AGENT</p>
+                <small>ARXIV 2606.29395</small>
               </div>
-              <div class="article-summary">
-                <p>PAPER NOTE 01 · ARXIV 2606.29395</p>
-                <h2>NaLA: A 3D Native LLM Layout Agent for High-quality 3D Scene Generation</h2>
-                <span>从点云输入、粗到细 Pose 预测与交互式布局实验，理解 LLM 如何直接处理 3D 场景中的空间关系。</span>
-                <div class="article-tags"><i>#3d-scene</i><i>#llm-agent</i></div>
+              <div class="post-copy">
+                <div class="post-meta"><span>2026-08-11</span><i></i><span>PAPER NOTE 01</span></div>
+                <h3>NaLA: A 3D Native LLM Layout Agent for High-quality 3D Scene Generation</h3>
+                <p>从点云输入、粗到细 Pose 预测与交互式布局实验，理解 LLM 如何直接处理 3D 场景中的空间关系。</p>
+                <div class="post-tags"><span># 3d-scene</span><span># llm-agent</span></div>
+                <div class="post-action"><span>阅读全文</span><b aria-hidden="true">→</b></div>
               </div>
-              <span class="article-arrow" aria-hidden="true">→</span>
             </a>
           </div>
         </section>
 
-        <aside class="profile-card">
-          <div class="profile-mark" aria-hidden="true">D</div>
-          <h2>DOTAFS</h2>
-          <div class="portfolio-links">
-            <a href="https://dotafs.github.io/" target="_blank" rel="noreferrer">
-              <span>本科时代作品集</span>
-              <i>dotafs.github.io ↗</i>
-            </a>
-            <a href="https://dotafsportfolio.com/" target="_blank" rel="noreferrer">
-              <span>研究生时代作品集</span>
-              <i>dotafsportfolio.com ↗</i>
-            </a>
-          </div>
+        <aside class="blog-sidebar" aria-label="DOTAFS 资料卡">
+          <section class="author-card">
+            <div class="author-banner" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="author-avatar" aria-hidden="true">D</div>
+            <h2>DOTAFS</h2>
+            <div class="portfolio-links">
+              <a href="https://dotafs.github.io/" target="_blank" rel="noreferrer">
+                <span><i aria-hidden="true">01</i>本科时代作品集</span>
+                <b aria-hidden="true">↗</b>
+              </a>
+              <a href="https://dotafsportfolio.com/" target="_blank" rel="noreferrer">
+                <span><i aria-hidden="true">02</i>研究生时代作品集</span>
+                <b aria-hidden="true">↗</b>
+              </a>
+            </div>
+          </section>
         </aside>
       </div>
-
-      <footer class="journal-footer">
-        <span>© 2026 DOTAFS</span>
-        <span>POWERED BY CURIOSITY</span>
-        <a href="#journal">BACK TO TOP ↑</a>
-      </footer>
     </main>
+
+    <footer class="blog-footer">
+      <div>
+        <span>© 2026 DOTAFS</span>
+        <span>2 POSTS · INTERACTIVE LEARNING NOTES</span>
+      </div>
+      <p>Visual direction inspired by <a href="https://github.com/EvanNotFound/hexo-theme-redefine" target="_blank" rel="noreferrer">Redefine ↗</a></p>
+    </footer>
   </body>
 </html>
