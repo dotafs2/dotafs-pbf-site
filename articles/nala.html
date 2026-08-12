@@ -12,13 +12,18 @@
     <meta name="twitter:image" content="/og-nala.png" />
     <title>NaLA: A 3D Native LLM Layout Agent for High-quality 3D Scene Generation — DOTAFS 学习笔记</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/paper-theme.css" />
-    <script type="module" crossorigin src="/assets/nalaPaper-CUCKq0RM.js"></script>
+    <meta name="theme-color" content="#f4f7fa" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/research-system.css" />
+    <script type="module" crossorigin src="/assets/nalaPaper-DBZ-iF5-.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
     <link rel="modulepreload" crossorigin href="/assets/three.module-Byxd6ypc.js">
     <link rel="stylesheet" crossorigin href="/assets/nalaPaper-dzo2T0GZ.css">
   </head>
-  <body class="paper-note paper-nala">
+  <body class="paper-note paper-nala research-page nala-page">
+    <a class="research-skip-link" href="#top">跳到正文</a>
     <div class="read-progress" aria-hidden="true"><i id="read-progress-fill"></i></div>
 
     <header class="site-header">
@@ -159,7 +164,7 @@
 
             <div class="paper-figure-viewer">
               <button id="paper-figure-zoom" class="paper-image-button" type="button" aria-label="放大当前论文图">
-                <img id="paper-figure-image" src="/paper/nala/figure-3.png" alt="论文 Fig. 3：NaLA 与基线在柜子和圆桌布局上的对比" />
+                <img id="paper-figure-image" src="/paper/nala/figure-3.png" width="890" height="355" loading="lazy" alt="论文 Fig. 3：NaLA 与基线在柜子和圆桌布局上的对比" />
                 <span>点击放大 ↗</span>
               </button>
               <div class="paper-figure-guide" aria-live="polite">
@@ -180,7 +185,7 @@
 
       <dialog id="paper-dialog" class="paper-dialog">
         <button id="paper-dialog-close" type="button" aria-label="关闭放大图片">关闭 ×</button>
-        <img id="paper-dialog-image" src="/paper/nala/figure-3.png" alt="放大的论文原图" />
+        <img id="paper-dialog-image" src="/paper/nala/figure-3.png" width="890" height="355" alt="放大的论文原图" />
       </dialog>
 
       <section id="idea" class="section-shell content-section">
