@@ -5,18 +5,18 @@
  */
 
 .next-site {
-  --next-body: #f5f7f9;
-  --next-content: #fff;
-  --next-card: #f9f9f9;
-  --next-menu: #fff;
-  --next-text: #555;
-  --next-heading: #222;
-  --next-muted: #999;
-  --next-line: #eee;
-  --next-line-strong: #ddd;
-  --next-accent: #fc6423;
-  --next-brand: #222;
-  --next-brand-text: #fff;
+  --next-body: #1b1d1f;
+  --next-content: #1b1d1f;
+  --next-card: rgb(227 225 220 / 4%);
+  --next-menu: #1b1d1f;
+  --next-text: #e3e1dc;
+  --next-heading: #e3e1dc;
+  --next-muted: rgb(227 225 220 / 56%);
+  --next-line: rgb(227 225 220 / 10%);
+  --next-line-strong: rgb(227 225 220 / 20%);
+  --next-accent: #899599;
+  --next-brand: #1b1d1f;
+  --next-brand-text: #e3e1dc;
   --next-sidebar-width: 240px;
   --next-offset: 12px;
   --next-content-padding: 40px;
@@ -30,18 +30,7 @@
   text-rendering: optimizeLegibility;
 }
 
-:root[data-theme="dark"] .next-site {
-  --next-body: #282828;
-  --next-content: #333;
-  --next-card: #3a3a3a;
-  --next-menu: #333;
-  --next-text: #ccc;
-  --next-heading: #eee;
-  --next-muted: #999;
-  --next-line: #444;
-  --next-line-strong: #555;
-  --next-brand: #222;
-}
+:root[data-theme="dark"] .next-site { color-scheme: dark; }
 
 .next-site *,
 .next-site *::before,
@@ -472,7 +461,7 @@
 .next-article .next-main h3,
 .next-article .next-main h4 {
   color: var(--next-heading);
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-style: normal;
   letter-spacing: 0;
 }
@@ -1209,6 +1198,723 @@
   }
 }
 
+/* Quiet dark reading system.
+   Three base colors only: ink, warm white and a desaturated blue-grey.
+   Surface, border and secondary-text values are alpha variations of warm white. */
+.next-site {
+  color-scheme: dark;
+}
+
+.next-site,
+.next-site button,
+.next-site input,
+.next-site select,
+.next-site textarea {
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif !important;
+}
+
+.next-site :where(
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  blockquote
+) {
+  color: var(--next-heading) !important;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif !important;
+}
+
+.next-site :where(
+  code,
+  pre,
+  kbd,
+  samp,
+  .eyebrow,
+  .section-label,
+  [class*="kicker"],
+  [class*="metric"],
+  [class*="readout"]
+) {
+  font-family: "IBM Plex Mono", Consolas, monospace !important;
+}
+
+.next-site :where(p, li, dd, td, label, figcaption, small) {
+  color: inherit;
+}
+
+.next-headband {
+  height: 1px;
+  background: var(--next-accent);
+}
+
+.next-header,
+.next-brand-column,
+.next-sidebar,
+.next-post,
+.next-article .next-main,
+.next-learning-main {
+  background: var(--next-content) !important;
+  box-shadow: none !important;
+}
+
+.next-brand,
+.next-site.worldclaw-page .next-brand,
+.next-site.worldclaw-page .next-avatar {
+  color: var(--next-heading) !important;
+  -webkit-text-fill-color: var(--next-heading) !important;
+}
+
+.next-brand-column p,
+.next-post-meta,
+.next-footer,
+.next-site .canvas-help {
+  color: var(--next-muted) !important;
+}
+
+.next-avatar {
+  color: var(--next-heading);
+  background: transparent;
+  border-color: var(--next-line-strong);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 32px;
+}
+
+.next-menu a:hover,
+.next-menu a.is-active,
+.next-menu button:hover,
+.next-profile-links a:hover {
+  color: var(--next-heading);
+  background: var(--next-card);
+}
+
+.next-menu a.is-active::after {
+  background: var(--next-accent);
+}
+
+.next-post-header h1 a {
+  background-image: linear-gradient(var(--next-accent), var(--next-accent));
+}
+
+.next-post-footer a,
+.next-article .button {
+  color: var(--next-heading) !important;
+  background: transparent !important;
+  border: 1px solid var(--next-line-strong) !important;
+}
+
+.next-post-footer a:hover,
+.next-article .button:hover,
+.next-article .button.primary {
+  color: var(--next-body) !important;
+  background: var(--next-accent) !important;
+  border-color: var(--next-accent) !important;
+}
+
+.next-site ::selection {
+  color: var(--next-body);
+  background: var(--next-accent);
+}
+
+.next-site .research-skip-link,
+.next-site .skip-link {
+  color: var(--next-body);
+  background: var(--next-accent);
+}
+
+.next-site.worldclaw-page {
+  --paper: #1b1d1f;
+  --white: #1b1d1f;
+  --ink: #e3e1dc;
+  --ink-soft: rgb(227 225 220 / 78%);
+  --muted: rgb(227 225 220 / 56%);
+  --line: rgb(227 225 220 / 10%);
+  --line-strong: rgb(227 225 220 / 20%);
+  --blue: #899599;
+  --blue-deep: #899599;
+  --blue-pale: rgb(227 225 220 / 4%);
+  --cyan: #899599;
+  --cyan-pale: rgb(227 225 220 / 4%);
+  --amber: #899599;
+  --amber-pale: rgb(227 225 220 / 4%);
+  --red: #899599;
+  --red-pale: rgb(227 225 220 / 4%);
+  --stage: #1b1d1f;
+  --stage-soft: rgb(227 225 220 / 4%);
+  --serif: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+}
+
+.next-site.nala-page {
+  --ink: #1b1d1f;
+  --ink-2: #1b1d1f;
+  --paper: #e3e1dc;
+  --paper-2: rgb(227 225 220 / 4%);
+  --acid: #899599;
+  --mint: #899599;
+  --orange: #899599;
+  --line-dark: rgb(227 225 220 / 10%);
+  --line-light: rgb(227 225 220 / 10%);
+  --muted-dark: rgb(227 225 220 / 56%);
+  --muted-light: rgb(227 225 220 / 56%);
+  --shadow: none;
+}
+
+.next-learning {
+  --bg: #1b1d1f;
+  --surface: #1b1d1f;
+  --surface-2: rgb(227 225 220 / 4%);
+  --line: rgb(227 225 220 / 10%);
+  --text: #e3e1dc;
+  --muted: rgb(227 225 220 / 56%);
+  --cyan: #899599;
+  --cyan-soft: rgb(227 225 220 / 4%);
+  --orange: #899599;
+  --orange-soft: rgb(227 225 220 / 4%);
+  --yellow: #899599;
+}
+
+.next-article :where(
+  .paper-proof,
+  .compare-card,
+  .score-card,
+  .honesty-box,
+  .final-takeaway,
+  .method-map,
+  .method-notes,
+  .references,
+  .key-answer,
+  .plain-language,
+  .fact-strip,
+  .summary-strip,
+  .bridge-section,
+  .panel
+),
+.next-learning :where(.panel, .bridge-section, .lesson-nav, .takeaway) {
+  color: var(--next-text) !important;
+  background: var(--next-card) !important;
+  border-color: var(--next-line) !important;
+  box-shadow: none !important;
+}
+
+.next-article :where(button, [role="tab"]),
+.next-learning :where(button, input) {
+  color: var(--next-text);
+  border-color: var(--next-line-strong);
+  box-shadow: none;
+}
+
+.next-article :where(
+  button.is-active,
+  [aria-pressed="true"],
+  [aria-selected="true"]
+),
+.next-learning :where(button.is-active, [aria-pressed="true"]) {
+  color: var(--next-heading) !important;
+  background: var(--next-card) !important;
+  border-color: var(--next-accent) !important;
+  box-shadow: inset 2px 0 var(--next-accent) !important;
+}
+
+.next-article :where(a, button):hover,
+.next-learning :where(a, button):hover {
+  border-color: var(--next-accent);
+}
+
+.next-article .next-main :where(b, strong) {
+  color: inherit !important;
+}
+
+.next-article .next-main :where(
+  div,
+  article,
+  aside,
+  header,
+  footer,
+  nav,
+  section,
+  figure,
+  figcaption,
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td,
+  dl,
+  dt,
+  dd,
+  ol,
+  ul,
+  li,
+  pre
+) {
+  border-color: var(--next-line) !important;
+}
+
+/* WorldClaw: flatten the former multicolour application chrome. Canvas imagery
+   remains functional, while every surrounding control uses the three site tones. */
+.next-site.worldclaw-page .next-main :where(
+  p,
+  span,
+  small,
+  b,
+  strong,
+  li,
+  dt,
+  dd,
+  label,
+  figcaption
+) {
+  color: inherit !important;
+}
+
+.next-site.worldclaw-page .next-main :where(
+  .method-row,
+  .method-split > div,
+  .example-prompt,
+  .system-flow,
+  .system-flow article,
+  .system-tab,
+  .preset,
+  .formula,
+  .data-flow,
+  .comparison-table thead th,
+  .comparison-table tbody td:last-child,
+  .method-notes .highlight,
+  .summary-limit,
+  .evidence-note,
+  .scope-grid article > span
+) {
+  color: var(--next-text) !important;
+  background: var(--next-card) !important;
+  border-color: var(--next-line) !important;
+}
+
+.next-site.worldclaw-page .next-main :where(
+  .pipeline-workbench,
+  .world-viewport,
+  .inspection-panel,
+  .code-card,
+  .heightfield-figure,
+  .object-figure
+) {
+  color: var(--next-text) !important;
+  background: var(--next-body) !important;
+  background-image: none !important;
+}
+
+.next-site.worldclaw-page .next-main :where(
+  .stage-button,
+  .viewport-bar,
+  .region-legend,
+  .stage-analogy,
+  .code-card > div
+) {
+  color: var(--next-muted) !important;
+  background: var(--next-card) !important;
+  border-color: var(--next-line) !important;
+}
+
+.next-site.worldclaw-page .next-main :where(
+  .stage-button.is-active,
+  #next-stage,
+  .play-button
+) {
+  color: var(--next-body) !important;
+  background: var(--next-accent) !important;
+  border-color: var(--next-accent) !important;
+}
+
+.next-site.worldclaw-page .next-main :where(
+  .live-dot,
+  .progress-track i,
+  .region-legend i
+) {
+  background: var(--next-accent) !important;
+  box-shadow: none !important;
+}
+
+.next-site.worldclaw-page .next-main :where(
+  .inspection-step,
+  .code-card pre .key,
+  .code-card pre .value,
+  .stage-analogy span,
+  .formula span,
+  .formula b,
+  .formula em,
+  .evidence-grid article > p,
+  .scope-grid article > span,
+  .project-notes li span
+) {
+  color: var(--next-accent) !important;
+}
+
+.next-site.worldclaw-page .next-main :where(
+  .viewport-status,
+  .inspection-panel > p,
+  .code-card pre,
+  .stage-analogy,
+  .heightfield-figure p,
+  .method-row span,
+  .method-split span,
+  .fact-strip span
+) {
+  color: var(--next-muted) !important;
+}
+
+.next-site.worldclaw-page .next-main input[type="range"] {
+  accent-color: var(--next-accent);
+  color-scheme: dark;
+}
+
+/* NaLA: keep the 3D and paper figures readable but remove the former violet,
+   cyan, orange and blue interface palette around them. */
+.next-site.nala-page .next-main :where(
+  p,
+  span,
+  small,
+  b,
+  strong,
+  li,
+  dt,
+  dd,
+  label,
+  figcaption,
+  article
+) {
+  color: inherit !important;
+}
+
+.next-site.nala-page .next-main :where(
+  .hero-demo,
+  .three-demo-app,
+  .three-demo-panel,
+  .paper-figure-explorer,
+  .placement-lab,
+  .lab-board-wrap,
+  .pipeline-display,
+  .pipeline-plain-result,
+  .story-asset-tray,
+  .story-code-output,
+  .transform-card,
+  .transform-inspector,
+  .plain-language,
+  .step-card,
+  .score-card,
+  .code-panel
+) {
+  color: var(--next-text) !important;
+  background: var(--next-card) !important;
+  border-color: var(--next-line) !important;
+  box-shadow: none !important;
+}
+
+.next-site.nala-page .next-main :where(
+  .demo-toolbar,
+  .demo-caption,
+  .three-demo-toolbar,
+  .canvas-corner-label,
+  .scene-verdict,
+  .paper-figure-tabs,
+  .pipeline-tabs,
+  .stack-list button,
+  .method-switch button,
+  .scenario-picker button,
+  .view-switch button
+) {
+  color: var(--next-muted) !important;
+  background: var(--next-body) !important;
+  border-color: var(--next-line) !important;
+}
+
+.next-site.nala-page .next-main :where(
+  em,
+  .eyebrow,
+  .paper-figure-tabs small,
+  .three-demo-toolbar small,
+  #three-ref,
+  #selected-transform,
+  [id$="-value"]
+) {
+  color: var(--next-accent) !important;
+}
+
+.next-site.nala-page .next-main :where(
+  .room-visual,
+  .three-canvas-wrap,
+  .lab-board,
+  .pipeline-visual,
+  .story-room
+) {
+  color: var(--next-text) !important;
+  background: var(--next-body) !important;
+  background-image: none !important;
+  border-color: var(--next-line) !important;
+}
+
+.next-site.nala-page .next-main :where(
+  .furniture,
+  .anchor-cell,
+  .final-object,
+  .story-bed,
+  .story-table,
+  .story-anchor-cell,
+  .story-coarse-chair
+) {
+  color: var(--next-text) !important;
+  background: var(--next-card) !important;
+  border-color: var(--next-accent) !important;
+  box-shadow: none !important;
+}
+
+.next-site.nala-page .next-main :where(
+  .residual-line,
+  .meter i
+) {
+  background: var(--next-accent) !important;
+}
+
+.next-site.nala-page .next-main :where(.meter, .pipeline-tabs button) {
+  background: var(--next-card) !important;
+  border-color: var(--next-line) !important;
+}
+
+.next-site.nala-page .next-main input[type="range"] {
+  accent-color: var(--next-accent);
+  color-scheme: dark;
+}
+
+.next-learning .neuron-core {
+  fill: #1b1d1f;
+  stroke: #899599;
+}
+
+.next-learning .neuron-value,
+.next-learning .neuron-label,
+.next-learning .layer-label {
+  fill: #e3e1dc;
+}
+
+.next-site.next-learning :where(
+  .sample,
+  .training-actions button
+) {
+  color: var(--next-text) !important;
+  background: transparent !important;
+  border-color: var(--next-line-strong) !important;
+}
+
+.next-site.next-learning :where(
+  .sample:hover,
+  .sample.is-selected,
+  .training-actions button:hover
+) {
+  color: var(--next-heading) !important;
+  background: var(--next-card) !important;
+  border-color: var(--next-accent) !important;
+}
+
+.next-site.next-learning :where(
+  .training-actions button.primary,
+  .training-actions button[aria-pressed="true"]
+) {
+  color: var(--next-body) !important;
+  background: var(--next-accent) !important;
+  border-color: var(--next-accent) !important;
+}
+
+.next-site.next-learning :where(
+  .compact-metrics b,
+  .prediction-label b,
+  .sample span,
+  .sample b,
+  .rate-control span,
+  .lesson-step b,
+  .lesson-explainer strong
+) {
+  color: var(--next-heading) !important;
+}
+
+.next-site.next-learning :where(
+  .panel-heading p,
+  .compact-metrics span,
+  .sample-picker legend,
+  .rate-control small,
+  .trainer-status,
+  .lesson-explainer p,
+  .bridge-heading > p
+) {
+  color: var(--next-muted) !important;
+}
+
+/* Home modules: one graphite layer, differentiated through alpha, borders and
+   physical press feedback rather than additional colours or decoration. */
+.next-home .next-page-layout {
+  gap: 16px;
+}
+
+.next-home .next-main {
+  gap: 16px;
+}
+
+.next-home .next-post-index {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  background: var(--next-card) !important;
+  border: 1px solid var(--next-line-strong);
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.next-home .next-post-card {
+  display: block;
+  min-height: 278px;
+  padding: 40px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: rgb(137 149 153 / 14%);
+}
+
+.next-site.next-home .next-post-card:focus-visible {
+  outline: 2px solid var(--next-accent) !important;
+  outline-offset: -3px !important;
+}
+
+.next-site.next-home :where(.next-menu a, .next-profile-links a):focus-visible {
+  outline: 2px solid var(--next-accent) !important;
+  outline-offset: 2px !important;
+}
+
+.next-home .next-post-card:active {
+  background: rgb(227 225 220 / 2%);
+  transform: translateY(2px);
+}
+
+.next-home .next-post-header h1 {
+  transition: color 180ms ease;
+}
+
+.next-home .next-post-footer span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  color: var(--next-text);
+  border: 1px solid var(--next-line-strong);
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.next-home .next-post-footer i {
+  margin-left: 8px;
+  font-style: normal;
+  transition: transform 180ms ease;
+}
+
+.next-home .next-sidebar {
+  background: transparent !important;
+}
+
+.next-home .next-sidebar-inner {
+  background: var(--next-card);
+  border: 1px solid var(--next-line-strong);
+}
+
+.next-home .next-profile-links {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 0;
+}
+
+.next-home .next-profile-links a {
+  padding: 5px 10px;
+  border: 1px solid var(--next-line);
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.next-home .next-profile-links a:last-child {
+  border-bottom: 1px solid var(--next-line);
+}
+
+.next-home .next-profile-links a:active {
+  transform: translateX(0);
+}
+
+.next-home .next-site-state {
+  gap: 8px;
+}
+
+.next-home .next-site-state div {
+  min-width: 0;
+  flex: 1;
+  padding: 8px;
+  background: rgb(227 225 220 / 2%);
+  border: 1px solid var(--next-line);
+}
+
+.next-home .next-site-state div:last-child {
+  border-right: 1px solid var(--next-line);
+}
+
+.next-home .next-menu a:active,
+.next-home .next-profile-links a:active {
+  background: rgb(227 225 220 / 8%);
+}
+
+@media (hover: hover) {
+  .next-home .next-post-index:hover {
+    background: rgb(227 225 220 / 7%) !important;
+    border-color: var(--next-accent);
+    transform: translateY(-3px);
+  }
+
+  .next-home .next-post-card:hover .next-post-footer span {
+    color: var(--next-body);
+    background: var(--next-accent);
+    border-color: var(--next-accent);
+  }
+
+  .next-home .next-post-card:hover .next-post-footer i {
+    transform: translateX(3px);
+  }
+
+  .next-home .next-profile-links a:hover {
+    background: rgb(227 225 220 / 6%);
+    border-color: var(--next-accent);
+    transform: translateX(2px);
+  }
+}
+
+@media (max-width: 720px) {
+  .next-home .next-main {
+    gap: 12px;
+  }
+
+  .next-home .next-post-card {
+    min-height: 0;
+    padding: 28px 20px;
+  }
+
+  .next-home .next-post-index {
+    border-right: 0;
+    border-left: 0;
+  }
+
+  .next-home .next-sidebar-inner {
+    border-right: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .next-menu,
+  .next-article .next-menu,
+  .next-learning .next-menu {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .next-site *,
   .next-site *::before,
@@ -1217,5 +1923,79 @@
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
+  }
+}
+
+/* Bilingual home header: language choice remains a separate, stable route and
+   uses the same graphite interaction language as the rest of the journal. */
+.next-home .next-header-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 112px;
+  padding: 4px 24px 8px;
+}
+
+.next-home .next-header-content .next-menu {
+  align-self: stretch;
+  min-height: 52px;
+  padding: 0;
+}
+
+.next-language-switch {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  min-height: 44px;
+  color: var(--next-muted);
+  font-family: "IBM Plex Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.next-language-switch a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--next-muted);
+  border-bottom: 1px solid transparent;
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.next-language-switch a:hover,
+.next-language-switch a.is-active {
+  color: var(--next-heading);
+  border-bottom-color: var(--next-accent);
+  background: var(--next-card);
+}
+
+.next-language-switch a:active {
+  background: rgb(227 225 220 / 8%);
+}
+
+.next-site.next-home .next-language-switch a:focus-visible {
+  outline: 2px solid var(--next-accent) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 720px) {
+  .next-home .next-header-content {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .next-home .next-language-switch {
+    align-self: stretch;
+    justify-content: flex-end;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--next-line);
+  }
+
+  .next-home .next-header-content .next-menu {
+    width: 100%;
+    padding: 8px 4px;
   }
 }
