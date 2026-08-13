@@ -1,12 +1,11 @@
 const root = document.documentElement;
 const themeToggle = document.querySelector("#theme-toggle");
 const storageKey = "dotafs-journal-theme";
-const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
 
 function preferredTheme() {
   const storedTheme = window.localStorage.getItem(storageKey);
   if (storedTheme === "light" || storedTheme === "dark") return storedTheme;
-  return systemTheme.matches ? "dark" : "light";
+  return "light";
 }
 
 function applyTheme(theme) {
@@ -24,10 +23,6 @@ themeToggle?.addEventListener("click", () => {
   const nextTheme = root.dataset.theme === "dark" ? "light" : "dark";
   window.localStorage.setItem(storageKey, nextTheme);
   applyTheme(nextTheme);
-});
-
-systemTheme.addEventListener("change", () => {
-  if (!window.localStorage.getItem(storageKey)) applyTheme(preferredTheme());
 });
 
 function revealHashTarget() {

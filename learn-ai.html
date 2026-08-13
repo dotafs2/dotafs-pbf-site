@@ -6,7 +6,7 @@
     <meta name="description" content="用一个真实运行的 XOR 神经网络理解参数、前向传播、损失和反向传播。" />
     <title>小模型学习实验室 · 神经网络可视化入门</title>
     <link rel="icon" href="data:," />
-    <meta name="theme-color" content="#f4f7fa" />
+    <meta name="theme-color" content="#f5f7f9" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet" />
@@ -14,30 +14,38 @@
     <script type="module" crossorigin src="/assets/learningLab-CT8gvSu5.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
     <link rel="stylesheet" crossorigin href="/assets/learningLab-BEs0LD41.css">
+    <link rel="stylesheet" href="/next-theme.css" />
   </head>
-  <body class="lab-page" id="top">
+  <body class="lab-page next-site next-learning" id="top">
     <a class="research-skip-link" href="#lab-content">跳到实验</a>
-    <header class="hero">
-      <nav>
-        <a href="/home/">DOTAFS / 学习笔记</a>
-        <span>NEURAL NETWORK LAB / 01</span>
-        <span class="lab-nav-links"><a href="/">PBF 实验</a><a href="/articles/worldclaw.html">WorldClaw</a><a href="/articles/nala.html">NaLA</a></span>
-      </nav>
-      <div class="hero-copy">
-        <p class="eyebrow">别先背公式，先看它真的学会</p>
-        <h1>让一个小网络<br />自己学会 <em>XOR</em></h1>
-        <p class="lede">四条数据、十三个可学习参数、一个答案。训练时你会亲眼看到：预测犯错 → 计算 Loss → 修改权重 → 下一次少错一点。</p>
-      </div>
-      <div class="truth-line" aria-label="本实验与大模型的对应关系">
-        <span><b>输入</b> 两个数字</span>
-        <i>→</i>
-        <span><b>参数</b> 13 个旋钮</span>
-        <i>→</i>
-        <span><b>输出</b> 0 到 1 的概率</span>
+    <div class="next-headband" aria-hidden="true"></div>
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column">
+          <a class="next-brand" href="/home/" aria-label="DOTAFS 首页">DOTAFS</a>
+          <p>Personal learning notes</p>
+        </div>
+        <nav class="next-menu" aria-label="主导航">
+          <a href="/home/"><span aria-hidden="true">⌂</span>首页</a>
+          <a href="/home/#articles"><span aria-hidden="true">▤</span>归档</a>
+          <a class="is-active" href="/learn-ai.html" aria-current="page"><span aria-hidden="true">◇</span>AI 学习</a>
+          <a href="/"><span aria-hidden="true">◈</span>PBF Demo</a>
+          <a href="https://github.com/dotafs2" target="_blank" rel="noreferrer"><span aria-hidden="true">↗</span>GitHub</a>
+        </nav>
       </div>
     </header>
 
-    <main id="lab-content">
+    <main id="lab-content" class="next-learning-main">
+      <header class="next-post-header next-learning-intro">
+        <h1 class="next-post-title">让一个小网络自己学会 XOR</h1>
+        <div class="next-post-meta">
+          <span>发表于 2026-08-13</span><span>神经网络入门</span><span>可交互实验</span>
+        </div>
+        <p>四条数据、十三个可学习参数、一个答案。训练时可以直接观察预测犯错、计算 Loss、修改权重，再在下一轮少错一点。</p>
+        <div class="next-learning-flow" aria-label="本实验与大模型的对应关系">
+          <span><b>输入</b>两个数字</span><i>→</i><span><b>参数</b>13 个旋钮</span><i>→</i><span><b>输出</b>0 到 1 的概率</span>
+        </div>
+      </header>
       <section class="lesson-nav" aria-label="学习步骤">
         <button class="lesson-step is-active" type="button" data-stage="data"><small>01</small><b>喂给数据</b><span>告诉它输入和正确答案</span></button>
         <button class="lesson-step" type="button" data-stage="forward"><small>02</small><b>向前计算</b><span>参数共同产生一次预测</span></button>
@@ -102,7 +110,7 @@
           <label class="rate-control" for="learning-rate">
             <span>② 学习率 <b id="rate-value">0.35</b></span>
             <small>每次修改参数的幅度</small>
-            <input id="learning-rate" type="range" min="0.05" max="0.9" step="0.05" value="0.35" />
+            <input id="learning-rate" name="learning-rate" type="range" min="0.05" max="0.9" step="0.05" value="0.35" autocomplete="off" />
           </label>
 
           <div class="training-actions">
@@ -160,8 +168,9 @@
       </section>
     </main>
 
-    <footer>
-      <span>小模型学习实验室</span>
+    <footer class="next-footer">
+      <span>© 2026 DOTAFS</span>
+      <span>界面基于 <a href="https://theme-next.js.org/" target="_blank" rel="noreferrer">NexT</a> 风格重构</span>
       <a href="#top">回到顶部 ↑</a>
     </footer>
 

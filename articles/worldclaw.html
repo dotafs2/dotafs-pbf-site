@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f4f7fa" />
+    <meta name="theme-color" content="#f5f7f9" />
     <meta name="description" content="WorldClaw 论文可视化简介：方法流程、与传统 PCG 的区别、实验结论和适用范围。" />
     <title>WorldClaw 论文图解 · 方法、对比与适用范围</title>
     <link rel="icon" href="data:," />
@@ -15,28 +15,35 @@
     <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
     <link rel="modulepreload" crossorigin href="/assets/three.module-Byxd6ypc.js">
     <link rel="stylesheet" crossorigin href="/assets/worldclawPaper-CiWr6VFa.css">
+    <link rel="stylesheet" href="/next-theme.css" />
   </head>
-  <body class="research-page worldclaw-page">
+  <body class="research-page worldclaw-page next-site next-article">
     <a class="skip-link" href="#content">跳到正文</a>
+    <div class="next-headband" aria-hidden="true"></div>
 
-    <header class="site-header">
-      <a class="site-brand" href="#top" aria-label="回到页面顶部">
-        <span>论文图解</span>
-        <b>WorldClaw</b>
-      </a>
-      <div class="site-meta" aria-label="论文信息">
-        <span>arXiv:2608.05248</span>
-        <time datetime="2026-08-05">2026-08-05</time>
-        <span>cs.AI · cs.CV</span>
-      </div>
-      <div class="header-actions">
-        <a href="/">返回游戏</a>
-        <a href="https://arxiv.org/abs/2608.05248" target="_blank" rel="noreferrer">原论文 ↗</a>
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column">
+          <a class="next-brand" href="/home/">DOTAFS</a>
+          <p>Personal learning notes</p>
+        </div>
+        <nav class="next-menu" aria-label="个人网站导航">
+          <a href="/home/">首页</a>
+          <a class="is-active" href="/home/#articles">归档</a>
+          <a href="/learn-ai.html">AI 学习</a>
+          <a href="/">PBF Demo</a>
+          <a href="https://arxiv.org/abs/2608.05248" target="_blank" rel="noreferrer">原论文</a>
+        </nav>
       </div>
     </header>
 
-    <div class="page-shell" id="top">
-      <aside class="toc" aria-label="文章目录">
+    <div class="page-shell next-page-layout" id="top">
+      <aside class="toc next-sidebar" aria-label="文章目录">
+        <div class="next-sidebar-profile">
+          <div class="next-avatar" aria-hidden="true">D</div>
+          <strong>DOTAFS</strong>
+          <a href="/home/">返回个人主页</a>
+        </div>
         <p>目录</p>
         <nav>
           <a href="#overview" class="is-current">概览</a>
@@ -53,7 +60,7 @@
         </div>
       </aside>
 
-      <main id="content">
+      <main id="content" class="next-main next-post-page">
         <section class="paper-intro" id="overview" aria-labelledby="page-title">
           <div class="intro-copy">
             <p class="section-label">可视化简介</p>
@@ -399,10 +406,9 @@
       </main>
     </div>
 
-    <footer class="site-footer">
-      <span>WorldClaw 论文图解</span>
-      <span>基于 arXiv:2608.05248v1</span>
-      <a href="#top">回到顶部 ↑</a>
+    <footer class="next-footer">
+      <p>© 2026 DOTAFS · WorldClaw Paper Note</p>
+      <p><a href="/home/#articles">返回学习笔记</a> · 界面结构基于 <a href="https://theme-next.js.org/" target="_blank" rel="noreferrer">NexT · Gemini</a></p>
     </footer>
 
   </body>
