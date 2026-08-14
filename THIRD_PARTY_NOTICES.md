@@ -33,3 +33,44 @@ from the upstream project at
 This adaptation was modified for DOTAFS on 2026-08-13. Corresponding source is
 published in the `dotafs2/dotafs-pbf-site` repository. The required NexT
 official-site attribution is retained in the footer of each adapted page.
+
+## World Models article figures
+
+The World Models learning note redistributes the following unmodified SVG
+figures from
+[`worldmodels/worldmodels.github.io`](https://github.com/worldmodels/worldmodels.github.io):
+
+- `articles/world-models-assets/world_model_overview.svg`
+- `articles/world-models-assets/vae.svg`
+- `articles/world-models-assets/mdn_rnn_new.svg`
+
+The figures are credited to David Ha and Jürgen Schmidhuber and are distributed
+under the Creative Commons Attribution 4.0 International license. A copy is
+included at `licenses/worldmodels-CC-BY-4.0.txt`.
+
+The figures are reproduced without modification. The DOTAFS article text,
+layout, charts, and interactive teaching examples are independently authored.
+
+## WorldClaw and NaLA paper figure excerpts
+
+The WorldClaw and NaLA learning notes include attributed figure excerpts from
+the authors' paper and project pages for research commentary and explanation:
+
+- `paper/worldclaw/terrain-stages.jpg`
+- `paper/worldclaw/scene-refinement.jpg`
+- `paper/nala/figure-3.png`
+- `paper/nala/figure-4.png`
+- `paper/nala/figure-6.png`
+- `paper/nala/figure-7.png`
+- `paper/nala/figure-9.png`
+
+Sources:
+
+- [WorldClaw project page](https://tencent-hunyuan.github.io/Hunyuan3D-WorldClaw/)
+- [WorldClaw paper](https://arxiv.org/abs/2608.05248)
+- [NaLA project page](https://adamcwan.github.io/NaLA/)
+- [NaLA paper](https://arxiv.org/abs/2606.29395)
+
+These excerpts remain credited to their respective authors. No open-content
+license is asserted for them. The surrounding article text, layout, tables,
+and interactive teaching examples are independently authored.

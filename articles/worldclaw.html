@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1b1d1f" />
-    <meta name="description" content="WorldClaw 论文可视化简介：方法流程、与传统 PCG 的区别、实验结论和适用范围。" />
-    <title>WorldClaw 论文图解 · 方法、对比与适用范围</title>
+    <meta name="description" content="WorldClaw 论文阅读笔记：研究问题、相关工作、全局到局部生成架构、地形与对象细节、实验比较和局限。" />
+    <title>WorldClaw：从问题到实验 · DOTAFS</title>
     <link rel="icon" href="data:," />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,6 +16,7 @@
     <link rel="modulepreload" crossorigin href="/assets/three.module-Byxd6ypc.js">
     <link rel="stylesheet" crossorigin href="/assets/worldclawPaper-CiWr6VFa.css">
     <link rel="stylesheet" href="/next-theme.css" />
+    <link rel="stylesheet" href="/articles/paper-longform.css" />
   </head>
   <body class="research-page worldclaw-page next-site next-article">
     <a class="skip-link" href="#content">跳到正文</a>
@@ -46,27 +47,28 @@
         </div>
         <p>目录</p>
         <nav>
-          <a href="#overview" class="is-current">概览</a>
-          <a href="#compare">与 PCG 的区别</a>
-          <a href="#pipeline">方法流程</a>
-          <a href="#terrain">地形模块</a>
-          <a href="#objects">对象生成</a>
-          <a href="#evidence">实验依据</a>
-          <a href="#scope">适用范围</a>
+          <a href="#overview" class="is-current">论文信息</a>
+          <a href="#problem">1. 研究问题</a>
+          <a href="#compare">2. 相关工作</a>
+          <a href="#pipeline">3. 总体架构</a>
+          <a href="#terrain">4. 地形生成</a>
+          <a href="#objects">5. 对象与精修</a>
+          <a href="#evidence">6. 实验比较</a>
+          <a href="#scope">7. 优势与局限</a>
         </nav>
         <div class="toc-note">
           <span>阅读时间</span>
-          <b>约 8 分钟</b>
+          <b>约 18 分钟</b>
         </div>
       </aside>
 
       <main id="content" class="next-main next-post-page">
         <section class="paper-intro" id="overview" aria-labelledby="page-title">
           <div class="intro-copy">
-            <p class="section-label">可视化简介</p>
+            <p class="section-label">PAPER NOTE · GUO ET AL. · 2026</p>
             <h1 id="page-title">WorldClaw</h1>
             <p class="paper-subtitle">Agentic 3D Open-World Generation at Scale</p>
-            <p class="intro-summary">一套从自然语言需求构建可编辑 3D 场景的离线流程。它使用传统 PCG 生成地形，再为重点区域生成独立的 3D 对象。</p>
+            <p class="intro-summary">它不尝试一次生成整张开放世界，而是先建立全局地形与区域语义，再只为需要细节的区域生成、放置和修正独立 3D 对象。</p>
             <div class="intro-actions">
               <a class="button primary" href="#compare">先看它与 PCG 的区别</a>
               <button class="button secondary" id="quick-summary" type="button">阅读简要结论</button>
@@ -114,11 +116,51 @@
           <p class="summary-limit">论文尚未报告量化指标、消融实验和平均生成时间，因此目前更适合将它理解为方法原型。</p>
         </aside>
 
+        <section class="lesson paper-reading" id="problem" aria-labelledby="problem-title">
+          <header class="lesson-header">
+            <div>
+              <p class="section-label">01 / RESEARCH QUESTION</p>
+              <h2 id="problem-title">他们真正想解决的是“可探索世界”，不是一张好看的图</h2>
+            </div>
+            <p>输入只有一句开放式描述，输出却要同时满足全局连贯、局部丰富、自由视角稳定和资产可编辑。</p>
+          </header>
+
+          <div class="paper-prose">
+            <p>图像或视频生成器可以给出漂亮视角，但镜头之外可能没有稳定几何；传统 PCG 能建立巨大、可复现的世界，却只能调用预先写好的规则和资产；单体 3D 生成器能做对象，却很难直接组织成连续的大场景。WorldClaw 试图把这些能力拆开，再由 Agent 连接起来。</p>
+            <p>论文的核心判断是：<strong>全局一致性与局部细节不必在同一个生成步骤里完成。</strong>先在整个世界上确定区域、地形和尺度，再把算力花在港口、营地、建筑群等真正需要细节的局部。</p>
+          </div>
+
+          <div class="abstract-grid" aria-label="WorldClaw 摘要拆解">
+            <div><span>问题</span><p>开放文本缺少地形参数、区域边界、对象数量和接触关系等施工信息。</p></div>
+            <div><span>全局</span><p>用结构化规划、语义布局图和 region-aware height field 建立连续地形。</p></div>
+            <div><span>局部</span><p>为选中区域生成 2D composition，再分割并重建成独立 textured meshes。</p></div>
+            <div><span>反馈</span><p>Agent 在 Blender 中 render–inspect–edit，修正比例、朝向、悬空和穿透。</p></div>
+          </div>
+
+          <h3>论文把已有路线分成四类</h3>
+          <div class="paper-table-wrap">
+            <table class="paper-data-table">
+              <thead><tr><th>路线</th><th>强项</th><th>主要缺口</th><th>WorldClaw 的处理</th></tr></thead>
+              <tbody>
+                <tr><td>Procedural Content Generation</td><td>可控、可复现、可扩展</td><td>内容受规则与生成器库限制</td><td>保留 PCG 做地形，让 Agent 自动编排参数和工具</td></tr>
+                <tr><td>Image / Video Lifting</td><td>视觉先验丰富</td><td>长距离和新视角几何容易漂移</td><td>图像只作为局部 composition，不作为最终场景表示</td></tr>
+                <tr><td>Native 3D Diffusion</td><td>直接生成几何，视角一致</td><td>受大规模 3D 数据稀缺影响</td><td>只在对象级调用 3D 生成，避免一次生成整个世界</td></tr>
+                <tr class="is-emphasis"><td>MLLM Agent</td><td>理解意图、规划和调用工具</td><td>精确尺度与 3D 空间控制不足</td><td>以结构化中间表示、相机几何和渲染反馈补足</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <aside class="paper-takeaway">
+            <span>先记住</span>
+            <p><code>Prompt → Plan P → Terrain T → Regional Objects O → Compose(T, O)</code>。论文的新意主要在这条全局到局部的生产管线，而不是单独发明一种噪声或 3D 重建算法。</p>
+          </aside>
+        </section>
+
         <section class="lesson" id="compare" aria-labelledby="compare-title">
           <header class="lesson-header">
             <div>
-              <p class="section-label">核心区别</p>
-              <h2 id="compare-title">WorldClaw 和传统 PCG 分别解决什么问题？</h2>
+              <p class="section-label">02 / RELATED WORK</p>
+              <h2 id="compare-title">它不是取代 PCG，而是在 PCG 之前增加理解与规划</h2>
             </div>
             <p>地形算法高度重合。区别主要出现在输入方式、内容覆盖和交付目标。</p>
           </header>
@@ -190,7 +232,7 @@
         <section class="lesson" id="pipeline" aria-labelledby="pipeline-title">
           <header class="lesson-header">
             <div>
-              <p class="section-label">方法流程</p>
+              <p class="section-label">03 / ARCHITECTURE</p>
               <h2 id="pipeline-title">从文字需求到可编辑场景</h2>
             </div>
             <p>选择一个示例，按顺序查看四个处理阶段。三维示意图支持拖动旋转与滚轮缩放。</p>
@@ -249,11 +291,16 @@
         <section class="lesson" id="terrain" aria-labelledby="terrain-title">
           <header class="lesson-header">
             <div>
-              <p class="section-label">地形模块</p>
+              <p class="section-label">04 / GLOBAL TERRAIN</p>
               <h2 id="terrain-title">区域感知高度场</h2>
             </div>
             <p>这部分属于传统 PCG。WorldClaw 的作用是根据文本规划生成区域图，并为各区域选择参数。</p>
           </header>
+
+          <figure class="paper-source-figure">
+            <div><img src="/paper/worldclaw/terrain-stages.jpg" width="1792" height="329" loading="lazy" alt="WorldClaw 论文中的地形生成、资产散布和地形精修流程" /></div>
+            <figcaption><b>论文 Fig. 2 的地形流程。</b>scene.yaml 与 layout map 驱动高度场，随后散布地形资产，再通过参数、材质和 skybox 迭代精修。来源：WorldClaw 项目页，仅用于论文解读。</figcaption>
+          </figure>
 
           <div class="terrain-lesson">
             <div class="terrain-explanation">
@@ -281,8 +328,8 @@
         <section class="lesson" id="objects" aria-labelledby="objects-title">
           <header class="lesson-header">
             <div>
-              <p class="section-label">对象生成</p>
-              <h2 id="objects-title">二维构图如何变成三维对象？</h2>
+              <p class="section-label">05 / REGIONAL OBJECTS</p>
+              <h2 id="objects-title">二维构图如何变成可编辑的三维对象？</h2>
             </div>
             <p>系统保留地形相机参数，使图像中的对象可以在重建后回到对应的三维位置。</p>
           </header>
@@ -304,13 +351,23 @@
               </div>
             </div>
           </div>
+
+          <div class="paper-prose paper-prose-after">
+            <p>Region composition 并不是最终几何，它是一个带地形与视角约束的二维布局先验。系统用 text-guided SAM3 找出每个实例，SAM3D 分别重建 Mesh，再通过两套相机射线把对象中心映射回地形表面。这样每个对象仍然保留独立 ID、Mesh、材质和变换。</p>
+            <p>单图重建会带来尺度误差，因此论文先在图像空间校准投影面积，再沿地形相机射线联合搜索深度和缩放，直到对象底部与地形达到足够的接触比例。</p>
+          </div>
+
+          <figure class="paper-source-figure">
+            <div><img src="/paper/worldclaw/scene-refinement.jpg" width="2048" height="375" loading="lazy" alt="WorldClaw 论文中的对象精修和地形接触精修流程" /></div>
+            <figcaption><b>论文 Fig. 3 的精修闭环。</b>对象先检查姿态、比例与 Mesh；随后检查悬空、穿透和支撑面，并局部协同修改对象与地形。来源：WorldClaw 项目页，仅用于论文解读。</figcaption>
+          </figure>
         </section>
 
         <section class="lesson" id="evidence" aria-labelledby="evidence-title">
           <header class="lesson-header">
             <div>
-              <p class="section-label">实验依据</p>
-              <h2 id="evidence-title">论文展示了什么，还缺少什么？</h2>
+              <p class="section-label">06 / EXPERIMENTS</p>
+              <h2 id="evidence-title">实验展示了什么，又没有证明什么？</h2>
             </div>
             <p>论文以视觉案例和定性比较为主，没有提供系统性的量化评测。</p>
           </header>
@@ -342,6 +399,25 @@
             </aside>
           </div>
 
+          <h3>与代表性方法的定性比较</h3>
+          <div class="paper-table-wrap">
+            <table class="paper-data-table method-result-table">
+              <thead><tr><th>方法</th><th>地形与区域</th><th>自由视角表示</th><th>对象可编辑性</th></tr></thead>
+              <tbody>
+                <tr><td>SynCity</td><td>块级生成，长距离组织较弱</td><td>持久 3D，但相邻块可能不一致</td><td>以场景级表示为主</td></tr>
+                <tr><td>Marble</td><td>单个视角丰富，区域组织不明确</td><td>远距离移动后几何质量下降</td><td>不暴露独立对象资产</td></tr>
+                <tr><td>MajutsuCity</td><td>城市布局强，地貌较规则</td><td>自由视角受城市网格影响</td><td>独立资产可控</td></tr>
+                <tr><td>WorldGen</td><td>可漫游但示例地形较平坦</td><td>显式 textured mesh，局部稳定</td><td>支持场景拆分与增强</td></tr>
+                <tr class="is-emphasis"><td>WorldClaw</td><td>连续全局地形 + 语义分区</td><td>地形与实例均为显式 Mesh</td><td>对象独立重建、放置和替换</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <aside class="paper-takeaway">
+            <span>证据强度</span>
+            <p>论文的视觉案例足以说明管线能够产出复杂世界，但没有量化指标、消融、平均耗时或成本，因此不能据此判断它在平均质量和生产效率上稳定领先。</p>
+          </aside>
+
           <div class="limitations">
             <h3>作者列出的主要限制</h3>
             <dl>
@@ -355,8 +431,8 @@
         <section class="lesson" id="scope" aria-labelledby="scope-title">
           <header class="lesson-header">
             <div>
-              <p class="section-label">适用范围</p>
-              <h2 id="scope-title">什么时候考虑 WorldClaw？</h2>
+              <p class="section-label">07 / ADVANTAGES &amp; LIMITS</p>
+              <h2 id="scope-title">它的优势来自分工，代价也来自长链路</h2>
             </div>
             <p>它与成熟 PCG 不是替代关系，两者适合的生产任务不同。</p>
           </header>
@@ -384,6 +460,13 @@
             </article>
           </div>
 
+          <div class="advantage-list">
+            <article><span>01</span><h3>全局与局部分离</h3><p>先锁定地形尺度和区域关系，局部生成不会轻易破坏整个世界的组织。</p></article>
+            <article><span>02</span><h3>中间表示可检查</h3><p>规划、布局图、高度场、实例 Mask、Mesh 和诊断渲染都能单独审阅。</p></article>
+            <article><span>03</span><h3>显式资产可编辑</h3><p>结果不是只能观看的神经场；地形和对象可以继续进 Blender 或游戏引擎修改。</p></article>
+            <article><span>04</span><h3>可替换底层工具</h3><p>规划、图像生成、分割、单图 3D 和精修模块通过结构化接口协作。</p></article>
+          </div>
+
           <div class="project-notes">
             <h3>对当前项目可借鉴的设计</h3>
             <ol>
@@ -399,6 +482,7 @@
           <h2 id="references-title">参考资料</h2>
           <ol>
             <li><a href="https://arxiv.org/html/2608.05248v1" target="_blank" rel="noreferrer">WorldClaw: Agentic 3D Open-World Generation at Scale ↗</a><span>论文 HTML 全文</span></li>
+            <li><a href="https://tencent-hunyuan.github.io/Hunyuan3D-WorldClaw/" target="_blank" rel="noreferrer">WorldClaw Project Page ↗</a><span>原始案例、视频与论文图</span></li>
             <li><a href="https://arxiv.org/abs/2306.09310" target="_blank" rel="noreferrer">Infinite Photorealistic Worlds using Procedural Generation ↗</a><span>Infinigen 论文</span></li>
             <li><a href="https://feedback.minecraft.net/hc/en-us/articles/47424728811149-Minecraft-Java-Edition-26-3-Snapshot-4" target="_blank" rel="noreferrer">Minecraft Java Edition — World Generation ↗</a><span>官方世界生成更新说明</span></li>
           </ol>

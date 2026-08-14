@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1b1d1f" />
+    <meta name="description" content="World Models 论文阅读笔记：研究问题、V-M-C 架构、CarRacing 与 VizDoom 实验、相关工作比较及 PBD 延伸。" />
+    <title>World Models：从问题到实验 · DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <script src="world-models.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page">
+    <a class="skip-link" href="#content">跳到正文</a>
+    <div class="next-headband" aria-hidden="true"></div>
+
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column">
+          <a class="next-brand" href="/home/">DOTAFS</a>
+          <p>Personal learning notes</p>
+        </div>
+        <nav class="next-menu" aria-label="个人网站导航">
+          <a href="/home/">首页</a>
+          <a class="is-active" href="/home/#articles">归档</a>
+          <a href="/learn-ai.html">AI 学习</a>
+          <a href="/">PBF Demo</a>
+          <a href="https://worldmodels.github.io/" target="_blank" rel="noreferrer">原文</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="next-page-layout wm-layout" id="top">
+      <main id="content" class="next-main wm-main">
+        <article>
+          <header class="wm-intro" id="overview">
+            <p class="wm-kicker">PAPER NOTE · HA &amp; SCHMIDHUBER · 2018</p>
+            <h1>World Models</h1>
+            <p class="wm-deck">一篇把“看见、预测、行动”拆开的模型式强化学习论文。重点不只是生成未来画面，而是让很小的策略网络在学到的内部环境中训练，再回到真实环境执行。</p>
+            <dl class="paper-meta">
+              <div><dt>任务</dt><dd>CarRacing-v0 / VizDoom Take Cover</dd></div>
+              <div><dt>输入</dt><dd>连续 RGB 帧与动作</dd></div>
+              <div><dt>核心</dt><dd>VAE + MDN-RNN + Linear Controller</dd></div>
+              <div><dt>阅读顺序</dt><dd>问题 → 架构 → 细节 → 实验 → 比较</dd></div>
+            </dl>
+          </header>
+
+          <section class="paper-section" id="problem" aria-labelledby="problem-title">
+            <header class="section-heading">
+              <span>01 / RESEARCH QUESTION</span>
+              <h2 id="problem-title">他们想解决什么问题？</h2>
+            </header>
+
+            <div class="prose">
+              <p>如果一个 Agent 直接从像素学习动作，它同时要完成三件困难的事：从画面里找出有用结构、理解动作会造成什么后果、再把长期奖励反向归因到当前动作。传统 model-free 深度强化学习把这三件事塞进同一个策略网络，能工作，但通常需要大量真实交互，而且很难知道网络到底学到了什么。</p>
+              <p>World Models 的问题更具体：<strong>能否先用无监督学习得到一个压缩的、带时间变化的内部世界，再只训练一个很小的控制器？</strong>如果内部世界足够可信，控制器甚至可以暂时不接触真实环境，只在模型生成的 Dream 中试错。</p>
+            </div>
+
+            <div class="abstract-block" aria-label="论文摘要的中文拆解">
+              <div>
+                <span>输入</span>
+                <p>高维像素序列、Agent 执行过的动作，以及环境是否结束。</p>
+              </div>
+              <div>
+                <span>学习</span>
+                <p>先压缩每一帧的空间结构，再预测隐状态随动作变化的概率分布。</p>
+              </div>
+              <div>
+                <span>控制</span>
+                <p>让小型 Controller 只读取当前隐状态和循环网络记忆，输出动作。</p>
+              </div>
+              <div>
+                <span>验证</span>
+                <p>在赛车中直接控制，在 Doom 中完全于 Dream 训练后迁回真实游戏。</p>
+              </div>
+            </div>
+
+            <blockquote>
+              <p>“Can agents learn inside of their own dreams?”</p>
+              <cite>World Models 原始交互文章提出的问题</cite>
+            </blockquote>
+
+            <h3>它与之前工作的关系</h3>
+            <p class="prose">这不是第一个 model-based RL，也不是第一个学习潜空间的模型。它真正特殊的地方，是把高维视觉、随机未来和“在模型里训练策略”组合成一条非常清楚的工程管线。</p>
+
+            <div class="table-wrap">
+              <table class="paper-table comparison-table">
+                <thead>
+                  <tr><th>路线</th><th>环境表示</th><th>优势</th><th>当时的主要限制</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Model-free RL</td><td>不显式学习动力学</td><td>省去模拟器误差问题</td><td>真实采样需求高；表征、记忆、策略纠缠在一起</td></tr>
+                  <tr><td>PILCO / Gaussian Process</td><td>带不确定性的显式动力学</td><td>低维连续控制中样本效率很高</td><td>高维像素和大数据下较难扩展</td></tr>
+                  <tr><td>潜空间动力学</td><td>先压缩，再预测 latent state</td><td>预测比直接生成像素便宜</td><td>不少方法仍要在真实环境中完成策略训练或微调</td></tr>
+                  <tr class="is-emphasis"><td>World Models</td><td>VAE 的 z + RNN 的 h</td><td>原始 RGB 输入；随机未来；Controller 可在 Dream 中训练</td><td>策略会利用模型漏洞；性能受内部世界质量限制</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>先记住</span>
+              <p>它不是“一个大网络直接输出动作”，而是三个职责分离的模块：<code>V</code> 负责看，<code>M</code> 负责想象后果，<code>C</code> 负责选动作。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="architecture" aria-labelledby="architecture-title">
+            <header class="section-heading">
+              <span>02 / ARCHITECTURE</span>
+              <h2 id="architecture-title">先看全局：V、M、C 怎样组成一个闭环</h2>
+            </header>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface">
+                <img src="world-models-assets/world_model_overview.svg" alt="World Models 原文中的 VAE、MDN-RNN 与 Controller 总览图" />
+              </div>
+              <figcaption><b>原文总览图。</b>画面先进入 V，隐状态与动作进入 M，C 同时读取 z 与 h。原图：Ha &amp; Schmidhuber，CC BY 4.0。</figcaption>
+            </figure>
+
+            <div class="vmc-map" aria-label="World Models 的 V、M、C 三部分，点击查看每部分的输入与输出">
+              <button class="vmc-node is-active" type="button" data-concept="vision" aria-pressed="true">
+                <span>V</span><b>看见</b><small>frame → z</small>
+              </button>
+              <i aria-hidden="true">→</i>
+              <button class="vmc-node" type="button" data-concept="memory" aria-pressed="false">
+                <span>M</span><b>预测</b><small>z + action → future</small>
+              </button>
+              <i aria-hidden="true">→</i>
+              <button class="vmc-node" type="button" data-concept="controller" aria-pressed="false">
+                <span>C</span><b>行动</b><small>z + memory → action</small>
+              </button>
+              <div class="vmc-readout" aria-live="polite">
+                <span id="concept-label">VISION / VAE</span>
+                <p id="concept-copy">一帧有上万个像素；V 把它压成较短的隐向量 z，只留下对任务有用的结构。</p>
+              </div>
+            </div>
+
+            <ol class="training-sequence">
+              <li><span>数据</span><p>用随机策略在真实环境跑轨迹，保存 <code>(frame, action, next frame)</code>。赛车实验采集了 10,000 条 rollout。</p></li>
+              <li><span>空间</span><p>单独训练 VAE，使每帧 64 × 64 RGB 图像变成短向量 <code>z</code>。</p></li>
+              <li><span>时间</span><p>固定 VAE 后训练 MDN-RNN，学习 <code>p(zₜ₊₁ | zₜ, aₜ, hₜ)</code>。</p></li>
+              <li><span>策略</span><p>固定 V 与 M，只优化 Controller。论文用 CMA-ES，不依赖策略梯度。</p></li>
+              <li><span>部署</span><p>C 在每一帧读取 <code>[zₜ, hₜ]</code> 并输出动作；Doom 实验把同一个 C 从 Dream 直接迁回游戏。</p></li>
+            </ol>
+          </section>
+
+          <section class="paper-section" id="details" aria-labelledby="details-title">
+            <header class="section-heading">
+              <span>03 / FROM SHALLOW TO DEEP</span>
+              <h2 id="details-title">三个模块具体学了什么</h2>
+            </header>
+
+            <section class="module-section" id="vision" aria-labelledby="vision-title">
+              <header class="module-heading">
+                <span>V / VISION</span>
+                <div><h3 id="vision-title">VAE：把像素换成可预测的状态</h3><p>它追求的不是完美还原，而是保留控制任务需要的结构。</p></div>
+              </header>
+
+              <div class="module-summary">
+                <p>输入一张 <code>64 × 64 × 3</code> 的图，Encoder 输出高斯分布的均值和方差，从中采样 latent vector <code>z</code>，Decoder 再尝试重建原图。CarRacing 使用 32 维 z，VizDoom 使用 64 维 z。</p>
+                <dl>
+                  <div><dt>结构</dt><dd>4 层卷积 + 4 层反卷积，stride 2</dd></div>
+                  <div><dt>损失</dt><dd>重建误差 + KL divergence</dd></div>
+                  <div><dt>训练</dt><dd>独立训练 1 epoch</dd></div>
+                </dl>
+              </div>
+
+              <figure class="source-figure">
+                <div class="source-figure-surface">
+                  <img src="world-models-assets/vae.svg" alt="原论文的 VAE 编码和解码流程图，包含输入、隐变量与重建画面" />
+                </div>
+                <figcaption><b>原文 VAE 图。</b>左右是真实与重建画面，中间是采样得到的 z。原图：Ha &amp; Schmidhuber，CC BY 4.0。</figcaption>
+              </figure>
+
+              <div class="interactive-block">
+                <div class="interactive-heading"><span>可操作例子</span><p>拖动四个教学用隐变量，比较原始观察与有损重建。</p></div>
+                <div class="vae-lab">
+                  <figure class="canvas-panel">
+                    <figcaption><span>OBSERVATION</span><b>原始画面</b><small>64 × 64 × RGB</small></figcaption>
+                    <canvas id="vision-source" width="520" height="320" role="img" aria-label="赛车环境原始观察画面"></canvas>
+                  </figure>
+                  <div class="compressor" aria-label="画面被压缩成 32 维隐变量">
+                    <span>ENCODE</span><i aria-hidden="true">→</i><b>z ∈ ℝ<sup>32</sup></b>
+                    <div class="latent-cells" id="latent-cells" aria-hidden="true"></div>
+                    <i aria-hidden="true">→</i><span>DECODE</span>
+                  </div>
+                  <figure class="canvas-panel">
+                    <figcaption><span>RECONSTRUCTION</span><b>从 z 重建</b><small>细节会丢失</small></figcaption>
+                    <canvas id="vision-reconstruction" width="520" height="320" role="img" aria-label="由隐变量重建的赛车观察画面"></canvas>
+                  </figure>
+                </div>
+                <div class="latent-controls">
+                  <label>z[0] <output data-latent-output="0">0.15</output><input data-latent="0" type="range" min="-1" max="1" step="0.05" value="0.15" /></label>
+                  <label>z[1] <output data-latent-output="1">-0.10</output><input data-latent="1" type="range" min="-1" max="1" step="0.05" value="-0.10" /></label>
+                  <label>z[2] <output data-latent-output="2">0.25</output><input data-latent="2" type="range" min="-1" max="1" step="0.05" value="0.25" /></label>
+                  <label>z[3] <output data-latent-output="3">0.05</output><input data-latent="3" type="range" min="-1" max="1" step="0.05" value="0.05" /></label>
+                  <button id="randomize-latent" type="button">换一个 z</button>
+                </div>
+                <p class="visual-note"><b>不要把每一维硬解释成语义。</b>真实 VAE 的 latent 往往是分布式表征。这里让四维分别影响弯度、车位、地平线和路宽，只是为了看清“短向量能够控制重建结构”。</p>
+              </div>
+            </section>
+
+            <section class="module-section" id="memory" aria-labelledby="memory-title">
+              <header class="module-heading">
+                <span>M / MEMORY</span>
+                <div><h3 id="memory-title">MDN-RNN：预测的不是唯一未来，而是一组可能</h3><p>动作相同，下一状态仍可能不同；概率分布比单点回归更合适。</p></div>
+              </header>
+
+              <div class="module-summary">
+                <p>RNN 读取当前的 <code>zₜ</code>、动作 <code>aₜ</code> 与记忆 <code>hₜ</code>，输出下一隐状态的 mixture density。论文使用 5 个高斯混合分量；CarRacing 的 LSTM 有 256 个 hidden units，Doom 有 512 个，并额外预测死亡/结束信号。</p>
+                <dl>
+                  <div><dt>输出</dt><dd>5-component Gaussian mixture</dd></div>
+                  <div><dt>意义</dt><dd>表达未来的多峰与不确定性</dd></div>
+                  <div><dt>训练</dt><dd>固定 V 后训练 20 epochs</dd></div>
+                </dl>
+              </div>
+
+              <figure class="source-figure source-figure-compact">
+                <div class="source-figure-surface">
+                  <img src="world-models-assets/mdn_rnn_new.svg" alt="原论文 MDN-RNN 输入 z、动作、记忆并预测下一 latent distribution 的图" />
+                </div>
+                <figcaption><b>原文 MDN-RNN 图。</b>RNN 并不直接输出“下一张确定图片”，而是输出下一 z 的分布参数。原图：Ha &amp; Schmidhuber，CC BY 4.0。</figcaption>
+              </figure>
+
+              <div class="interactive-block">
+                <div class="interactive-heading"><span>可操作例子</span><p>选择动作并调节温度 τ，观察采样未来如何分叉。</p></div>
+                <div class="prediction-lab">
+                  <div class="prediction-controls">
+                    <div class="action-group" role="group" aria-label="选择当前动作">
+                      <button type="button" data-predict-action="-1" aria-pressed="false">← 向左</button>
+                      <button class="is-active" type="button" data-predict-action="0" aria-pressed="true">↑ 直行</button>
+                      <button type="button" data-predict-action="1" aria-pressed="false">向右 →</button>
+                    </div>
+                    <label>温度 τ <output id="prediction-temperature-value">0.25</output><input id="prediction-temperature" type="range" min="0" max="1" step="0.05" value="0.25" /></label>
+                  </div>
+                  <figure class="prediction-stage">
+                    <figcaption><span>CURRENT z<sub>t</sub></span><b id="prediction-caption">直行时，未来样本集中在道路中央</b><span>P(z<sub>t+1</sub> | a<sub>t</sub>, z<sub>t</sub>, h<sub>t</sub>)</span></figcaption>
+                    <canvas id="prediction-canvas" width="980" height="430" role="img" aria-label="给定动作和温度后的多条未来轨迹预测"></canvas>
+                  </figure>
+                  <div class="state-strips">
+                    <div><span>当前画面 z<sub>t</sub></span><div id="z-strip" class="state-strip" aria-hidden="true"></div></div>
+                    <i aria-hidden="true">+</i>
+                    <div><span>历史记忆 h<sub>t</sub></span><div id="h-strip" class="state-strip" aria-hidden="true"></div></div>
+                    <i aria-hidden="true">+</i>
+                    <div><span>动作 a<sub>t</sub></span><b id="action-token">STRAIGHT</b></div>
+                  </div>
+                </div>
+                <p class="visual-note"><b>温度不是简单的“噪声大小”。</b>它控制采样分布的尖锐程度：太低会生成过于容易、可被利用的世界；适度提高能逼 Controller 学到更稳健的策略。</p>
+              </div>
+            </section>
+
+            <section class="module-section" id="controller" aria-labelledby="controller-title">
+              <header class="module-heading">
+                <span>C / CONTROLLER</span>
+                <div><h3 id="controller-title">Controller：把复杂性留在世界模型里</h3><p>理解世界的网络很大，真正做决定的网络可以很小。</p></div>
+              </header>
+
+              <div class="module-summary">
+                <p>Controller 只接收 <code>[zₜ, hₜ]</code>，经一个线性层输出动作，再用 <code>tanh</code> 限制范围。CarRacing 的 C 只有 867 个参数，Doom 为 1,088 个。论文使用 CMA-ES 在参数空间搜索策略，因此 V 与 M 在此阶段都保持冻结。</p>
+                <dl>
+                  <div><dt>CarRacing</dt><dd>steering / gas / brake</dd></div>
+                  <div><dt>VizDoom</dt><dd>left / stay / right</dd></div>
+                  <div><dt>优化</dt><dd>CMA-ES evolution strategy</dd></div>
+                </dl>
+              </div>
+
+              <div class="interactive-block">
+                <div class="interactive-heading"><span>可操作例子</span><p>换一个弯道，查看线性策略根据 z 与 h 的组合选出动作。</p></div>
+                <div class="controller-lab">
+                  <figure class="controller-scene">
+                    <figcaption><span>z<sub>t</sub> + h<sub>t</sub></span><b id="curve-label">前方道路向右弯</b></figcaption>
+                    <canvas id="controller-canvas" width="600" height="380" role="img" aria-label="当前弯道和赛车控制结果"></canvas>
+                  </figure>
+                  <div class="controller-compute">
+                    <div class="controller-inputs"><span>INPUT FEATURES</span><div id="controller-input-bars" aria-label="控制器输入特征条"></div></div>
+                    <div class="weight-matrix" aria-hidden="true"><span>W<sub>c</sub></span><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="action-scores" aria-live="polite">
+                      <span>OUTPUT ACTION</span>
+                      <div><b>LEFT</b><i><em id="score-left"></em></i><output id="value-left">0.00</output></div>
+                      <div><b>STRAIGHT</b><i><em id="score-straight"></em></i><output id="value-straight">0.00</output></div>
+                      <div><b>RIGHT</b><i><em id="score-right"></em></i><output id="value-right">0.00</output></div>
+                    </div>
+                  </div>
+                  <div class="controller-actions">
+                    <button id="new-curve" type="button">换一个弯道</button>
+                    <button id="run-controller" type="button">让 C 决定</button>
+                    <p id="controller-result">C 还没有输出动作。</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </section>
+
+          <section class="paper-section" id="experiments" aria-labelledby="experiments-title">
+            <header class="section-heading">
+              <span>04 / EXPERIMENTS</span>
+              <h2 id="experiments-title">实验真正证明了什么</h2>
+            </header>
+
+            <section class="experiment" id="carracing">
+              <header><span>EXPERIMENT A</span><h3>CarRacing：记忆 h 是否真的有用？</h3></header>
+              <div class="prose">
+                <p>这个任务每次随机生成赛道，官方“解决”标准是连续 100 次平均分达到 900。只靠当前帧的 z，车能开，但遇到急弯会摇摆和出界；加入 M 的 hidden state 后，Controller 能使用最近的时间信息判断道路如何变化。</p>
+              </div>
+
+              <div class="result-bars" role="img" aria-label="CarRacing 平均得分比较：A3C continuous 591，A3C discrete 652，V only 632，V plus hidden controller 788，leaderboard 838，World Models V plus M 906">
+                <div class="result-scale"><span>0</span><span>CarRacing 平均分 / 1000</span><span>1000</span></div>
+                <div><span>A3C continuous</span><i><em style="width:59.1%"></em></i><b>591 ± 45</b></div>
+                <div><span>V only</span><i><em style="width:63.2%"></em></i><b>632 ± 251</b></div>
+                <div><span>A3C discrete</span><i><em style="width:65.2%"></em></i><b>652 ± 10</b></div>
+                <div><span>V + hidden layer C</span><i><em style="width:78.8%"></em></i><b>788 ± 141</b></div>
+                <div><span>当时 leaderboard</span><i><em style="width:83.8%"></em></i><b>838 ± 11</b></div>
+                <div class="is-best"><span>World Models · V + M</span><i><em style="width:90.6%"></em></i><b>906 ± 21</b></div>
+                <div class="solve-line" aria-hidden="true"><span>SOLVE = 900</span></div>
+              </div>
+
+              <div class="evidence-grid">
+                <div><span>对照变量</span><p>C 的输入是否包含 M 的 hidden state。</p></div>
+                <div><span>结果</span><p><code>z only</code> 为 632；增加一层隐藏层也只有 788；<code>z + h</code> 达到 906。</p></div>
+                <div><span>解释</span><p>单帧告诉车“现在在哪里”，时间记忆帮助它判断“赛道正在怎样弯”。</p></div>
+              </div>
+            </section>
+
+            <section class="experiment" id="dream">
+              <header><span>EXPERIMENT B</span><h3>VizDoom：能否完全在 Dream 中训练？</h3></header>
+              <div class="prose">
+                <p>Agent 需要左右躲避火球，得分是生存时间。作者先用真实轨迹训练 V 和 M，然后让 C 只与 MDN-RNN 生成的环境交互。最后把 C 原样放回 VizDoom，不再微调。</p>
+              </div>
+
+              <div class="dream-lab">
+                <div class="dream-steps" role="group" aria-label="Dream 训练的五个步骤">
+                  <button class="is-active" type="button" data-dream-step="0" aria-pressed="true"><span>1</span>采集</button>
+                  <button type="button" data-dream-step="1" aria-pressed="false"><span>2</span>压缩</button>
+                  <button type="button" data-dream-step="2" aria-pressed="false"><span>3</span>预测</button>
+                  <button type="button" data-dream-step="3" aria-pressed="false"><span>4</span>梦中训练</button>
+                  <button type="button" data-dream-step="4" aria-pressed="false"><span>5</span>回到现实</button>
+                </div>
+                <div class="dream-stage" aria-live="polite">
+                  <div class="environment-window real-window"><span>REAL ENVIRONMENT</span><div class="doom-room"><i class="agent-dot"></i><i class="fireball one"></i><i class="fireball two"></i></div></div>
+                  <div class="transfer-arrow"><b id="dream-arrow">→</b><small id="dream-transfer">frames + actions</small></div>
+                  <div class="environment-window model-window"><span>WORLD MODEL</span><div class="latent-room"><i></i><i></i><i></i><i></i><i></i><i></i><b>M</b></div></div>
+                  <div class="dream-explanation">
+                    <span id="dream-step-label">STEP 1 / COLLECT</span>
+                    <h3 id="dream-step-title">先在真实环境中随机探索</h3>
+                    <p id="dream-step-copy">保存每一步的画面和动作，让模型看到“做了什么”以及“接下来发生了什么”。</p>
+                    <button id="next-dream-step" type="button">下一步</button>
+                  </div>
+                </div>
+              </div>
+
+              <h3>为什么温度 τ 决定能不能迁回现实</h3>
+              <p class="prose">低温 Dream 很稳定，也很容易被 Controller 找到漏洞：它在虚拟环境中活得很久，回到真实 Doom 却立刻失败。温度提高后，世界模型生成更难、更分散的未来，虚拟分数下降，真实分数反而上升。最佳真实迁移出现在 τ = 1.15。</p>
+
+              <div class="temperature-chart">
+                <div class="chart-legend"><span><i></i>Dream 得分</span><span><i></i>真实 Doom 得分</span></div>
+                <svg viewBox="0 0 760 330" role="img" aria-labelledby="temperature-chart-title temperature-chart-desc">
+                  <title id="temperature-chart-title">不同温度下的 Dream 与真实 Doom 平均生存得分</title>
+                  <desc id="temperature-chart-desc">温度从 0.1 增加到 1.3 时，Dream 得分下降，真实 Doom 得分先上升后下降，1.15 时最高。</desc>
+                  <g class="grid">
+                    <line x1="78" y1="274" x2="720" y2="274"/><line x1="78" y1="214" x2="720" y2="214"/>
+                    <line x1="78" y1="154" x2="720" y2="154"/><line x1="78" y1="94" x2="720" y2="94"/><line x1="78" y1="34" x2="720" y2="34"/>
+                  </g>
+                  <g class="axis-labels">
+                    <text x="62" y="279">0</text><text x="42" y="219">500</text><text x="34" y="159">1000</text><text x="34" y="99">1500</text><text x="34" y="39">2000</text>
+                    <text x="95" y="307">0.10</text><text x="237" y="307">0.50</text><text x="379" y="307">1.00</text><text x="521" y="307">1.15</text><text x="663" y="307">1.30</text>
+                    <text x="371" y="327">temperature τ</text>
+                  </g>
+                  <polyline class="dream-series" points="112,24 254,27 396,137 538,164 680,186"/>
+                  <polyline class="real-series" points="112,251 254,250 396,170 538,143 680,184"/>
+                  <g class="dream-points"><circle cx="112" cy="24" r="5"/><circle cx="254" cy="27" r="5"/><circle cx="396" cy="137" r="5"/><circle cx="538" cy="164" r="5"/><circle cx="680" cy="186" r="5"/></g>
+                  <g class="real-points"><rect x="107" y="246" width="10" height="10"/><rect x="249" y="245" width="10" height="10"/><rect x="391" y="165" width="10" height="10"/><rect x="533" y="138" width="10" height="10"/><rect x="675" y="179" width="10" height="10"/></g>
+                  <text class="peak-label" x="550" y="130">真实环境 1092 ± 556</text>
+                </svg>
+              </div>
+
+              <div class="table-wrap">
+                <table class="paper-table score-table">
+                  <thead><tr><th>τ</th><th>Dream</th><th>真实 Doom</th><th>读法</th></tr></thead>
+                  <tbody>
+                    <tr><td>0.10</td><td>2086 ± 140</td><td>193 ± 58</td><td>梦太容易，策略几乎不能迁移</td></tr>
+                    <tr><td>0.50</td><td>2060 ± 277</td><td>196 ± 50</td><td>仍在利用模型的确定性</td></tr>
+                    <tr><td>1.00</td><td>1145 ± 690</td><td>868 ± 511</td><td>现实性能开始超过基准</td></tr>
+                    <tr class="is-emphasis"><td>1.15</td><td>918 ± 546</td><td>1092 ± 556</td><td>最好的真实迁移</td></tr>
+                    <tr><td>1.30</td><td>732 ± 269</td><td>753 ± 139</td><td>世界过难，训练收益下降</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+
+          <section class="paper-section" id="comparison" aria-labelledby="comparison-title">
+            <header class="section-heading">
+              <span>05 / ADVANTAGES &amp; LIMITS</span>
+              <h2 id="comparison-title">它比其他方法好在哪里，又缺了什么</h2>
+            </header>
+
+            <div class="advantage-list">
+              <article><span>01</span><h3>职责分离</h3><p>V 与 M 用无监督目标学习世界，C 只面对低维决策问题。每个模块可以单独训练、替换和检查。</p></article>
+              <article><span>02</span><h3>在 latent space 模拟</h3><p>预测 32 或 64 维 z 比预测每个 RGB 像素便宜，也更容易让 RNN 关注与控制有关的变化。</p></article>
+              <article><span>03</span><h3>Controller 很小</h3><p>把容量放进世界模型后，策略仅有约千个参数，CMA-ES 就能搜索，不需要再端到端反向传播。</p></article>
+              <article><span>04</span><h3>显式处理不确定性</h3><p>MDN 输出分布，温度还能调整 Dream 的难度。Doom 实验证明“不确定性”直接影响 sim-to-real。</p></article>
+            </div>
+
+            <div class="table-wrap">
+              <table class="paper-table method-table">
+                <thead><tr><th>比较维度</th><th>Model-free</th><th>PILCO 一类</th><th>World Models</th></tr></thead>
+                <tbody>
+                  <tr><td>输入尺度</td><td>可直接接像素，但样本昂贵</td><td>更适合低维状态</td><td>先把像素压成 z</td></tr>
+                  <tr><td>动力学</td><td>不显式建模</td><td>概率模型，重视 uncertainty</td><td>MDN-RNN 的 latent distribution</td></tr>
+                  <tr><td>策略训练位置</td><td>真实/官方模拟环境</td><td>模型与真实数据循环</td><td>可完全在 Dream 中</td></tr>
+                  <tr><td>可检查性</td><td>策略内部较难拆解</td><td>模型不确定性可分析</td><td>重建、rollout、C 可分别观察</td></tr>
+                  <tr><td>主要失败方式</td><td>样本不足或奖励设计错误</td><td>扩展性和模型偏差</td><td>Controller 利用 Dream 漏洞</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>论文自己承认的限制</h3>
+            <ul class="limits-list">
+              <li><b>模型漏洞。</b>Controller 会主动搜索能得高分的状态，一旦进入训练数据之外的区域，M 的错误会被放大。</li>
+              <li><b>容量与遗忘。</b>一个有限 RNN 很难长期记住复杂世界；新经验也可能覆盖旧动态。</li>
+              <li><b>逐帧预测不等于规划。</b>M 会生成下一个状态，但论文没有显式的层级目标、搜索树或长期规划器。</li>
+              <li><b>压缩会丢物理细节。</b>视觉上不重要的细节，可能恰好决定碰撞、接触或稳定性。</li>
+            </ul>
+
+            <div class="paper-takeaway">
+              <span>我的判断</span>
+              <p>World Models 最重要的贡献不是某个单独网络，而是一个非常清楚的接口设计：<code>pixels → z → probabilistic dynamics → small policy</code>。后来的 latent dynamics、Dreamer 系列和很多 learned simulator 都沿着这条思想继续推进。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="pbd" aria-labelledby="pbd-title">
+            <header class="section-heading">
+              <span>06 / EXTENSION</span>
+              <h2 id="pbd-title">把这个思路换成 PBD，会发生什么</h2>
+            </header>
+
+            <div class="prose">
+              <p>如果观察不再是赛车画面，而是布料粒子的 <code>x</code>、<code>v</code> 和约束状态，V 可以省略或换成图网络 Encoder；M 学习“当前粒子状态 + 外力/抓取动作 → 下一状态”；C 则选择抓取点、目标位移或 solver 参数。</p>
+              <p>这和判断“它是不是布料”不是同一个问题。分类器回答材料类别，World Model 回答动作之后状态怎样变化。对 PBD 来说，后者更像代理求解器或加速器，但必须额外检查约束误差、穿透、能量和长 rollout 稳定性。</p>
+            </div>
+
+            <div class="solver-pipeline" aria-label="从 PBD solver 采集轨迹并训练学习模型的流程">
+              <div><span>GROUND TRUTH</span><b>PBD solver</b><small>x, v, constraints</small></div><i>→</i>
+              <div><span>DATA</span><b>trajectory</b><small>(s<sub>t</sub>, a<sub>t</sub>, s<sub>t+1</sub>)</small></div><i>→</i>
+              <div><span>LEARN</span><b>M<sub>θ</sub></b><small>predict next state</small></div><i>→</i>
+              <div><span>ROLLOUT</span><b>Dream</b><small>fast approximation</small></div>
+            </div>
+
+            <div class="cloth-lab interactive-block">
+              <div class="interactive-heading"><span>可操作例子</span><p>左右分别是显式约束求解与带小误差的学习模型；连续推进后比较误差累积。</p></div>
+              <div class="cloth-controls">
+                <div role="group" aria-label="选择对布料施加的动作">
+                  <button class="is-active" type="button" data-cloth-action="gravity" aria-pressed="true">重力</button>
+                  <button type="button" data-cloth-action="pull" aria-pressed="false">向右拉</button>
+                  <button type="button" data-cloth-action="lift" aria-pressed="false">向上提</button>
+                </div>
+                <div><button id="step-cloth" type="button">前进一步</button><button id="reset-cloth" type="button">重置</button></div>
+              </div>
+              <div class="cloth-canvases">
+                <figure><figcaption><span>REAL</span><b>显式约束求解</b></figcaption><canvas id="real-cloth" width="620" height="360" role="img" aria-label="PBD 求解得到的布料状态"></canvas></figure>
+                <figure><figcaption><span>MODEL</span><b>学习模型预测</b></figcaption><canvas id="dream-cloth" width="620" height="360" role="img" aria-label="学习模型预测的布料状态"></canvas></figure>
+              </div>
+              <div class="cloth-readout" aria-live="polite"><span>STEP <b id="cloth-step">0</b></span><span>平均位置误差 <b id="cloth-error">0.00 px</b></span><p id="cloth-message">两边从完全相同的状态开始。</p></div>
+              <p class="visual-note"><b>观察重点：</b>单步误差很小不代表 rollout 稳定。训练时最好同时记录 stretch/bend constraint violation、碰撞穿透和能量漂移，而不只比较位置 MSE。</p>
+            </div>
+          </section>
+
+          <footer class="wm-reference" id="reference">
+            <span>REFERENCES &amp; ATTRIBUTION</span>
+            <ol>
+              <li>David Ha, Jürgen Schmidhuber. <a href="https://worldmodels.github.io/" target="_blank" rel="noreferrer">World Models — interactive article</a>, 2018.</li>
+              <li><a href="https://arxiv.org/abs/1803.10122" target="_blank" rel="noreferrer">Recurrent World Models Facilitate Policy Evolution</a>, arXiv:1803.10122.</li>
+              <li>本页复用的原论文 SVG 图来自 <a href="https://github.com/worldmodels/worldmodels.github.io" target="_blank" rel="noreferrer">worldmodels/worldmodels.github.io</a>，按 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> 使用，未修改图内内容；网页排版与教学交互为本站重写。</li>
+            </ol>
+            <p>实验数字取自原文表格；交互画布是概念教学演示，不是论文模型复现。</p>
+            <a href="/home/#articles">← 返回学习笔记</a>
+          </footer>
+        </article>
+      </main>
+
+      <aside class="next-sidebar next-article-toc wm-toc" aria-label="文章目录">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/">返回个人主页</a></div>
+        <p>目录</p>
+        <nav>
+          <a class="is-current" href="#overview">论文信息</a>
+          <a href="#problem">1. 研究问题</a>
+          <a href="#architecture">2. 总体架构</a>
+          <a href="#details">3. V / M / C</a>
+          <a href="#experiments">4. 实验</a>
+          <a href="#comparison">5. 优势与局限</a>
+          <a href="#pbd">6. PBD 延伸</a>
+          <a href="#reference">参考资料</a>
+        </nav>
+      </aside>
+    </div>
+
+    <footer class="next-footer"><p>© 2026 DOTAFS · World Models</p><p>Reference: <a href="https://worldmodels.github.io/" target="_blank" rel="noreferrer">Ha &amp; Schmidhuber, 2018</a></p></footer>
+  </body>
+</html>
