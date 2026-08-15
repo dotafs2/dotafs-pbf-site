@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1b1d1f" />
+    <meta name="description" content="GNS 论文阅读笔记：从粒子模拟、动态图构建和消息传递，到训练噪声、长时 rollout、实验泛化与 SAO 物理世界延伸。" />
+    <meta property="og:title" content="GNS：让粒子从数据中学会物理 · DOTAFS" />
+    <meta property="og:description" content="约 20 分钟读懂 Graph Network-based Simulators：它为什么把粒子连成图，怎样预测下一步，以及它对 SAO 世界物理层意味着什么。" />
+    <meta property="og:type" content="article" />
+    <title>GNS：让粒子从数据中学会物理 · DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <link rel="stylesheet" href="gns.css" />
+    <script src="gns.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page gns-page">
+    <a class="skip-link" href="#content">跳到正文</a>
+    <div class="next-headband" aria-hidden="true"></div>
+    <div class="read-progress" aria-hidden="true"><i id="read-progress-bar"></i></div>
+
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column">
+          <a class="next-brand" href="/home/">DOTAFS</a>
+          <p>Personal learning notes</p>
+        </div>
+        <nav class="next-menu" aria-label="个人网站导航">
+          <a href="/home/">首页</a>
+          <a class="is-active" href="/home/#articles">归档</a>
+          <a href="/learn-ai.html">AI 学习</a>
+          <a href="/">PBF Demo</a>
+          <a href="https://arxiv.org/abs/2002.09405" target="_blank" rel="noreferrer">原文</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="next-page-layout wm-layout" id="top">
+      <main id="content" class="next-main wm-main">
+        <article>
+          <header class="wm-intro gns-intro" id="overview">
+            <div class="wm-intro-copy">
+              <p class="wm-kicker">PAPER NOTE · SANCHEZ-GONZALEZ ET AL. · ICML 2020</p>
+              <h1>Learning to Simulate Complex Physics with Graph Networks</h1>
+              <p>这篇论文问的不是“怎样把水画得更漂亮”，而是：如果只给机器许多粒子运动轨迹，它能不能自己学会水、沙、软体和刚体下一刻怎样变化？</p>
+              <a href="https://arxiv.org/abs/2002.09405" target="_blank" rel="noreferrer">阅读原论文 ↗</a>
+            </div>
+            <div class="gns-intro-panel" aria-label="论文信息">
+              <p><strong>先给结论：</strong>GNS 把粒子模拟重新描述为一个动态图上的局部交流问题。每个粒子是节点，可能发生作用的邻居之间连边，神经网络通过多轮消息传递预测每个粒子的加速度。</p>
+              <dl class="paper-meta">
+                <div><dt>输入</dt><dd>粒子位置、5 步速度历史、材料类型与全局条件</dd></div>
+                <div><dt>输出</dt><dd>每个粒子的下一步平均加速度</dd></div>
+                <div><dt>核心</dt><dd>动态图 + Encode–Process–Decode</dd></div>
+                <div><dt>阅读</dt><dd>约 20 分钟</dd></div>
+              </dl>
+            </div>
+          </header>
+
+          <section class="paper-section" id="problem" aria-labelledby="problem-title">
+            <header class="section-heading">
+              <span>01 / RESEARCH QUESTION</span>
+              <h2 id="problem-title">论文前言到底在问什么？</h2>
+            </header>
+
+            <div class="prose">
+              <p>传统物理模拟器很强，但强在“工程师已经知道该写什么”。做流体要选 SPH、网格或 PBD，做沙子要处理摩擦和颗粒堆积，做软体又要换材料模型。高质量模拟器往往需要长期工程投入，而且越追求精确，计算成本通常越高。</p>
+              <p>另一条路是让模型直接从数据学习动力学：给它很多 <code>当前状态 → 下一状态</code> 的例子，让它近似真实模拟器或真实世界。问题是，一个场景可能有上万个粒子，每个粒子都在移动，邻居关系还会不停变化。普通网络很难处理这种可变数量、可变连接、长期反复预测的状态。</p>
+              <p>因此论文提出的研究问题是：<strong>能不能设计一种足够通用的学习框架，用同一套结构表示不同粒子材料，并在训练场景之外继续进行大规模、长时间的物理预测？</strong></p>
+            </div>
+
+            <div class="abstract-block" aria-label="论文问题拆解">
+              <div><span>已知</span><p>每一帧的粒子位置，以及由位置差分得到的速度与加速度。</p></div>
+              <div><span>要学</span><p>附近粒子之间怎样互相影响，而不是背下某一条固定轨迹。</p></div>
+              <div><span>要预测</span><p>每个粒子下一步的加速度，再用固定积分器更新速度和位置。</p></div>
+              <div><span>要验证</span><p>单步准确之外，连续几百到几千步之后是否仍像合理的物理运动。</p></div>
+            </div>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface gns-light-figure">
+                <img src="/paper/gns/figure-1.png" width="1394" height="1264" alt="GNS 论文 Figure 1：水、黏性材料和沙子的三维 rollout 序列" />
+              </div>
+              <figcaption><b>论文 Fig. 1。</b>同一类 GNS 架构分别学习 Water-3D、Goop-3D 与 Sand-3D。图像展示模型 rollout 的三个时间点；它不是一段视频生成，而是粒子状态逐步更新后再渲染。</figcaption>
+            </figure>
+
+            <div class="table-wrap">
+              <table class="paper-table gns-scope-table">
+                <thead><tr><th>它是什么</th><th>它不是什么</th></tr></thead>
+                <tbody>
+                  <tr><td>从粒子轨迹学习动力学的代理模拟器</td><td>从照片自动发现完整物理定律的系统</td></tr>
+                  <tr><td>给定当前状态，预测下一状态的 forward model</td><td>负责目标、奖励和行动选择的 Agent</td></tr>
+                  <tr><td>显式粒子状态上的 learned physics</td><td>从 RGB 像素直接生成下一帧的视频模型</td></tr>
+                  <tr><td>可反复调用、形成长 trajectory 的模拟模块</td><td>天然保证能量、动量和刚性约束的解析求解器</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>先记住</span>
+              <p>这篇论文的前言在寻找一种“通用的可学习粒子模拟接口”。它不声称神经网络已经懂得整个现实世界，而是把一个困难问题缩小成：局部实体之间的作用能否从数据中学出来。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="graph" aria-labelledby="graph-title">
+            <header class="section-heading">
+              <span>02 / PARTICLES AS A GRAPH</span>
+              <h2 id="graph-title">为什么把粒子连成一张图？</h2>
+            </header>
+
+            <div class="prose">
+              <p>把“图”想成每一帧临时建立的邻居名单就够了。每个粒子是一个节点；只要两个粒子的距离小于连接半径 <code>R</code>，就在它们之间建立边。粒子移动后，下一帧重新寻找邻居，所以图的连接也跟着改变。</p>
+              <p>这和 PBF/SPH 的邻居搜索非常接近。区别是：PBF 把邻居带进工程师写好的密度约束，SPH 把邻居带进压力与黏性核函数；GNS 把邻居的相对位置、距离和状态送进神经网络，让网络学习“这对粒子应该产生什么影响”。</p>
+            </div>
+
+            <div class="table-wrap">
+              <table class="paper-table">
+                <thead><tr><th>路线</th><th>粒子为何互相影响</th><th>下一步怎样得到</th></tr></thead>
+                <tbody>
+                  <tr><td>SPH</td><td>落在平滑核支持域内</td><td>显式计算密度、压力与黏性力</td></tr>
+                  <tr><td>PBD / PBF</td><td>落在邻域或共享约束</td><td>迭代投影位置，满足密度、距离和碰撞约束</td></tr>
+                  <tr><td>MPM</td><td>通过背景网格交换量</td><td>粒子到网格、网格更新、再回到粒子</td></tr>
+                  <tr class="is-emphasis"><td>GNS</td><td>连接半径内建立动态图边</td><td>学习边消息与节点更新，解码为加速度</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="interactive-block graph-lab">
+              <div class="interactive-heading"><span>可操作例子</span><p>调节邻居半径和消息轮数，观察中心粒子能间接获得多远的信息。</p></div>
+              <div class="gns-control-row">
+                <label>连接半径 R <output id="radius-value">74</output><input id="radius-control" type="range" min="42" max="118" step="4" value="74" /></label>
+                <label>消息轮数 M <output id="message-value">3</output><input id="message-control" type="range" min="1" max="6" step="1" value="3" /></label>
+                <button id="shuffle-graph" type="button">换一组粒子</button>
+              </div>
+              <figure class="graph-stage">
+                <figcaption><span>DYNAMIC NEIGHBOR GRAPH</span><b id="graph-caption">每轮只能跨过一条边；多轮后信息可以传播到更远的粒子</b></figcaption>
+                <canvas id="graph-canvas" width="920" height="470" role="img" aria-label="粒子连接半径与多轮消息传播教学示意"></canvas>
+              </figure>
+              <div class="graph-stats" aria-live="polite">
+                <span>边数量 <b id="edge-count">0</b></span>
+                <span>中心粒子直接邻居 <b id="neighbor-count">0</b></span>
+                <span>M 轮可到达 <b id="reach-count">0</b></span>
+              </div>
+              <p class="visual-note"><b>教学示意，不是论文模型复现。</b>圆点只展示“局部连接”和“多跳传播”。真实 GNS 的消息是 128 维隐向量，不是沿着边传递一个手写物理数值。</p>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>为什么能扩展</span>
+              <p>网络对所有粒子复用同一套局部更新函数，因此参数数量不会随着粒子数量直接增长。真正随规模增长的是节点和边的计算量，这也是它可以在测试时处理更多粒子的原因之一。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="architecture" aria-labelledby="architecture-title">
+            <header class="section-heading">
+              <span>03 / ARCHITECTURE</span>
+              <h2 id="architecture-title">Encode–Process–Decode 怎样推进一帧</h2>
+            </header>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface gns-light-figure">
+                <img src="/paper/gns/figure-2.png" width="1408" height="893" alt="GNS 论文 Figure 2：学习模拟器与 Encode-Process-Decode 图网络架构" />
+              </div>
+              <figcaption><b>论文 Fig. 2。</b>上方是反复调用的学习模拟器；下方把动力学模型拆成 Encoder、Processor 和 Decoder。Decoder 预测动力学信息，固定的 Update 再产生下一状态。</figcaption>
+            </figure>
+
+            <div class="gns-pipeline" aria-label="点击查看 GNS 各阶段的输入和输出">
+              <button class="gns-stage is-active" type="button" data-stage="encode" aria-pressed="true"><span>01</span><b>ENCODE</b><small>粒子状态 → 隐图</small></button>
+              <i aria-hidden="true">→</i>
+              <button class="gns-stage" type="button" data-stage="process" aria-pressed="false"><span>02</span><b>PROCESS × M</b><small>反复传递消息</small></button>
+              <i aria-hidden="true">→</i>
+              <button class="gns-stage" type="button" data-stage="decode" aria-pressed="false"><span>03</span><b>DECODE</b><small>隐状态 → 加速度</small></button>
+              <i aria-hidden="true">→</i>
+              <button class="gns-stage" type="button" data-stage="update" aria-pressed="false"><span>04</span><b>UPDATE</b><small>积分到下一帧</small></button>
+              <div class="gns-stage-readout" aria-live="polite"><span id="stage-label">ENCODER / 建图</span><p id="stage-copy">读取当前位置、最近 5 步速度、粒子材料和边界距离；在半径 R 内连边，并把节点与边都编码成 128 维隐向量。</p></div>
+            </div>
+
+            <h3>输入不是一张图片，而是一份粒子状态表</h3>
+            <div class="state-vector" aria-label="单个粒子的输入特征">
+              <span>x<sub>i</sub><sup>t</sup></span><i>=</i>
+              <b>当前位置 p<sub>i</sub><sup>t</sup></b><i>+</i>
+              <b>最近 5 步速度</b><i>+</i>
+              <b>材料 / 边界类型</b><i>+</i>
+              <b>全局条件</b>
+            </div>
+
+            <div class="architecture-notes">
+              <article><span>NODE</span><h3>粒子节点</h3><p>节点保存速度历史、材料类别和边界距离等自身信息。位置本身不直接交给节点编码器，以鼓励空间平移不变性。</p></article>
+              <article><span>EDGE</span><h3>邻居关系</h3><p>边保存两粒子的相对位移和距离。网络更关心“你在我左边多远”，而不是“我们位于世界坐标多少”。</p></article>
+              <article><span>PROCESSOR</span><h3>多轮推理</h3><p>默认配置做 10 轮消息传递。每轮更新边，再把收到的消息汇总到节点；更深的传播可表达更远、更复杂的作用。</p></article>
+              <article><span>OUTPUT</span><h3>预测加速度</h3><p>Decoder 为每个粒子输出二维或三维加速度，Euler 积分器再更新速度和位置。可学习部分与更新规则明确分开。</p></article>
+            </div>
+
+            <div class="equation-card">
+              <span>ONE SIMULATION STEP</span>
+              <p><code>加速度 â<sub>t</sub> = GNS<sub>θ</sub>(位置、速度历史、材料、邻居)</code></p>
+              <p><code>v̂<sub>t+1</sub> = v<sub>t</sub> + â<sub>t</sub></code></p>
+              <p><code>p̂<sub>t+1</sub> = p<sub>t</sub> + v̂<sub>t+1</sub></code></p>
+              <small>论文为简化记号省略固定时间步长 Δt。这里表达的是“学加速度，积分器负责推进”，不是让网络直接吐出整段动画。</small>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>架构的关键</span>
+              <p>它没有把整个模拟器都变成黑盒。网络只负责最难手写的动力学函数，图结构提供局部关系，积分器保留清楚的时间更新接口。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="training" aria-labelledby="training-title">
+            <header class="section-heading">
+              <span>04 / TRAINING &amp; ROLLOUT</span>
+              <h2 id="training-title">为什么单步很准，连续模拟仍会崩？</h2>
+            </header>
+
+            <div class="prose">
+              <p>训练数据里的每个输入都来自真实模拟器。模型只需要看真实的第 <code>t</code> 帧，预测真实的第 <code>t+1</code> 帧，所以它学到的是一个 one-step predictor。</p>
+              <p>部署时情况不同：第二步的输入已经是模型第一步的预测，第三步又建立在前两步误差之上。一点位置偏差会改变邻居图，邻居变化又会改变下一轮消息，误差便可能越来越大。这就是 rollout 的分布偏移。</p>
+            </div>
+
+            <div class="rollout-chain" aria-label="单步训练与连续 rollout 的区别">
+              <div><span>TRAIN</span><b>真实 X<sub>t</sub></b><i>→</i><b>预测 X̂<sub>t+1</sub></b><small>每次都从干净状态开始</small></div>
+              <div><span>ROLLOUT</span><b>X<sub>0</sub></b><i>→</i><b>X̂<sub>1</sub></b><i>→</i><b>X̂<sub>2</sub></b><i>→</i><b>…</b><small>模型不断吃自己的输出</small></div>
+            </div>
+
+            <div class="interactive-block error-lab">
+              <div class="interactive-heading"><span>可操作例子</span><p>比较只见过干净输入的模型，与训练时见过扰动并学会纠偏的模型。</p></div>
+              <div class="error-controls">
+                <div role="group" aria-label="选择训练方式">
+                  <button class="is-active" type="button" data-error-model="clean" aria-pressed="true">只训练干净单步</button>
+                  <button type="button" data-error-model="noise" aria-pressed="false">加入适量训练噪声</button>
+                </div>
+                <label>Rollout 长度 <output id="horizon-value">80</output><input id="horizon-control" type="range" min="10" max="160" step="5" value="80" /></label>
+              </div>
+              <figure class="error-stage">
+                <figcaption><span>ACCUMULATED ERROR</span><b id="error-caption">模型从未学过“带一点误差的状态”，偏差会逐步放大</b></figcaption>
+                <canvas id="error-canvas" width="920" height="420" role="img" aria-label="训练噪声对长时 rollout 误差影响的概念曲线"></canvas>
+              </figure>
+              <div class="error-readout" aria-live="polite"><span>末步概念误差 <b id="final-error">0.00</b></span><p id="error-message">训练分布和 rollout 分布逐渐分离。</p></div>
+              <p class="visual-note"><b>教学曲线，不是论文数值。</b>论文实际使用速度上的随机游走噪声，默认标准差为 0.0003，并同步调整位置，使训练输入更像模型在 rollout 中会遇到的轻微错误状态。</p>
+            </div>
+
+            <div class="training-tradeoff">
+              <article><span>噪声太少</span><p>单步测试漂亮，但模型没有练过从偏差状态恢复，长期 rollout 容易漂移。</p></article>
+              <article class="is-emphasis"><span>噪声适中</span><p>牺牲一点干净单步精度，换来更好的长时稳定性。论文消融中这一档 rollout 最好。</p></article>
+              <article><span>噪声太大</span><p>输入偏离真实状态过多，模型连正常局部动力学都更难学准。</p></article>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>研究意义</span>
+              <p>训练噪声不是为了让画面随机，而是在教模型“犯了一点错之后怎样回到合理状态”。对所有反复调用自身预测的 world model，这都是比单步分数更深的一层问题。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="experiments" aria-labelledby="experiments-title">
+            <header class="section-heading">
+              <span>05 / EXPERIMENTS</span>
+              <h2 id="experiments-title">实验真正证明了什么？</h2>
+            </header>
+
+            <div class="prose">
+              <p>作者没有只在一种水体上调出好看的动画，而是让同一套架构面对水、沙、黏塑性 goop、刚体、静态障碍和多材料相互作用。数据由 SPH、PBD/FleX 和 MPM 等传统模拟器生成；典型数据集包含 1000 条训练轨迹、100 条验证轨迹和 100 条测试轨迹，每条持续 300–2000 步。</p>
+              <p>训练目标仍然只是每个粒子的单步加速度 L2 误差；评估则同时看单步 MSE、完整 rollout MSE，以及对粒子排列不敏感的 Optimal Transport 和 MMD。这样可以避免只凭一张渲染图判断模型是否正确。</p>
+            </div>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface gns-light-figure">
+                <img src="/paper/gns/figure-3.png" width="2046" height="671" loading="lazy" alt="GNS 论文 Figure 3：多种材料、预测与真实结果及超出训练分布的场景" />
+              </div>
+              <figcaption><b>论文 Fig. 3。</b>上排为初始状态，中排为 GNS 预测，下排为 ground truth。a–e 是不同材料与交互，f–h 测试高分辨率湍流、未见形状和更大空间。</figcaption>
+            </figure>
+
+            <div class="table-wrap">
+              <table class="paper-table result-table">
+                <thead><tr><th>场景</th><th>数据来源</th><th>最多粒子</th><th>Rollout 长度</th><th>观察重点</th></tr></thead>
+                <tbody>
+                  <tr><td>Water-3D</td><td>SPH</td><td>13k</td><td>800</td><td>三维自由表面流体</td></tr>
+                  <tr><td>Sand-3D</td><td>MPM</td><td>20k</td><td>350</td><td>摩擦与颗粒堆积</td></tr>
+                  <tr><td>Goop-3D</td><td>MPM</td><td>14k</td><td>300</td><td>黏性与塑性形变</td></tr>
+                  <tr><td>BoxBath</td><td>PBD / FleX</td><td>1k</td><td>150</td><td>水中刚体保持形状</td></tr>
+                  <tr><td>MultiMaterial</td><td>MPM</td><td>2k</td><td>1000</td><td>水、沙、goop 与刚体共用一套参数</td></tr>
+                  <tr><td>FluidShake</td><td>MPM</td><td>1.3k</td><td>2000</td><td>容器外力与长时误差</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>最强的一组结果是规模泛化</h3>
+            <div class="generalization-strip">
+              <article><span>TRAIN</span><b>约 2.5k 粒子</b><p>WaterRamps 的训练场景只有较小容器和 1–5 个随机斜坡。</p></article>
+              <i aria-hidden="true">→</i>
+              <article><span>TEST A</span><b>28k 粒子 / 2500 步</b><p>持续注水后，粒子数达到训练时约一个数量级。</p></article>
+              <i aria-hidden="true">→</i>
+              <article><span>TEST B</span><b>85k 粒子 / 5000 步</b><p>区域面积 32 倍、粒子数 34 倍、轨迹长度 8 倍。</p></article>
+            </div>
+            <p class="prose">这并不等于模型对任意世界都能泛化。它说明的是：当测试场景仍由相似的局部粒子作用组成时，使用相对位置和共享消息函数，使学到的局部规律可以在更大的图上重复使用。</p>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface gns-light-figure">
+                <img src="/paper/gns/figure-4.png" width="1300" height="521" loading="lazy" alt="GNS 论文 Figure 4：消息轮数、参数共享、连接半径、训练噪声和相对位置编码消融" />
+              </div>
+              <figcaption><b>论文 Fig. 4 左侧消融。</b>上排是单步误差，下排是 rollout 误差。红色为默认配置。影响更明显的因素包括消息轮数、连接半径、Processor 参数是否共享、训练噪声和相对位置编码。</figcaption>
+            </figure>
+
+            <div class="evidence-grid">
+              <article><span>论文支持</span><h3>同一架构覆盖多类材料</h3><p>不同数据集使用相同总体结构和一套默认超参数；MultiMaterial 进一步用单个模型处理多材料交互。</p></article>
+              <article><span>论文支持</span><h3>局部规律能迁移到更大图</h3><p>相对位置输入和共享局部函数，使模型可用于训练分布之外的粒子数、空间尺度与轨迹长度。</p></article>
+              <article><span>不能推出</span><h3>GNS 一定比传统模拟器快</h3><p>补充材料明确说加速不是本工作的主要目标；不同场景中，GNS 有时更快，有时反而更慢。</p></article>
+              <article><span>不能推出</span><h3>它发现了精确物理定律</h3><p>模型优化的是预测误差；它可以生成合理轨迹，但没有显式恢复压力方程、摩擦律或守恒定律。</p></article>
+            </div>
+          </section>
+
+          <section class="paper-section" id="limits" aria-labelledby="limits-title">
+            <header class="section-heading">
+              <span>06 / LIMITS</span>
+              <h2 id="limits-title">看起来像物理，不代表永远守住物理</h2>
+            </header>
+
+            <div class="prose">
+              <p>GNS 的结果很强，但它仍然是从有限轨迹拟合出来的近似动力学。模型学到什么，取决于训练数据里出现过什么。对于混沌系统，两条都合理的水流轨迹也可能逐渐分叉，因此逐粒子 MSE 会不断增长；而“视觉上像水”也不能替代守恒、碰撞和稳定性检查。</p>
+            </div>
+
+            <ul class="limits-list">
+              <li><b>没有硬约束保证。</b>模型可能近似保持刚体形状，但架构里没有刚性约束。补充材料的 FluidShake-Box 失败例中，长时间猛烈晃动后方块开始变形。</li>
+              <li><b>罕见接触容易学错。</b>某个 Goop 模型会把材料错误地粘在墙上；作者认为静摩擦与黏附行为需要更多覆盖。</li>
+              <li><b>只看最近 5 步。</b>当正确行为依赖更久以前的形状、接触或隐藏状态时，这个短历史可能不够。</li>
+              <li><b>邻居搜索是实际成本。</b>补充实验显示大量时间花在构建邻居图，而不是图网络推理本身。</li>
+              <li><b>数据来自模拟器。</b>论文主要学习 SPH、PBD 和 MPM 生成的轨迹，因此首先证明的是“模仿模拟器”，不是自动跨越 sim-to-real。</li>
+              <li><b>不是完整 world model。</b>它没有视觉感知、玩家语义、奖励、行动规划、场景记忆和渲染，只负责状态动力学。</li>
+            </ul>
+
+            <div class="paper-takeaway">
+              <span>我的判断</span>
+              <p>GNS 最重要的贡献不是宣告“解析物理过时了”，而是证明图网络可以成为通用粒子动力学接口。它让材料规律可以从数据学习，但可靠系统仍需要状态设计、覆盖充分的数据和物理验证。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="sao" aria-labelledby="sao-title">
+            <header class="section-heading">
+              <span>07 / TOWARD SAO</span>
+              <h2 id="sao-title">它在最终目标 SAO 中处于哪一层？</h2>
+            </header>
+
+            <div class="prose">
+              <p>SAO 式世界真正困难的地方，不只是“画面像现实”，而是玩家做出一个此前没录制过的动作时，环境仍能给出连续、可信、可利用的后果。踩进水里要激起水花，推倒木箱要撞到旁边物体，切断绳索后受力关系要改变；世界必须可以被反事实地推进。</p>
+              <p>GNS 正好落在中间的动力学层：上游把现实或虚拟世界转换成实体状态，下游的 Agent、玩家输入和渲染系统使用预测结果。它不负责理解“玩家想打开门”，但可以负责在门已被施力之后，预测局部实体如何响应。</p>
+            </div>
+
+            <div class="sao-stack" aria-label="SAO 世界系统分层与 GNS 位置">
+              <article><span>06</span><b>角色目标与规划</b><small>Agent / player intention</small></article>
+              <article><span>05</span><b>行动与交互接口</b><small>forces, constraints, actions</small></article>
+              <article class="is-current"><span>04</span><b>可推进的世界动力学</b><small>GNS 所在位置</small></article>
+              <article><span>03</span><b>实体、材料与空间状态</b><small>particles, objects, scene graph</small></article>
+              <article><span>02</span><b>感知与世界建模</b><small>vision, tracking, state estimation</small></article>
+              <article><span>01</span><b>显示与沉浸</b><small>rendering, audio, haptics</small></article>
+            </div>
+
+            <div class="table-wrap">
+              <table class="paper-table sao-table">
+                <thead><tr><th>SAO 所需能力</th><th>GNS 现在能提供</th><th>仍缺什么</th></tr></thead>
+                <tbody>
+                  <tr><td>世界能随时间推进</td><td>从当前粒子状态预测下一步</td><td>跨区域、跨时间尺度的层级状态</td></tr>
+                  <tr><td>不同材料发生作用</td><td>材料类别进入节点特征，统一学习局部交互</td><td>覆盖开放世界材料组合的数据与约束</td></tr>
+                  <tr><td>玩家行为产生后果</td><td>可把外力、边界和控制量作为条件</td><td>从语义动作到物理控制量的接口</td></tr>
+                  <tr><td>长期世界一致</td><td>训练噪声减轻短中期误差累积</td><td>硬守恒、长期记忆、事件和持久状态</td></tr>
+                  <tr><td>实时运行</td><td>局部共享计算适合并行</td><td>动态图构建、LOD、稀疏更新和硬件优化</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="our-extension">
+              <span>我们的延伸 / 不是论文结论</span>
+              <h3>从显式求解器走向可学习世界，最稳妥的路线可能是混合系统</h3>
+              <ol>
+                <li><b>先让 PBF/SPH/MPM 充当老师。</b><p>它们生成干净、可控、带材料参数的轨迹，让我们知道模型正在学习什么。</p></li>
+                <li><b>先学习残差或难写的材料部分。</b><p>碰撞、不可穿透和关键约束仍由显式求解器保证；图网络补充复杂黏附、材料风格或粗粒度动力学。</p></li>
+                <li><b>把玩家动作变成条件。</b><p>手部接触、抓取、切割或技能效果先转成力、约束变化与边界事件，再进入动力学模型。</p></li>
+                <li><b>用物理指标验收。</b><p>除了位置误差，还要追踪密度、穿透、能量、动量、体积和长时可恢复性。</p></li>
+                <li><b>最后才扩展成世界层。</b><p>把局部 learned physics 与对象状态、场景图、角色规划和渲染连接，形成能被持续推进的 SAO 世界。</p></li>
+              </ol>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>最终位置</span>
+              <p>PBF 不是最终目标，GNS 也不是。它们分别代表“人写规律”和“数据学规律”两种世界推进方式。SAO 需要的是把二者组织成一个可交互、可验证、能长期保持因果一致的世界系统。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="summary" aria-labelledby="summary-title">
+            <header class="section-heading">
+              <span>08 / SUMMARY</span>
+              <h2 id="summary-title">读完后应该带走的五件事</h2>
+            </header>
+            <ol class="summary-list">
+              <li><span>01</span><p>GNS 学的不是渲染，而是粒子状态怎样随时间变化。</p></li>
+              <li><span>02</span><p>图是动态邻居表：节点代表粒子，边代表当前可能发生的局部作用。</p></li>
+              <li><span>03</span><p>多轮消息传递让局部信息逐步传播；相对位置让同一规律能搬到更大空间。</p></li>
+              <li><span>04</span><p>单步准确不等于长期稳定；适量训练噪声是在教模型从自己的小错误中恢复。</p></li>
+              <li><span>05</span><p>它为 SAO 提供的是可学习动力学层，而不是完整世界、Agent 或沉浸系统。</p></li>
+            </ol>
+          </section>
+
+          <footer class="wm-reference" id="reference">
+            <span>REFERENCES &amp; ATTRIBUTION</span>
+            <ol>
+              <li>Alvaro Sanchez-Gonzalez et al. <a href="https://arxiv.org/abs/2002.09405" target="_blank" rel="noreferrer">Learning to Simulate Complex Physics with Graph Networks</a>, ICML 2020.</li>
+              <li><a href="https://github.com/google-deepmind/deepmind-research/tree/master/learning_to_simulate" target="_blank" rel="noreferrer">Google DeepMind — learning_to_simulate code and datasets</a>.</li>
+              <li>Peter W. Battaglia et al. <a href="https://arxiv.org/abs/1806.01261" target="_blank" rel="noreferrer">Relational inductive biases, deep learning, and graph networks</a>, 2018.</li>
+              <li>Matthias Müller et al. <a href="https://matthias-research.github.io/pages/publications/posBasedDyn.pdf" target="_blank" rel="noreferrer">Position Based Dynamics</a>, 2007.</li>
+              <li>论文 Fig. 1–4 取自原论文 HTML/PDF，仅用于研究学习与评论解读，图像权利归原作者及出版方；本站未改变图中实验内容。</li>
+            </ol>
+            <p>文中论文数据与结论来自原文和补充材料；“我们的延伸”明确标记为面向 SAO 目标的推演。两个交互画布均为概念教学演示，不是 GNS 训练结果或论文复现。</p>
+            <a href="/home/#articles">← 返回学习笔记</a>
+          </footer>
+        </article>
+      </main>
+
+      <aside class="next-sidebar next-article-toc wm-toc" aria-label="文章目录">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/">返回个人主页</a></div>
+        <p>目录</p>
+        <nav>
+          <a class="is-current" href="#overview">论文信息</a>
+          <a href="#problem">1. 研究问题</a>
+          <a href="#graph">2. 粒子图</a>
+          <a href="#architecture">3. 模型架构</a>
+          <a href="#training">4. 训练与误差</a>
+          <a href="#experiments">5. 实验</a>
+          <a href="#limits">6. 局限</a>
+          <a href="#sao">7. SAO 位置</a>
+          <a href="#summary">8. 总结</a>
+          <a href="#reference">参考资料</a>
+        </nav>
+      </aside>
+    </div>
+
+    <footer class="next-footer"><p>© 2026 DOTAFS · GNS</p><p>Reference: <a href="https://arxiv.org/abs/2002.09405" target="_blank" rel="noreferrer">Sanchez-Gonzalez et al., 2020</a></p></footer>
+  </body>
+</html>
