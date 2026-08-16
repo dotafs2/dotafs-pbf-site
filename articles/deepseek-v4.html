@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1b1d1f" />
+    <meta name="description" content="DeepSeek-V4 技术报告学习笔记：从大模型、Token、注意力和 MoE 的基础概念出发，读懂百万上下文、CSA/HCA、mHC、Muon、FP4、推理档位与 Agent 训练。" />
+    <meta property="og:title" content="DeepSeek-V4：百万上下文背后的新技术 · DOTAFS" />
+    <meta property="og:description" content="给不懂大模型的读者：约 20 分钟读懂 DeepSeek-V4 为什么能处理 100 万 Token，以及哪些技术是真正的新东西。" />
+    <meta property="og:type" content="article" />
+    <title>DeepSeek-V4：百万上下文背后的新技术 · DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <link rel="stylesheet" href="gns.css" />
+    <link rel="stylesheet" href="deepseek-v4.css" />
+    <script src="deepseek-v4.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page gns-page deepseek-page">
+    <a class="skip-link" href="#content">跳到正文</a>
+    <div class="next-headband" aria-hidden="true"></div>
+    <div class="read-progress" aria-hidden="true"><i id="read-progress-bar"></i></div>
+
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column">
+          <a class="next-brand" href="/home/">DOTAFS</a>
+          <p>Personal learning notes</p>
+        </div>
+        <nav class="next-menu" aria-label="个人网站导航">
+          <a href="/home/">首页</a>
+          <a class="is-active" href="/home/#articles">归档</a>
+          <a href="/learn-ai.html">AI 学习</a>
+          <a href="/">PBF Demo</a>
+          <a href="https://arxiv.org/abs/2606.19348" target="_blank" rel="noreferrer">原文</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="next-page-layout wm-layout" id="top">
+      <main id="content" class="next-main wm-main">
+        <article>
+          <header class="wm-intro ds-intro" id="overview">
+            <div class="wm-intro-copy">
+              <p class="wm-kicker">MODEL NOTE · DEEPSEEK-AI · 2026</p>
+              <h1>DeepSeek-V4：百万上下文背后的新技术</h1>
+              <p>如果你不懂大模型，先不要被 1.6T 参数、FP4、CSA 这些词吓到。这篇文章只追一个问题：DeepSeek-V4 为什么能在更长时间里读、想、调用工具，又为什么它仍然不是一个真正的“长期记忆大脑”？</p>
+              <div class="intro-links">
+                <a href="https://arxiv.org/abs/2606.19348" target="_blank" rel="noreferrer">技术报告 ↗</a>
+                <a href="https://huggingface.co/collections/deepseek-ai/deepseek-v4" target="_blank" rel="noreferrer">开放权重 ↗</a>
+              </div>
+            </div>
+            <div class="gns-intro-panel ds-intro-panel" aria-label="发布信息">
+              <p><strong>先给结论：</strong>V4 最重要的进步，不只是“模型变大”，而是把长文本的注意力、缓存和训练方式一起重新设计，让 100 万 Token 从一个昂贵的展示数字，变成更适合长期 Agent 使用的工作空间。</p>
+              <dl class="paper-meta">
+                <div><dt>Pro</dt><dd>1.6T 总参数，每次约 49B 激活</dd></div>
+                <div><dt>Flash</dt><dd>284B 总参数，每次约 13B 激活</dd></div>
+                <div><dt>上下文</dt><dd>两者均为 1M Token</dd></div>
+                <div><dt>发布</dt><dd>Preview 04-24 · Pro GA 08-13</dd></div>
+                <div><dt>本文日期</dt><dd>2026-08-16 · 约 20 分钟</dd></div>
+              </dl>
+            </div>
+          </header>
+
+          <section class="paper-section" id="question" aria-labelledby="question-title">
+            <header class="section-heading">
+              <span>01 / THE REAL QUESTION</span>
+              <h2 id="question-title">技术报告的前言到底在解决什么？</h2>
+            </header>
+
+            <div class="prose">
+              <p>过去我们让大模型变聪明，常用一条很直观的路：让它在回答前多想一会儿。复杂数学题、代码修改和 Agent 任务都可能需要更长的推理过程。但模型每多读一个 Token，就要从前文中寻找相关信息；上下文越来越长，普通注意力的计算和缓存也越来越贵。</p>
+              <p>这会形成一个矛盾：我们希望 Agent 能连续工作几小时，记住代码、终端输出、网页、工具结果和自己的计划；但它的“工作台”越长，运行越慢、显存越容易被 KV Cache 填满。技术报告把核心问题概括为：<strong>怎样突破超长上下文的效率瓶颈，让更长的推理和长期任务真正可用？</strong></p>
+              <p>所以 V4 不是突然发明了一个全新的大模型物种。它仍然是 Transformer，也继承了 DeepSeekMoE 和 Multi-Token Prediction。真正的新工作，是围绕“长上下文效率、深层训练稳定性和 Agent 后训练”做的一整套升级。</p>
+            </div>
+
+            <div class="abstract-block" aria-label="论文问题拆解">
+              <div><span>输入越来越长</span><p>代码库、文档、工具记录和推理痕迹会不断塞进上下文。</p></div>
+              <div><span>普通注意力太贵</span><p>每个新 Token 都需要查找过去的信息，长度上升会放大计算与缓存压力。</p></div>
+              <div><span>目标不是只装进去</span><p>模型还要能在一百万 Token 中找到信息、推理并继续行动。</p></div>
+              <div><span>V4 的答案</span><p>压缩、筛选、局部窗口、低精度和新的训练管线一起工作。</p></div>
+            </div>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface ds-light-figure">
+                <img src="/paper/deepseek-v4/figure-1.png" width="2048" height="1105" alt="DeepSeek-V4 论文 Figure 1：基准表现，以及不同上下文长度下的计算量和 KV Cache 比较" />
+              </div>
+              <figcaption><b>论文 Fig. 1。</b>左侧是多项知识、推理与 Agent 基准；右侧才是 V4 这篇报告最核心的故事：上下文增长时，V4 的单 Token 计算量和 KV Cache 增长远慢于 V3.2。图中结果由 DeepSeek 官方报告给出。</figcaption>
+            </figure>
+
+            <div class="paper-takeaway">
+              <span>先记住</span>
+              <p>V4 的主线不是“模型终于能记住所有东西”，而是“让一个很长的临时工作区更便宜”。上下文是当前会话里的工作记忆，不等于训练后的知识，也不等于跨会话永久记忆。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="basics" aria-labelledby="basics-title">
+            <header class="section-heading">
+              <span>02 / FOUR BASICS</span>
+              <h2 id="basics-title">先补四个基础词：Token、参数、注意力、KV Cache</h2>
+            </header>
+
+            <div class="concept-grid">
+              <article><span>01</span><h3>Token</h3><p>模型读写的基本碎片。一个汉字、英文词的一部分、标点或代码符号都可能是 Token。100 万 Token 不是 100 万个汉字，两者不能直接画等号。</p></article>
+              <article><span>02</span><h3>参数</h3><p>训练后留下的大量数字，决定模型如何变换信息。参数多不代表每次都全部参与计算；MoE 会只叫醒少量专家。</p></article>
+              <article><span>03</span><h3>注意力</h3><p>当前 Token 在回答前，给前文不同位置分配相关性。它像在一张超长会议记录中标记“这一刻应该回看哪里”。</p></article>
+              <article><span>04</span><h3>KV Cache</h3><p>模型把前文计算出的线索缓存起来，生成下一个 Token 时不必从头重算。会话越长，缓存通常越大。</p></article>
+            </div>
+
+            <div class="interactive-block attention-lab">
+              <div class="interactive-heading"><span>可操作例子</span><p>拖动上下文长度，观察普通注意力的“要比较多少对位置”和缓存压力为什么迅速变大。</p></div>
+              <label class="context-control">上下文长度 <output id="context-value">64K</output><input id="context-range" type="range" min="0" max="7" step="1" value="3" /></label>
+              <div class="cost-compare" aria-live="polite">
+                <article>
+                  <div><span>普通全注意力</span><b id="dense-cost">4,096×</b></div>
+                  <i><em id="dense-bar"></em></i>
+                  <p>教学中的相对比较对数量，按长度平方增长。</p>
+                </article>
+                <article>
+                  <div><span>压缩 + 稀疏思路</span><b id="sparse-cost">64×</b></div>
+                  <i><em id="sparse-bar"></em></i>
+                  <p>概念示意：先压缩，再只精查少量相关块。</p>
+                </article>
+              </div>
+              <p class="visual-note"><b>教学示意，不是 V4 精确公式或实测曲线。</b>真实 CSA/HCA 还包含压缩倍率、Top-k、滑动窗口、不同精度和混合层配置。论文给出的可引用实测是：在 1M 上下文下，V4-Pro 的单 Token 推理 FLOPs 为 V3.2 的 27%，KV Cache 为 10%；V4-Flash 分别为 10% 和 7%。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="architecture" aria-labelledby="architecture-title">
+            <header class="section-heading">
+              <span>03 / WHAT IS ACTUALLY NEW</span>
+              <h2 id="architecture-title">哪些是 V4 新技术，哪些只是继承？</h2>
+            </header>
+
+            <div class="table-wrap">
+              <table class="paper-table novelty-table">
+                <thead><tr><th>技术</th><th>V4 的身份</th><th>用人话说</th></tr></thead>
+                <tbody>
+                  <tr><td>Transformer</td><td>基础骨架</td><td>仍然是一层层处理 Token 的主结构</td></tr>
+                  <tr><td>DeepSeekMoE</td><td>从 V3 系列继承并微调</td><td>每个 Token 只调用少数专家，避免每次运行全部参数</td></tr>
+                  <tr><td>MTP</td><td>从 V3 继承，配置不变</td><td>训练模型同时预测多个后续 Token，也可帮助推理加速</td></tr>
+                  <tr class="is-emphasis"><td>CSA + HCA</td><td>V4 核心新架构</td><td>把很长的历史压缩后，再稀疏查找或密集阅读</td></tr>
+                  <tr class="is-emphasis"><td>mHC</td><td>V4 核心新架构</td><td>给深层网络增加多条受约束的信息通道</td></tr>
+                  <tr class="is-emphasis"><td>Muon</td><td>V4 核心训练升级</td><td>改变参数更新方向的整理方式，提高收敛和稳定性</td></tr>
+                  <tr class="is-emphasis"><td>OPD + Agent 管线</td><td>V4 后训练升级</td><td>先练多个专科老师，再把能力蒸馏到统一学生</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface ds-light-figure ds-arch-figure">
+                <img src="/paper/deepseek-v4/figure-2.svg" width="286" height="309" alt="DeepSeek-V4 论文 Figure 2：总体架构，包含 CSA/HCA、DeepSeekMoE、mHC 与 MTP" />
+              </div>
+              <figcaption><b>论文 Fig. 2。</b>从下向上看：Token 进入 Embedding；注意力层在 CSA/HCA 之间混合，前馈层使用 DeepSeekMoE；mHC 负责层与层之间的信息混合；顶部继续保留语言模型预测头与 MTP 模块。</figcaption>
+            </figure>
+
+            <div class="architecture-tabs" aria-label="点击查看 V4 三项核心架构升级">
+              <button class="is-active" type="button" data-tech="attention" aria-pressed="true"><span>01</span><b>CSA + HCA</b><small>长记忆怎样省钱</small></button>
+              <button type="button" data-tech="mhc" aria-pressed="false"><span>02</span><b>mHC</b><small>深层信号怎样稳定</small></button>
+              <button type="button" data-tech="muon" aria-pressed="false"><span>03</span><b>Muon</b><small>训练怎样走得更稳</small></button>
+              <div class="tech-readout"><span id="tech-label">HYBRID ATTENTION</span><p id="tech-copy">CSA 像“先把旧记录做成摘要，再用索引找出最相关的几段”；HCA 像“把更大段历史压成更短的概要，然后仍然全部阅读”。两者交错，再补一条最近 Token 的滑动窗口。</p></div>
+            </div>
+          </section>
+
+          <section class="paper-section" id="attention" aria-labelledby="attention-title">
+            <header class="section-heading">
+              <span>04 / CSA + HCA</span>
+              <h2 id="attention-title">百万上下文的关键：不是全忘，也不是全看</h2>
+            </header>
+
+            <div class="prose">
+              <p>普通注意力可以想成：你写下一个词之前，把过去每一句话都摊在桌上逐一比较。短对话时没问题；当桌面上有一百万个 Token，逐一比较会变得昂贵。</p>
+              <p><strong>CSA（Compressed Sparse Attention）</strong>做两次减法。第一步，把连续的若干 Token 压成一个 KV 条目；第二步，用 Lightning Indexer 快速打分，只选择 Top-k 个相关压缩块进行核心注意力。它很像先把档案装进有摘要的文件夹，再用目录挑出少数最相关文件夹。</p>
+              <p><strong>HCA（Heavily Compressed Attention）</strong>压得更狠，但不做 Top-k 稀疏选择，而是对压缩后的短序列保持密集注意力。它承担的是更粗粒度的全局视野。与此同时，V4 还保留最近 Token 的滑动窗口，因为刚说过的话往往需要逐字精读。</p>
+            </div>
+
+            <div class="memory-metaphor" aria-label="CSA 与 HCA 的直观比喻">
+              <article><span>最近几页</span><b>滑动窗口</b><p>不压缩，保留局部细节。</p></article>
+              <i aria-hidden="true">+</i>
+              <article><span>相关章节</span><b>CSA</b><p>先压缩，再用索引挑 Top-k。</p></article>
+              <i aria-hidden="true">+</i>
+              <article><span>整本书梗概</span><b>HCA</b><p>重度压缩，但保留全局浏览。</p></article>
+            </div>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface ds-light-figure">
+                <img src="/paper/deepseek-v4/figure-3.svg" width="471" height="232" alt="DeepSeek-V4 论文 Figure 3：CSA 压缩 KV、Lightning Indexer、Top-k 与滑动窗口结构" />
+              </div>
+              <figcaption><b>论文 Fig. 3。</b>黄色条是历史 KV：底部先做 Token 级压缩；中间的 Lightning Indexer 为压缩块打分并选择 Top-k；左侧额外加入最近的未压缩滑动窗口，最后一起进入共享 Key-Value 的多查询注意力。</figcaption>
+            </figure>
+
+            <div class="paper-takeaway">
+              <span>最重要的代价</span>
+              <p>压缩一定会丢细节，稀疏选择也可能选错。因此 V4 不是靠一个技巧取胜，而是让“局部原文、稀疏相关块、重压缩全局”互相补位。报告自己也承认，为追求极致效率保留了许多组件，使架构相对复杂。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="training" aria-labelledby="training-title">
+            <header class="section-heading">
+              <span>05 / TRAINING THE GIANT</span>
+              <h2 id="training-title">mHC、Muon 与 FP4：怎样让巨型模型训得动、跑得动</h2>
+            </header>
+
+            <div class="plain-tech-list">
+              <article>
+                <span>mHC</span>
+                <div><h3>把一条信息高速公路扩成多条受控车道</h3><p>普通残差连接把旧信号直接加回新信号，帮助深层网络别“忘掉前面”。Hyper-Connections 扩宽残差流，但层数一多可能数值不稳定。mHC 把混合矩阵限制在特定数学集合中，使信号不被层层放大，同时保留多路表达能力。</p></div>
+              </article>
+              <article>
+                <span>Muon</span>
+                <div><h3>不只看梯度往哪走，还整理整张参数矩阵的更新方向</h3><p>训练就是不断修改参数。Muon 会近似正交化矩阵更新，让不同方向不要过度挤在一起。V4 大部分模块用 Muon，Embedding、预测头、归一化等部分仍保留 AdamW。它是混合使用，不是把 AdamW 一刀切掉。</p></div>
+              </article>
+              <article>
+                <span>FP4</span>
+                <div><h3>用更少位数存专家权重，但让模型提前适应误差</h3><p>V4 在后训练加入量化感知训练，让 MoE 专家权重和 CSA 索引器的一部分路径适应 FP4。最终指令模型的专家权重用 FP4，多数其他参数用 FP8。论文报告 Top-k 选择器获得 2 倍加速，同时保持 99.7% 的 KV 条目召回率。</p></div>
+              </article>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>别误解 FP4</span>
+              <p>“4 位”不等于整个模型每个地方都只用 4 位，也不等于模型可以塞进普通显卡。V4-Pro 有 1.6T 总参数；即使每次只激活 49B，开放权重仍需要存放全部专家。MoE 节省的是每个 Token 的计算，不会让全部权重凭空消失。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="posttraining" aria-labelledby="posttraining-title">
+            <header class="section-heading">
+              <span>06 / FROM MODEL TO AGENT</span>
+              <h2 id="posttraining-title">后训练的新重点：先练专科老师，再合成一个学生</h2>
+            </header>
+
+            <div class="prose">
+              <p>预训练教模型“世界上有哪些文字和模式”，后训练才把它变成会回答、会推理、会调用工具的助手。V4 先为数学、代码、Agent、指令遵循等领域分别训练专家：先做监督微调，再用 GRPO 强化学习，让不同专家根据各自奖励继续成长。</p>
+              <p>接着，V4 使用多教师<strong>在线策略蒸馏（On-Policy Distillation，OPD）</strong>。学生模型先按自己当前能力生成轨迹，相关领域的老师再告诉它“在这些位置上，我会怎样分配下一个 Token 的概率”。超过十个教师的能力最终被蒸馏进一个统一模型，而不是简单把多套权重平均。</p>
+            </div>
+
+            <div class="distill-flow" aria-label="DeepSeek-V4 后训练流程">
+              <article><span>STEP 1</span><b>基础模型</b><small>32T / 33T Token 预训练</small></article>
+              <i>→</i>
+              <article><span>STEP 2</span><b>领域专家</b><small>数学 · 代码 · Agent · 指令</small></article>
+              <i>→</i>
+              <article><span>STEP 3</span><b>学生自己生成轨迹</b><small>保持 on-policy</small></article>
+              <i>→</i>
+              <article><span>STEP 4</span><b>统一 V4</b><small>对齐多位教师的完整概率分布</small></article>
+            </div>
+
+            <div class="reasoning-lab interactive-block">
+              <div class="interactive-heading"><span>可操作例子</span><p>选择推理档位，看看它改变的是“本次回答愿意花多少计算”，而不是换了一套基础权重。</p></div>
+              <div class="reasoning-buttons" role="group" aria-label="推理档位">
+                <button type="button" data-effort="none" aria-pressed="false">NON-THINK</button>
+                <button class="is-active" type="button" data-effort="high" aria-pressed="true">THINK HIGH</button>
+                <button type="button" data-effort="max" aria-pressed="false">THINK MAX</button>
+              </div>
+              <div class="reasoning-readout" aria-live="polite">
+                <div><span>适合任务</span><b id="effort-task">复杂问题、计划与日常 Agent</b></div>
+                <div><span>推理时间</span><i><em id="effort-time"></em></i></div>
+                <div><span>计算预算</span><i><em id="effort-budget"></em></i></div>
+                <p id="effort-copy">模型显式生成更长的思考过程，通常更慢，但在复杂问题上更可靠。</p>
+              </div>
+              <p class="visual-note"><b>概念教学，不代表固定延迟或固定 Token 数。</b>实际开销取决于问题、服务配置和模型是否提前完成。论文训练了 Non-think、Think High、Think Max 三个推理努力档位。</p>
+            </div>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface ds-light-figure ds-thinking-figure">
+                <img src="/paper/deepseek-v4/figure-7.png" width="763" height="1016" alt="DeepSeek-V4 论文 Figure 7：使用工具和普通对话时对历史推理内容的不同管理方式" />
+              </div>
+              <figcaption><b>论文 Fig. 7。</b>工具场景会跨多轮保留完整推理历史，使 Agent 不必每次重建计划；普通聊天在新用户消息到来时仍丢弃旧推理，只保留答案，避免上下文无意义膨胀。</figcaption>
+            </figure>
+          </section>
+
+          <section class="paper-section" id="evidence" aria-labelledby="evidence-title">
+            <header class="section-heading">
+              <span>07 / EVIDENCE &amp; CAUTION</span>
+              <h2 id="evidence-title">成绩应该怎么看，而不是只看排行榜第一</h2>
+            </header>
+
+            <div class="evidence-grid">
+              <article><span>官方强证据</span><h3>长上下文效率确实是论文主贡献</h3><p>在 1M 上下文下，报告给出相对 V3.2 的 FLOPs 和 KV Cache 大幅下降，并在 MRCR、CorpusQA 等长上下文测试中报告结果。这些结果直接对应它提出的问题。</p></article>
+              <article><span>需要谨慎</span><h3>很多对比来自官方统一或内部框架</h3><p>模型、推理预算、工具、上下文管理和提示方式都会影响 Agent 基准。论文中的“领先”应读成特定设置下的报告，不是所有真实任务上的永久排名。</p></article>
+              <article><span>真实反馈</span><h3>DeepSeek 自己也记录了小错与过度思考</h3><p>报告中的内部调查覆盖 85 位日常使用者：多数愿意或倾向把 V4-Pro 当主力代码模型，但仍提到低级错误、误解模糊提示和偶尔过度思考。</p></article>
+              <article><span>论文局限</span><h3>架构有效，但还不够简洁和可解释</h3><p>作者承认 V4 为降低风险保留了许多已验证组件，使整体较复杂；部分训练稳定技巧的底层原理仍未被充分理解。</p></article>
+            </div>
+
+            <div class="table-wrap">
+              <table class="paper-table model-choice-table">
+                <thead><tr><th>你遇到的任务</th><th>更合适的选择</th><th>原因</th></tr></thead>
+                <tbody>
+                  <tr><td>简单问答、改写、短代码</td><td>V4-Flash / Non-think</td><td>激活参数少，延迟和成本优先</td></tr>
+                  <tr><td>日常代码 Agent、搜索、规划</td><td>Flash High 或 Pro High</td><td>需要工具、推理和较长上下文的平衡</td></tr>
+                  <tr><td>复杂数学、困难调试、长任务</td><td>Pro Max</td><td>知识容量和推理预算更高，但最慢</td></tr>
+                  <tr><td>普通个人电脑本地运行</td><td>不要直接选 Pro/Flash 原始权重</td><td>总权重规模仍远超消费级单卡</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="paper-section" id="opensource" aria-labelledby="opensource-title">
+            <header class="section-heading">
+              <span>08 / WHAT OPEN-SOURCE MEANS</span>
+              <h2 id="opensource-title">“开源了”到底意味着什么？</h2>
+            </header>
+
+            <div class="open-source-split">
+              <article class="is-open"><span>现在真正开放的</span><ul><li>Pro、Flash 的 Base 与指令模型权重</li><li>Hugging Face / ModelScope 下载入口</li><li>MIT 模型权重许可</li><li>推理代码、编码格式与技术报告</li></ul></article>
+              <article><span>不能自动推导出的</span><ul><li>不代表训练数据全部公开</li><li>不代表外部团队能低成本完整复训</li><li>不代表普通电脑可以运行原始 Pro</li><li>不代表所有官方基准都已独立复现</li></ul></article>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>准确说法</span>
+              <p>本文采用“开放权重模型”这个更精确的说法。DeepSeek 官方确实提供 MIT 许可的权重与推理材料；但从零训练同等模型所需的数据、算力、工程系统和实验经验，并没有因为下载按钮出现就全部复制给所有人。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="sao" aria-labelledby="sao-title">
+            <header class="section-heading">
+              <span>09 / OUR EXTENSION TO SAO</span>
+              <h2 id="sao-title">它对我们的 SAO 目标意味着什么？</h2>
+            </header>
+
+            <div class="prose">
+              <p>DeepSeek-V4 不是 world model，也不会替代 PBF、GNS、3D 引擎或持久世界数据库。它处理的是 Token 序列，不是直接推进世界里的粒子、碰撞和对象状态。</p>
+              <p>但它非常适合 SAO 系统里的“语言与任务协调层”：读完整个项目、拆解长期目标、调用建模与代码工具、维护 NPC 的计划、根据世界数据库生成对白，并在许多轮工具调用中保持任务思路。</p>
+            </div>
+
+            <div class="sao-stack ds-sao-stack" aria-label="SAO 系统分层与 DeepSeek-V4 的位置">
+              <article class="is-current"><span>06</span><b>语言、规划与 Agent 编排</b><small>DeepSeek-V4 最适合的位置</small></article>
+              <article><span>05</span><b>NPC 行为与社会系统</b><small>可提供高层目标，但需要外部状态与规则</small></article>
+              <article><span>04</span><b>持久世界状态</b><small>数据库、事件日志、空间记忆</small></article>
+              <article><span>03</span><b>世界动力学</b><small>PBF / GNS / 物理引擎 / world model</small></article>
+              <article><span>02</span><b>3D 场景与实时渲染</b><small>WebGPU / Unreal / 生成式世界</small></article>
+              <article><span>01</span><b>身体、感官与接口</b><small>VR、触觉、追踪与未来神经接口</small></article>
+            </div>
+
+            <div class="our-extension">
+              <span>我们的延伸 / 不是论文结论</span>
+              <h3>百万上下文更像一个更大的“任务工作台”，不是 SAO 世界本身</h3>
+              <ol>
+                <li><b>让 V4 负责读计划、写代码和调工具。</b><p>它可以长时间处理项目上下文，适合作为构建世界的工程 Agent。</p></li>
+                <li><b>让权威世界状态留在外部系统。</b><p>门是否打开、物品归谁、NPC 在哪里，应存在数据库或游戏服务器，而不是只写在聊天上下文里。</p></li>
+                <li><b>只把相关状态检索给模型。</b><p>一百万 Token 仍然有限，也会带来延迟。长期世界需要检索、摘要、分层记忆和事件日志。</p></li>
+                <li><b>让物理层验证语言层。</b><p>大模型可以提出“推倒墙壁”的计划，但能否发生必须交给物理、规则和权限系统判断。</p></li>
+              </ol>
+            </div>
+          </section>
+
+          <section class="paper-section" id="summary" aria-labelledby="summary-title">
+            <header class="section-heading">
+              <span>10 / SUMMARY</span>
+              <h2 id="summary-title">读完后应该带走的六件事</h2>
+            </header>
+            <ol class="summary-list ds-summary-list">
+              <li><span>01</span><p>DeepSeek-V4 的主问题是超长上下文效率，不只是继续堆参数。</p></li>
+              <li><span>02</span><p>MoE 与 MTP 主要从 V3 继承；CSA/HCA、mHC、Muon 和新的后训练管线才是 V4 重点升级。</p></li>
+              <li><span>03</span><p>CSA 先压缩再稀疏挑选，HCA 重度压缩后密集阅读，滑动窗口保留最近细节。</p></li>
+              <li><span>04</span><p>一百万 Token 是更大的临时工作区，不等于永久记忆、完全理解或永不遗忘。</p></li>
+              <li><span>05</span><p>开放权重不等于普通电脑能运行，也不等于训练数据和完整复训条件全部开放。</p></li>
+              <li><span>06</span><p>面向 SAO，它更适合语言、规划与 Agent 编排层，不能替代世界状态、物理与沉浸接口。</p></li>
+            </ol>
+          </section>
+
+          <footer class="wm-reference" id="reference">
+            <span>REFERENCES &amp; ATTRIBUTION</span>
+            <ol>
+              <li>DeepSeek-AI. <a href="https://arxiv.org/abs/2606.19348" target="_blank" rel="noreferrer">DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence</a>, 2026.</li>
+              <li><a href="https://api-docs.deepseek.com/news/news260424" target="_blank" rel="noreferrer">DeepSeek V4 Preview Release</a>, 2026-04-24；<a href="https://api-docs.deepseek.com/news/news260813" target="_blank" rel="noreferrer">DeepSeek-V4-Pro GA Release</a>, 2026-08-13.</li>
+              <li><a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro" target="_blank" rel="noreferrer">DeepSeek-V4-Pro Model Card</a> 与 <a href="https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash" target="_blank" rel="noreferrer">DeepSeek-V4-Flash Model Card</a>.</li>
+              <li>论文 Fig. 1、2、3、7 取自 DeepSeek-V4 官方技术报告，仅用于研究学习、评论与技术解读；图像权利归原作者。本文没有修改图中的实验数据。</li>
+            </ol>
+            <p>文中参数、实验和架构结论来自官方技术报告与模型卡；“我们的延伸”明确标记为面向 SAO 系统目标的推演。两个交互组件均为概念教学演示，不是 DeepSeek-V4 模型复现或官方性能测试。</p>
+            <a href="/home/#articles">← 返回学习笔记</a>
+          </footer>
+        </article>
+      </main>
+
+      <aside class="next-sidebar next-article-toc wm-toc" aria-label="文章目录">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/">返回个人主页</a></div>
+        <p>目录</p>
+        <nav>
+          <a class="is-current" href="#overview">发布信息</a>
+          <a href="#question">1. 前言的问题</a>
+          <a href="#basics">2. 四个基础词</a>
+          <a href="#architecture">3. 新旧技术</a>
+          <a href="#attention">4. CSA + HCA</a>
+          <a href="#training">5. mHC / Muon / FP4</a>
+          <a href="#posttraining">6. Agent 后训练</a>
+          <a href="#evidence">7. 证据与谨慎</a>
+          <a href="#opensource">8. 开源含义</a>
+          <a href="#sao">9. SAO 位置</a>
+          <a href="#summary">10. 总结</a>
+          <a href="#reference">参考资料</a>
+        </nav>
+      </aside>
+    </div>
+
+    <footer class="next-footer"><p>© 2026 DOTAFS · DeepSeek-V4</p><p>Reference: <a href="https://arxiv.org/abs/2606.19348" target="_blank" rel="noreferrer">DeepSeek-AI, 2026</a></p></footer>
+  </body>
+</html>
