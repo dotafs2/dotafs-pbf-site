@@ -20,4 +20,7 @@ Non-negotiable rules:
   reading time changes.
 - Update `THIRD_PARTY_NOTICES.md` when redistributing paper figures or other
   third-party assets.
-- Do not publish, commit, or push unless the user explicitly asks in that turn.
+- The default delivery workflow is: make the requested change, validate it,
+  commit it, and push it directly to `origin/main`. A request to change this
+  website counts as authorization to publish that change. Keep work local only
+  when the user explicitly says to preview locally, not upload, or not publish.

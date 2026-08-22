@@ -67,7 +67,7 @@
 
             <div class="prose">
               <p>一块“石头”在渲染器里通常不只是一张彩色图。它还可能有法线、粗糙度、金属度、AO、高度、透明度，以及这些纹理的整套 mip。分辨率和材质数量同时上升后，压力会落在三个地方：安装包、显存，以及采样时从显存搬数据的带宽。</p>
-              <p>传统 GPU 压缩格式 BCn / ASTC 能够直接访问任意 block，硬件采样也很快，但通常分别处理各张纹理，难以利用“裂缝在 Albedo、Normal、Roughness 中出现在同一位置”这种相关性。AVIF、JPEG XL 一类格式压得更紧，却更像一段需要顺序解码的数据，不能让 shader 廉价地只询问一个 texel。</p>
+              <p>传统 GPU 压缩格式 <span class="term-tip" tabindex="0" aria-describedby="term-bcn">BCn<span class="term-tip-card" id="term-bcn" role="tooltip"><b>BCn · Block Compression 1–7</b><span>一族常见的 GPU 纹理格式。它通常把纹理切成 <strong>4 × 4 texel</strong> 的固定大小块，每块只保存少量颜色、端点或索引；GPU 知道坐标后可以直接找到那一块并硬件解码。</span><small>例如：BC5 常用于法线，BC6H / BC7 常用于 HDR 或高质量颜色。</small></span></span> / <span class="term-tip" tabindex="0" aria-describedby="term-astc">ASTC<span class="term-tip-card" id="term-astc" role="tooltip"><b>ASTC · Adaptive Scalable Texture Compression</b><span>同样是 GPU 可直接采样的分块格式，但每个 128-bit 块可以覆盖 4 × 4、6 × 6、8 × 8 等不同范围。覆盖越大，文件越小，但细节通常也越少。</span><small>它在移动 GPU 上很常见；“Adaptive”主要指可选择块覆盖范围和质量档位。</small></span></span> 能够直接访问任意 block，硬件采样也很快，但通常分别处理各张纹理，难以利用“裂缝在 Albedo、Normal、Roughness 中出现在同一位置”这种相关性。AVIF、JPEG XL 一类格式压得更紧，却更像一段需要顺序解码的数据，不能让 shader 廉价地只询问一个 texel。</p>
               <p>论文因此问：<strong>能否同时利用空间、通道和 mip 之间的重复信息，又保留 GPU 纹理所需的随机访问？</strong></p>
             </div>
 
