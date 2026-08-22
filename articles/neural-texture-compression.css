@@ -1135,6 +1135,26 @@
 }
 
 @media (max-width: 720px) {
+  .term-tip-card {
+    position: fixed;
+    top: auto;
+    right: auto;
+    bottom: 18px;
+    left: 50%;
+    width: calc(100vw - 36px);
+    transform: translate(-50%, 4px);
+  }
+
+  .term-tip-card::after {
+    display: none;
+  }
+
+  .term-tip:hover .term-tip-card,
+  .term-tip:focus .term-tip-card,
+  .term-tip:focus-within .term-tip-card {
+    transform: translate(-50%, 0);
+  }
+
   .ntc-intro,
   .paper-section,
   .ntc-reference {
