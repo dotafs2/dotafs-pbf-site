@@ -1092,6 +1092,78 @@ figcaption small {
   line-height: 1.95;
 }
 
+.learning-primer {
+  max-width: 760px;
+  margin-top: 28px;
+  border-top: 1px solid var(--wm-line);
+  border-bottom: 1px solid var(--wm-line);
+}
+
+.learning-primer-heading {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 18px;
+  padding: 14px 0 11px;
+}
+
+.learning-primer-heading span {
+  color: var(--wm-muted);
+  font: 10px/1.6 var(--wm-mono);
+  letter-spacing: .08em;
+}
+
+.wm-main .learning-primer h2 {
+  margin: 0;
+  border: 0;
+  color: var(--wm-text);
+  font-size: 17px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+}
+
+.learning-primer dl {
+  margin: 0;
+}
+
+.learning-primer dl > div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 18px;
+  padding: 11px 0;
+  border-top: 1px solid var(--wm-line);
+}
+
+.learning-primer dt,
+.learning-primer dd {
+  margin: 0;
+}
+
+.learning-primer dt {
+  color: var(--wm-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.75;
+}
+
+.learning-primer dd,
+.learning-primer > p {
+  color: var(--wm-muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.learning-primer > p {
+  margin: 0;
+  padding: 12px 0 14px 188px;
+  border-top: 1px solid var(--wm-line);
+}
+
+.learning-primer > p strong {
+  color: var(--wm-text);
+  font-weight: 500;
+}
+
 .paper-meta {
   margin: 30px 0 0;
   display: grid;
@@ -1791,6 +1863,16 @@ figcaption small {
 
   .paper-meta {
     grid-template-columns: 1fr;
+  }
+
+  .learning-primer-heading,
+  .learning-primer dl > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .learning-primer > p {
+    padding-left: 0;
   }
 
   .paper-meta > div:nth-child(odd),

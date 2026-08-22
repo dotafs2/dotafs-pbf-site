@@ -41,7 +41,21 @@
           <header class="wm-intro" id="overview">
             <p class="wm-kicker">PAPER NOTE · HA &amp; SCHMIDHUBER · 2018</p>
             <h1>World Models</h1>
-            <p class="wm-deck">一篇把“看见、预测、行动”拆开的模型式强化学习论文。重点不只是生成未来画面，而是让很小的策略网络在学到的内部环境中训练，再回到真实环境执行。</p>
+            <p class="wm-deck"><strong>世界模型，就是让 AI 在“脑内”拥有一个简化的环境模拟器：它能根据现在看到的东西和准备做的动作，猜接下来会发生什么。</strong>它想解决的核心问题是：AI 不必把每一次尝试都放到真实环境里，而能先在内部模型中练习，再把学到的行动方式带回真实环境。本文这篇 2018 年论文只在赛车和 Doom 游戏中验证这条思路，并不等于已经学会模拟真实世界。</p>
+
+            <div class="learning-primer" aria-labelledby="learning-primer-title">
+              <div class="learning-primer-heading">
+                <span>ZERO-BASE PRIMER</span>
+                <h2 id="learning-primer-title">先分清三种“学习”</h2>
+              </div>
+              <dl>
+                <div><dt>监督学习</dt><dd>给 AI 题目和标准答案，让它从大量例子中学会“看到这种输入，应该给出什么答案”。</dd></div>
+                <div><dt>非监督 / 自监督学习</dt><dd>不给人工标准答案，让 AI 从数据自身寻找规律，或把数据的一部分当成另一部分的答案。</dd></div>
+                <div><dt>强化学习</dt><dd>不给每一步的正确动作，只在行动后给奖励或惩罚，让 AI 学会怎样行动才能获得更高的长期总分。</dd></div>
+              </dl>
+              <p><strong>放回这篇论文：</strong>V 和 M 从采集到的画面序列中学习压缩与预测，属于非监督 / 自监督这一侧；C 没有“正确动作”标签，而是根据游戏总分，用进化策略寻找更好的行动规则。</p>
+            </div>
+
             <dl class="paper-meta">
               <div><dt>任务</dt><dd>CarRacing-v0 / VizDoom Take Cover</dd></div>
               <div><dt>输入</dt><dd>连续 RGB 帧与动作</dd></div>
@@ -57,8 +71,8 @@
             </header>
 
             <div class="prose">
-              <p>如果一个 Agent 直接从像素学习动作，它同时要完成三件困难的事：从画面里找出有用结构、理解动作会造成什么后果、再把长期奖励反向归因到当前动作。传统 model-free 深度强化学习把这三件事塞进同一个策略网络，能工作，但通常需要大量真实交互，而且很难知道网络到底学到了什么。</p>
-              <p>World Models 的问题更具体：<strong>能否先用无监督学习得到一个压缩的、带时间变化的内部世界，再只训练一个很小的控制器？</strong>如果内部世界足够可信，控制器甚至可以暂时不接触真实环境，只在模型生成的 Dream 中试错。</p>
+              <p>先把“世界”缩小到一个赛车游戏：AI 每一刻只收到一张画面，然后要决定方向盘和油门。如果它一边学会从画面中认出赛道，一边摸索“这样转弯会不会撞墙”，还要同时判断哪个动作最终得分更高，就需要在游戏里反复撞车，试错次数会非常多。</p>
+              <p>World Models 因此把问题拆成两步：<strong>能否先从画面和动作中学出一个会预测后果的内部环境，再让一个很小的控制器在里面练习？</strong>在这篇论文里，内部环境负责压缩画面并预测下一时刻的可能状态；控制器只负责根据当前状态选择动作。到 Doom 实验时，控制器甚至完全在模型生成的 Dream 中训练，最后才被放回真实游戏测试。</p>
             </div>
 
             <div class="abstract-block" aria-label="论文摘要的中文拆解">

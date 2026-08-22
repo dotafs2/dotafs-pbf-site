@@ -74,3 +74,24 @@ Sources:
 These excerpts remain credited to their respective authors. No open-content
 license is asserted for them. The surrounding article text, layout, tables,
 and interactive teaching examples are independently authored.
+
+## Neural Texture Compression paper figure excerpts
+
+The Neural Texture Compression learning note includes cropped, attributed
+figure excerpts from the NVIDIA author version of *Random-Access Neural
+Compression of Material Textures* for research commentary and explanation:
+
+- `paper/ntc/figure-1-render-comparison.png`
+- `paper/ntc/figure-4-method.png`
+- `paper/ntc/figure-12-failures.png`
+
+Source:
+
+- [NVIDIA Research project page](https://research.nvidia.com/labs/rtr/neural_texture_compression/)
+- [Author-version paper PDF](https://research.nvidia.com/labs/rtr/neural_texture_compression/assets/ntc_small_size.pdf)
+
+The excerpts remain credited to Karthik Vaidyanathan, Marco Salvi,
+Bartlomiej Wronski, Tomas Akenine-Möller, Pontus Ebelin, Aaron Lefohn, and
+NVIDIA. No open-content license is asserted for them. The surrounding article
+text, layout, tables, synthetic texture examples, and interactive teaching
+tools are independently authored.

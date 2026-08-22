@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1b1d1f" />
+    <meta name="description" content="NVIDIA Neural Texture Compression 学习笔记：从材质纹理冗余、特征金字塔与随机访问解码，到过滤代价、实验结果与工程取舍。" />
+    <title>NTC：把一套 PBR 纹理压成可查询的小函数 · DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="neural-texture-compression.css" />
+    <script src="neural-texture-compression.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article ntc-page">
+    <a class="skip-link" href="#content">跳到正文</a>
+    <div class="next-headband" aria-hidden="true"></div>
+
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column">
+          <a class="next-brand" href="/home/">DOTAFS</a>
+          <p>Personal learning notes</p>
+        </div>
+        <nav class="next-menu" aria-label="个人网站导航">
+          <a href="/home/">首页</a>
+          <a class="is-active" href="/home/#articles">归档</a>
+          <a href="/learn-ai.html">AI 学习</a>
+          <a href="/">PBF Demo</a>
+          <a href="https://research.nvidia.com/labs/rtr/neural_texture_compression/" target="_blank" rel="noreferrer">原文</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="next-page-layout ntc-layout" id="top">
+      <main id="content" class="next-main ntc-main">
+        <article>
+          <header class="ntc-intro" id="overview">
+            <p class="ntc-kicker">PAPER NOTE · NVIDIA · SIGGRAPH 2023</p>
+            <h1>NTC：把一套 PBR 纹理压成可查询的小函数</h1>
+            <p class="ntc-deck"><strong>NTC 不是让 AI 凭空生成材质。</strong>它在压缩阶段只学习当前这一套材质，把 Albedo、Normal、Roughness 等贴图共同藏进量化特征网格和一个很小的 MLP；运行时给它坐标与 mip 层级，它直接还原该位置的全部通道。</p>
+
+            <dl class="paper-meta">
+              <div><dt>论文</dt><dd>Random-Access Neural Compression of Material Textures</dd></div>
+              <div><dt>对象</dt><dd>同一材质的多通道纹理与 mip chain</dd></div>
+              <div><dt>关键能力</dt><dd>固定码率、GPU 随机访问、跨通道共享</dd></div>
+              <div><dt>阅读时间</dt><dd>约 22 分钟，含 3 组可操作实验</dd></div>
+            </dl>
+
+            <div class="plain-answer" aria-labelledby="plain-answer-title">
+              <span>先用一句话理解</span>
+              <div>
+                <h2 id="plain-answer-title">它把“查表”改成“算函数”</h2>
+                <p>普通纹理把每个像素的结果直接存下来；NTC 存一组小网格与网络参数，查询时再算出结果。因此它用更多 GPU 计算，换更少的磁盘、显存与带宽。</p>
+              </div>
+            </div>
+          </header>
+
+          <section class="paper-section" id="problem" aria-labelledby="problem-title">
+            <header class="section-heading">
+              <span>01 / RESEARCH QUESTION</span>
+              <h2 id="problem-title">他们想解决什么问题？</h2>
+            </header>
+
+            <div class="prose">
+              <p>一块“石头”在渲染器里通常不只是一张彩色图。它还可能有法线、粗糙度、金属度、AO、高度、透明度，以及这些纹理的整套 mip。分辨率和材质数量同时上升后，压力会落在三个地方：安装包、显存，以及采样时从显存搬数据的带宽。</p>
+              <p>传统 GPU 压缩格式 BCn / ASTC 能够直接访问任意 block，硬件采样也很快，但通常分别处理各张纹理，难以利用“裂缝在 Albedo、Normal、Roughness 中出现在同一位置”这种相关性。AVIF、JPEG XL 一类格式压得更紧，却更像一段需要顺序解码的数据，不能让 shader 廉价地只询问一个 texel。</p>
+              <p>论文因此问：<strong>能否同时利用空间、通道和 mip 之间的重复信息，又保留 GPU 纹理所需的随机访问？</strong></p>
+            </div>
+
+            <div class="abstract-grid" aria-label="论文问题的输入、学习目标、输出与边界">
+              <div><span>输入</span><p>尺寸对齐的一套材质纹理及其 mip 层级。</p></div>
+              <div><span>压缩</span><p>为这一套材质联合优化特征网格和小型 MLP。</p></div>
+              <div><span>查询</span><p><code>(u, v, lod)</code> 进入 decoder，一次得到所有材质通道。</p></div>
+              <div><span>边界</span><p>有损压缩；不是通用模型，也不会理解“石头”是什么。</p></div>
+            </div>
+
+            <h3>它和几条常见路线的区别</h3>
+            <div class="table-wrap">
+              <table class="paper-table route-table">
+                <thead><tr><th>路线</th><th>存什么</th><th>任意 texel 访问</th><th>主要取舍</th></tr></thead>
+                <tbody>
+                  <tr><td>BCn / ASTC</td><td>固定大小的压缩 block</td><td>强，硬件原生</td><td>快而稳定；很少跨纹理共享信息</td></tr>
+                  <tr><td>AVIF / JPEG XL</td><td>带熵编码的图像码流</td><td>弱，通常先解码</td><td>存储率高；不适合 shader 的随机查询</td></tr>
+                  <tr><td>通用神经图像压缩</td><td>共享模型 + 每张图的 latent</td><td>视方法而定</td><td>可泛化到新图；不一定针对实时材质采样</td></tr>
+                  <tr class="is-emphasis"><td>NTC</td><td>每套材质自己的量化 latent + 小 MLP</td><td>强，一次查询一个 texel</td><td>显存更小；解码需要 GPU 算力</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>不要混淆</span>
+              <p>NTC 是 <em>per-material overfitting</em>：压缩一块材质时现场训练，最后只保存这块材质的紧凑表示。它不是提前读过大量图片、能回答各种问题的“大模型”。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="redundancy" aria-labelledby="redundancy-title">
+            <header class="section-heading">
+              <span>02 / WHY IT COMPRESSES</span>
+              <h2 id="redundancy-title">压缩从哪里来：同一条裂缝不必记三次</h2>
+            </header>
+
+            <div class="prose">
+              <p>Albedo 的暗缝、Normal 的凹陷和 Roughness 的变化通常来自同一个表面结构。如果逐张贴图压缩，每个编码器都要重新描述那条缝；联合压缩则可以先把“这里有一条缝”存进共享 latent，再由 decoder 分别翻译成颜色、法线和粗糙度。</p>
+              <p>这不是说三个通道必须相同，而是它们在空间位置上常有关联。通道越多、对齐越好，能共享的结构一般越多；如果通道完全错位或彼此无关，NTC 的优势会下降，甚至出现一个通道的特征泄漏到另一个通道。</p>
+            </div>
+
+            <div class="interactive-block correlation-lab" id="correlation-lab">
+              <header class="interactive-heading">
+                <div><span>INTERACTIVE 01</span><h3>拖动“通道相关性”，观察共享结构</h3></div>
+                <p>这是概念演示，不是论文编码器复现。纹理越对齐，越多边缘可以由同一份 latent 描述。</p>
+              </header>
+              <div class="lab-controls">
+                <label for="correlation">通道相关性 <output id="correlation-value" for="correlation">78%</output></label>
+                <input id="correlation" type="range" min="0" max="100" value="78" step="1" />
+                <button id="correlation-reset" type="button">重置</button>
+              </div>
+              <div class="texture-triptych">
+                <figure><figcaption><span>01</span><b>Albedo</b></figcaption><canvas id="albedo-canvas" width="300" height="190" role="img" aria-label="教学用颜色纹理"></canvas></figure>
+                <figure><figcaption><span>02</span><b>Normal</b></figcaption><canvas id="normal-canvas" width="300" height="190" role="img" aria-label="教学用法线纹理"></canvas></figure>
+                <figure><figcaption><span>03</span><b>Roughness</b></figcaption><canvas id="roughness-canvas" width="300" height="190" role="img" aria-label="教学用粗糙度纹理"></canvas></figure>
+              </div>
+              <div class="lab-readout" aria-live="polite">
+                <dl>
+                  <div><dt>三张独立记录</dt><dd>300 units</dd></div>
+                  <div><dt>共享 latent 估算</dt><dd id="shared-cost">197 units</dd></div>
+                  <div><dt>可共享结构</dt><dd id="shared-structure">高</dd></div>
+                </dl>
+                <p id="correlation-explanation">裂缝与凸起在三张图中大体对齐，decoder 可以复用一份空间描述，再分别输出不同通道。</p>
+              </div>
+              <p class="demo-note">上面的 units 是为了解释趋势而设的教学量，不对应论文 BPPC。论文的实际结果见第 5 节。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="method" aria-labelledby="method-title">
+            <header class="section-heading">
+              <span>03 / METHOD</span>
+              <h2 id="method-title">具体怎么做：两层特征网格，加一个很小的解码器</h2>
+            </header>
+
+            <figure class="source-figure source-figure-wide">
+              <div class="source-figure-surface source-paper"><img src="../paper/ntc/figure-4-method.png" alt="NTC 论文图 4：高低分辨率特征网格、位置编码与 MLP 解码器架构" /></div>
+              <figcaption><b>论文 Figure 4。</b>目标 texel 从高分辨率网格取四个邻居，从低分辨率网格做双线性插值，再连同位置编码和 LOD 送入 MLP。图源：Vaidyanathan et al., SIGGRAPH 2023。</figcaption>
+            </figure>
+
+            <ol class="method-steps">
+              <li><span>01</span><div><h3>先把所有贴图当成一个张量</h3><p>论文把整套材质看成 <code>w × h × c</code>。它不需要预先知道哪个通道是颜色或法线，只要求这些通道共享尺寸和空间对齐。</p></div></li>
+              <li><span>02</span><div><h3>用特征金字塔记住材质</h3><p>每一级有两张可训练的 2D 网格：高分辨率 <code>G₀</code> 负责细节，低分辨率 <code>G₁</code> 负责平滑变化。一个 feature level 可以覆盖 2–4 个 mip，所以不用为每层都存完整数据。</p></div></li>
+              <li><span>03</span><div><h3>训练时就模拟量化损失</h3><p>latent 最终必须变成有限 bit。训练阶段向特征加入量化区间内的噪声并 clamp，让 decoder 提前适应“数字被舍入”的误差；结束前再真正量化并微调网络权重。</p></div></li>
+              <li><span>04</span><div><h3>一个查询只读附近少量特征</h3><p>目标 texel 从 <code>G₀</code> 取四个相邻 feature，保留给网络学习如何插值；从 <code>G₁</code> 取一个双线性结果。再加入 8 × 8 周期位置编码和归一化 LOD。</p></div></li>
+              <li><span>05</span><div><h3>MLP 一次还原全部通道</h3><p>论文网络只有两个 hidden layer，每层 64 个通道。输出层不加 activation；一次运行会给出当前 texel 的全部材质通道。</p></div></li>
+            </ol>
+
+            <div class="decoder-equation" aria-label="NTC 解码器的概念公式">
+              <span>DECODER</span>
+              <p><code>material(u, v, lod) = MLP(G₀ neighbors, bilinear(G₁), position, lod)</code></p>
+            </div>
+
+            <div class="interactive-block decoder-lab" id="decoder-lab">
+              <header class="interactive-heading">
+                <div><span>INTERACTIVE 02</span><h3>亲手查询一个 texel</h3></div>
+                <p>点击网格或移动坐标。你只会点亮目标附近的 latent，而不是先解压整张图。</p>
+              </header>
+              <div class="decoder-workbench">
+                <div class="decoder-canvas-wrap">
+                  <canvas id="decoder-grid" width="560" height="390" role="img" aria-label="可点击的 NTC 特征网格，显示目标纹素和四个相邻特征"></canvas>
+                  <p>点击网格选择位置；方向键可微调 U / V。</p>
+                </div>
+                <div class="decoder-controls">
+                  <label for="decoder-u">U <output id="decoder-u-value" for="decoder-u">0.36</output></label>
+                  <input id="decoder-u" type="range" min="0" max="100" value="36" />
+                  <label for="decoder-v">V <output id="decoder-v-value" for="decoder-v">0.58</output></label>
+                  <input id="decoder-v" type="range" min="0" max="100" value="58" />
+                  <label for="decoder-lod">LOD / mip <output id="decoder-lod-value" for="decoder-lod">1</output></label>
+                  <input id="decoder-lod" type="range" min="0" max="7" value="1" step="1" />
+                  <button id="decoder-reset" type="button">回到示例位置</button>
+                </div>
+              </div>
+
+              <ol class="decoder-pipeline" aria-label="从纹理坐标到材质通道的解码流程">
+                <li><span>01 / ADDRESS</span><b id="address-readout">texel (36, 58), mip 1</b><small>只定位当前查询</small></li>
+                <li><span>02 / FEATURES</span><b id="feature-readout">G₀: 4 cells · G₁: 1 blend</b><small>读取局部 latent</small></li>
+                <li><span>03 / MLP</span><b>2 × 64 hidden</b><small>位置 + LOD 一起进入</small></li>
+                <li><span>04 / OUTPUT</span><b>all channels</b><small>一次产生整组材质值</small></li>
+              </ol>
+
+              <div class="material-output" aria-live="polite">
+                <div><span class="swatch" id="albedo-swatch"></span><dl><dt>Albedo</dt><dd id="albedo-output">rgb(92, 86, 72)</dd></dl></div>
+                <div><span class="normal-disc" id="normal-disc"></span><dl><dt>Normal</dt><dd id="normal-output">(0.04, 0.11, 0.99)</dd></dl></div>
+                <div><span class="rough-meter"><i id="rough-meter"></i></span><dl><dt>Roughness</dt><dd id="rough-output">0.63</dd></dl></div>
+              </div>
+              <p id="decoder-explanation" class="demo-note">在 mip 1，查询落在较细的 feature level。四个 G₀ 邻居保留局部细节，G₁ 提供缓慢变化的底色。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="training" aria-labelledby="training-title">
+            <header class="section-heading">
+              <span>04 / TRAINING &amp; FILTERING</span>
+              <h2 id="training-title">“训练”发生在哪里，为什么过滤反而麻烦</h2>
+            </header>
+
+            <div class="two-column-reading">
+              <section>
+                <h3>压缩阶段：像把材质背下来</h3>
+                <p>这套材质自己就是训练数据。优化器反复随机抽取纹素，让 decoder 的输出接近原纹理，同时更新 feature pyramid 和 MLP。论文使用 Adam、L2 loss 和 250k 次迭代；最后 5% 固定已经量化的 latent，只继续微调权重。</p>
+                <p>因此压缩比 BCn 慢得多，但它是离线资产处理。论文的 fused CUDA 实现把采样、网络、损失和反传放进一个 kernel，比 PyTorch 原型快约 10 倍。</p>
+              </section>
+              <section>
+                <h3>运行阶段：只前向，不再学习</h3>
+                <p>shader 不做训练，只执行前向解码。它不需要 encoder，也不扫描整张纹理；输入坐标、LOD 和局部 latent，输出材质通道。</p>
+                <p>代价是：一次普通纹理采样变成若干 feature load 加矩阵运算。这正是 NTC 的硬件假设——现代 GPU 越来越擅长计算，而高分辨率纹理的数据搬运仍然昂贵。</p>
+              </section>
+            </div>
+
+            <h3>最容易忽略的坑：双线性不是一次解码</h3>
+            <div class="prose">
+              <p>硬件纹理单元能便宜地过滤 BCn，但 NTC 的 decoder 给出一个 texel。精确双线性要解码四个点，三线性要解码八个点，成本很快翻倍。论文改用 stochastic filtering：每帧只抖动坐标并取一个样本，再让时间重建把多帧结果融合起来。</p>
+            </div>
+
+            <div class="filter-lab" aria-labelledby="filter-title">
+              <div class="filter-tabs" role="group" aria-label="选择过滤方法">
+                <button class="is-active" type="button" data-filter="nearest" aria-pressed="true">单点</button>
+                <button type="button" data-filter="bilinear" aria-pressed="false">精确双线性</button>
+                <button type="button" data-filter="trilinear" aria-pressed="false">精确三线性</button>
+                <button type="button" data-filter="stochastic" aria-pressed="false">随机过滤</button>
+              </div>
+              <div class="filter-readout" aria-live="polite">
+                <div><span id="filter-taps">1</span><small>次 decoder / sample</small></div>
+                <p id="filter-copy"><strong>单点：</strong>最快，但纹理缩放时容易闪烁和锯齿。</p>
+              </div>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>类比 PBD</span>
+              <p>它有点像用一个 learned surrogate 替换查表：显存流量下降，但一次“读取”变成计算。和降低 solver iteration 一样，得到的速度或质量要放到整条渲染管线里测，不能只看压缩率。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="evidence" aria-labelledby="evidence-title">
+            <header class="section-heading">
+              <span>05 / EVIDENCE</span>
+              <h2 id="evidence-title">论文结果：更小，不代表完全免费</h2>
+            </header>
+
+            <figure class="source-figure">
+              <div class="source-figure-surface source-paper"><img src="../paper/ntc/figure-1-render-comparison.png" alt="NTC 论文图 1：BC high、NTC 与 4K 参考材质的渲染及纹理细节比较" /></div>
+              <figcaption><b>论文 Figure 1。</b>NTC 用 3.8 MB 保存 4096² 材质，BC high 用 5.3 MB 保存 1024²；NTC 的线性分辨率高 4 倍、texel 数高 16 倍，同时少用约 30% 存储。图源：Vaidyanathan et al., SIGGRAPH 2023。</figcaption>
+            </figure>
+
+            <div class="table-wrap">
+              <table class="paper-table metrics-table">
+                <thead><tr><th>方法 / 档位</th><th>平均 BPPC ↓</th><th>PSNR ↑</th><th>1 − SSIM ↓</th><th>怎么读</th></tr></thead>
+                <tbody>
+                  <tr><td>AVIF</td><td>0.20</td><td>29.49 dB</td><td>0.1138</td><td>低码率对照</td></tr>
+                  <tr class="is-emphasis"><td>NTC 0.2</td><td>0.23</td><td>32.71 dB</td><td>0.0633</td><td>相近存储下误差更低</td></tr>
+                  <tr><td>AVIF</td><td>0.49</td><td>33.10 dB</td><td>0.0758</td><td>中低码率对照</td></tr>
+                  <tr class="is-emphasis"><td>NTC 0.5</td><td>0.56</td><td>36.12 dB</td><td>0.0418</td><td>论文的常用平衡点</td></tr>
+                  <tr><td>BC Medium</td><td>3.12</td><td>37.38 dB</td><td>0.0340</td><td>GPU 原生格式</td></tr>
+                  <tr class="is-emphasis"><td>NTC 2.25</td><td>2.51</td><td>45.30 dB</td><td>0.0134</td><td>高质量档</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="table-note">BPPC 是每像素、每通道平均 bit 数。表中是论文 20 套材质的平均值，不是单张示例图；PSNR 越高越好，1 − SSIM 越低越好。</p>
+
+            <div class="interactive-block tradeoff-lab" id="tradeoff-lab">
+              <header class="interactive-heading">
+                <div><span>INTERACTIVE 03</span><h3>选择 NTC 档位，观察存储、质量与时间</h3></div>
+                <p>数值来自论文 4K × 4K × 9 通道的统计表，以及 RTX 4090 全屏材质测试。</p>
+              </header>
+              <div class="profile-tabs" role="group" aria-label="选择 NTC 压缩档位">
+                <button class="is-active" type="button" data-profile="0.2" aria-pressed="true">NTC 0.2</button>
+                <button type="button" data-profile="0.5" aria-pressed="false">NTC 0.5</button>
+                <button type="button" data-profile="1.0" aria-pressed="false">NTC 1.0</button>
+                <button type="button" data-profile="2.25" aria-pressed="false">NTC 2.25</button>
+              </div>
+              <div class="metric-bars" aria-live="polite">
+                <div><span>存储</span><i><b id="storage-bar"></b></i><output id="storage-value">3.52 MB</output></div>
+                <div><span>PSNR</span><i><b id="psnr-bar"></b></i><output id="psnr-value">32.71 dB</output></div>
+                <div><span>运行</span><i><b id="runtime-bar"></b></i><output id="runtime-value">1.15 ms</output></div>
+              </div>
+              <p id="profile-copy" class="profile-copy">极低码率：适合先看整体材质是否可接受，细小高频细节最容易被抹掉。</p>
+              <p class="demo-note">BC High 在同一运行测试中是 0.49 ms。这里的毫秒数只说明论文特定场景与 RTX 4090 上的相对代价，不能直接当成你的项目帧耗。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="deployment" aria-labelledby="deployment-title">
+            <header class="section-heading">
+              <span>06 / CURRENT SDK</span>
+              <h2 id="deployment-title">今天怎么接：Sample、Load、Feedback 是三种不同交换</h2>
+            </header>
+
+            <div class="prose">
+              <p>论文主要讨论直接随机访问。NVIDIA 现在的 RTXNTC SDK 又把它拆成三种工程路径。它们共享同一压缩资产，却不代表相同的显存和运行成本。</p>
+            </div>
+
+            <div class="mode-switcher">
+              <div class="mode-tabs" role="group" aria-label="选择 NTC SDK 推理模式">
+                <button class="is-active" type="button" data-mode="sample" aria-pressed="true">On Sample</button>
+                <button type="button" data-mode="load" aria-pressed="false">On Load</button>
+                <button type="button" data-mode="feedback" aria-pressed="false">On Feedback</button>
+              </div>
+              <div class="mode-diagram" aria-live="polite">
+                <ol id="mode-flow"><li>NTC asset</li><li>shader decoder</li><li>当前 texel</li><li>material channels</li></ol>
+                <dl>
+                  <div><dt>显存</dt><dd id="mode-memory">保留 NTC 紧凑表示</dd></div>
+                  <div><dt>帧内成本</dt><dd id="mode-cost">每次材质采样都执行 decoder</dd></div>
+                  <div><dt>适合</dt><dd id="mode-fit">高端 GPU、显存与带宽紧张的场景</dd></div>
+                </dl>
+                <p id="mode-copy">直接在 shader 里按坐标解码。它最接近论文的 random access，也最依赖现代矩阵计算能力；输出是未过滤 texel，通常要配 stochastic filtering。</p>
+              </div>
+            </div>
+
+            <div class="paper-takeaway">
+              <span>版本边界</span>
+              <p>本文讲的核心方法来自 2023 论文；上面的三种模式来自当前 RTXNTC SDK。SDK 仍处于 Beta，接口和硬件建议可能继续变化。</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="limits" aria-labelledby="limits-title">
+            <header class="section-heading">
+              <span>07 / ADVANTAGES &amp; LIMITS</span>
+              <h2 id="limits-title">它比别人强在哪里，又会在哪些地方坏掉</h2>
+            </header>
+
+            <div class="advantage-list">
+              <article><span>01</span><h3>联合利用三类冗余</h3><p>空间、通道与 mip 一起优化；对多通道 PBR 材质比单独压每张图更有优势。</p></article>
+              <article><span>02</span><h3>固定码率与随机访问并存</h3><p>不使用需要顺序展开的熵码流，shader 可以直接询问任意 texel。</p></article>
+              <article><span>03</span><h3>把瓶颈从带宽移向计算</h3><p>在计算资源充足而显存或 PCIe 搬运受限时，这种交换更有意义。</p></article>
+              <article><span>04</span><h3>同一表示可走多条部署路径</h3><p>当前 SDK 可以直接采样，也可以在加载或 sampler feedback 阶段转成 BCn。</p></article>
+            </div>
+
+            <figure class="source-figure">
+              <div class="source-figure-surface source-paper"><img src="../paper/ntc/figure-12-failures.png" alt="NTC 论文图 12：模糊、颜色偏移、通道泄漏与锐利阶梯纹理丢失等失败案例" /></div>
+              <figcaption><b>论文 Figure 12 的失败案例。</b>从左到右包括模糊、颜色偏移、跨通道 feature leakage，以及锐利阶梯图案被抹平。图源：Vaidyanathan et al., SIGGRAPH 2023。</figcaption>
+            </figure>
+
+            <div class="limit-list">
+              <div><span>01</span><p><strong>有损且会“串台”。</strong>高频细节可能变糊，一个通道的结构可能泄漏到另一个通道；alpha cutout 经阈值放大后尤其容易闪烁。</p></div>
+              <div><span>02</span><p><strong>依赖通道对齐。</strong>如果 Normal 与 Albedo 的结构错位，共享 latent 很难同时解释它们。</p></div>
+              <div><span>03</span><p><strong>总是输出全部通道。</strong>只需要 opacity 的 shadow pass 也可能承担整组输出的网络成本。</p></div>
+              <div><span>04</span><p><strong>过滤与各向异性采样昂贵。</strong>精确过滤需要重复 decoder；随机过滤则依赖时间重建并可能带来 specular flicker。</p></div>
+              <div><span>05</span><p><strong>每种材质有自己的网络。</strong>同一 wave / warp 中混入多种材质会产生分支与参数切换问题。</p></div>
+              <div><span>06</span><p><strong>单张 RGB 图不一定划算。</strong>通道越少，可利用的跨通道相关性越少；NTC 的目标本来就是整套材质。</p></div>
+            </div>
+          </section>
+
+          <section class="paper-section" id="practice" aria-labelledby="practice-title">
+            <header class="section-heading">
+              <span>08 / PRACTICAL MAPPING</span>
+              <h2 id="practice-title">放进你的图形学项目，应该先做什么</h2>
+            </header>
+
+            <div class="prose">
+              <p>如果你的项目主要是 Three.js / WebGL，现在不适合直接把 RTXNTC 当成一行依赖装进去：官方 SDK 面向 DX12 / Vulkan 和 RTX GPU。更现实的第一步，是把这篇文章的思想用于资产分析——检查贴图是否对齐、通道是否相关、哪些 pass 真正同时使用全部通道，以及当前瓶颈究竟是显存、带宽还是算力。</p>
+              <p>如果你在原生渲染器或 Unreal 的 RTX 路径实验，可以先挑一个 4K、通道较多、屏幕覆盖率高的材质做 A/B：同相机轨迹记录 VRAM、frame time、temporal flicker 与材质误差，再决定用 On Sample、On Load 或 Feedback。不要先压整个资产库。</p>
+            </div>
+
+            <ol class="experiment-checklist">
+              <li><span>01</span><div><b>选对样本</b><p>至少包含 Albedo、Normal、Roughness、高度等多个对齐通道，并保留未压缩 reference。</p></div></li>
+              <li><span>02</span><div><b>先看误差位置</b><p>不要只看平均 PSNR；重点检查法线高光、alpha cutout、细裂缝与远距离 mip。</p></div></li>
+              <li><span>03</span><div><b>测整条 frame</b><p>分别记录显存、上传量、采样/解码耗时、时间重建成本和 GPU 占用。</p></div></li>
+              <li><span>04</span><div><b>按 pass 分析通道需求</b><p>如果大部分 pass 只读一个通道，一次输出全部通道的优势会被削弱。</p></div></li>
+            </ol>
+
+            <div class="paper-takeaway">
+              <span>最终判断</span>
+              <p>NTC 最值得学的不是“纹理也能用 AI”，而是一种图形学系统设计：<strong>发现资产中的相关性，把存储表示改成可随机查询的小函数，再用多出来的 ALU 换回显存与带宽。</strong></p>
+            </div>
+          </section>
+
+          <footer class="ntc-reference" id="reference">
+            <span>REFERENCES &amp; ATTRIBUTION</span>
+            <ol>
+              <li>Karthik Vaidyanathan et al. <a href="https://research.nvidia.com/labs/rtr/neural_texture_compression/" target="_blank" rel="noreferrer">Random-Access Neural Compression of Material Textures</a>, ACM SIGGRAPH 2023.</li>
+              <li>NVIDIA. <a href="https://github.com/NVIDIA-RTX/RTXNTC" target="_blank" rel="noreferrer">RTX Neural Texture Compression SDK</a>, current Beta implementation and integration modes.</li>
+              <li>NVIDIA. <a href="https://github.com/NVIDIA-RTX/RTXNTC/blob/main/docs/SettingsAndQuality.md" target="_blank" rel="noreferrer">Settings and Quality Guide</a>, channel count, quality targets, adaptive compression and known artifacts.</li>
+              <li>NVIDIA. <a href="https://github.com/NVIDIA-RTX/RTXNTC/blob/main/docs/integration/InferenceOnSample.md" target="_blank" rel="noreferrer">Inference on Sample Integration Guide</a>, random texel access and filtering guidance.</li>
+            </ol>
+            <p>论文图用于研究评论与解释，版权归原作者；表格数字取自论文。页面中的合成纹理、成本 units 与 decoder 输出是教学演示，不是官方 NTC 复现或性能承诺。</p>
+            <a href="/home/#articles">← 返回学习笔记</a>
+          </footer>
+        </article>
+      </main>
+
+      <aside class="next-sidebar next-article-toc ntc-toc" aria-label="文章目录">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/">返回个人主页</a></div>
+        <p>目录</p>
+        <nav>
+          <a class="is-current" href="#overview">论文信息</a>
+          <a href="#problem">1. 研究问题</a>
+          <a href="#redundancy">2. 压缩来源</a>
+          <a href="#method">3. 方法细节</a>
+          <a href="#training">4. 训练与过滤</a>
+          <a href="#evidence">5. 论文结果</a>
+          <a href="#deployment">6. 当前 SDK</a>
+          <a href="#limits">7. 优势与局限</a>
+          <a href="#practice">8. 项目映射</a>
+          <a href="#reference">参考资料</a>
+        </nav>
+      </aside>
+    </div>
+
+    <footer class="next-footer"><p>© 2026 DOTAFS · Neural Texture Compression</p><p>Reference: <a href="https://research.nvidia.com/labs/rtr/neural_texture_compression/" target="_blank" rel="noreferrer">Vaidyanathan et al., 2023</a></p></footer>
+  </body>
+</html>
