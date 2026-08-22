@@ -110,28 +110,55 @@
 
             <div class="interactive-block correlation-lab" id="correlation-lab">
               <header class="interactive-heading">
-                <div><span>INTERACTIVE 01</span><h3>拖动“通道相关性”，观察共享结构</h3></div>
-                <p>这是概念演示，不是论文编码器复现。纹理越对齐，越多边缘可以由同一份 latent 描述。</p>
+                <div><span>INTERACTIVE 01</span><h3>同一条裂缝，为什么不必记录三次</h3></div>
+                <p>这是空间相关性的概念演示，不是论文编码器复现。点击任意贴图，会在三张图的同一个坐标取样。</p>
               </header>
-              <div class="lab-controls">
-                <label for="correlation">通道相关性 <output id="correlation-value" for="correlation">78%</output></label>
-                <input id="correlation" type="range" min="0" max="100" value="78" step="1" />
-                <button id="correlation-reset" type="button">重置</button>
+
+              <div class="correlation-primer" aria-label="通道相关性的正确与错误理解">
+                <div><span>不是</span><p>Albedo、Normal、Roughness 的数值变得一样</p></div>
+                <div><span>而是</span><p>它们在<strong>同一个纹理坐标</strong>出现可预测的结构变化</p></div>
               </div>
+
+              <div class="correlation-toolbar">
+                <div class="correlation-slider">
+                  <label for="correlation">三张贴图的结构对齐程度 <output id="correlation-value" for="correlation">82%</output></label>
+                  <input id="correlation" type="range" min="0" max="100" value="82" step="1" />
+                  <div aria-hidden="true"><span>各自错位</span><span>同一条裂缝</span></div>
+                </div>
+                <div class="correlation-actions">
+                  <div class="correlation-view" role="group" aria-label="选择纹理观察方式">
+                    <button class="is-active" type="button" data-correlation-view="material" aria-pressed="true">材质结果</button>
+                    <button type="button" data-correlation-view="mask" aria-pressed="false">只看变化位置</button>
+                  </div>
+                  <button id="correlation-reset" type="button">重置实验</button>
+                </div>
+              </div>
+
+              <p class="sample-instruction"><b>试一下：</b>点击 Albedo 里的裂缝。十字取样点会同步出现在三张贴图上，再看下方三个通道是否同时响应。也可以用方向键移动取样点。</p>
+
               <div class="texture-triptych">
-                <figure><figcaption><span>01</span><b>Albedo</b></figcaption><canvas id="albedo-canvas" width="300" height="190" role="img" aria-label="教学用颜色纹理"></canvas></figure>
-                <figure><figcaption><span>02</span><b>Normal</b></figcaption><canvas id="normal-canvas" width="300" height="190" role="img" aria-label="教学用法线纹理"></canvas></figure>
-                <figure><figcaption><span>03</span><b>Roughness</b></figcaption><canvas id="roughness-canvas" width="300" height="190" role="img" aria-label="教学用粗糙度纹理"></canvas></figure>
+                <figure><figcaption><span><b>Albedo</b><small>裂缝处颜色变暗</small></span><i id="albedo-state">变化 0%</i></figcaption><canvas id="albedo-canvas" width="360" height="220" role="img" tabindex="0" aria-label="教学用 Albedo 纹理；点击或使用方向键移动同步取样点"></canvas></figure>
+                <figure><figcaption><span><b>Normal</b><small>裂缝处表面方向改变</small></span><i id="normal-state">变化 0°</i></figcaption><canvas id="normal-canvas" width="360" height="220" role="img" tabindex="0" aria-label="教学用 Normal 纹理；点击或使用方向键移动同步取样点"></canvas></figure>
+                <figure><figcaption><span><b>Roughness</b><small>裂缝处粗糙度改变</small></span><i id="roughness-state">变化 0%</i></figcaption><canvas id="roughness-canvas" width="360" height="220" role="img" tabindex="0" aria-label="教学用 Roughness 纹理；点击或使用方向键移动同步取样点"></canvas></figure>
               </div>
-              <div class="lab-readout" aria-live="polite">
-                <dl>
-                  <div><dt>三张独立记录</dt><dd>300 units</dd></div>
-                  <div><dt>共享 latent 估算</dt><dd id="shared-cost">197 units</dd></div>
-                  <div><dt>可共享结构</dt><dd id="shared-structure">高</dd></div>
-                </dl>
-                <p id="correlation-explanation">裂缝与凸起在三张图中大体对齐，decoder 可以复用一份空间描述，再分别输出不同通道。</p>
+
+              <div class="sample-panel" aria-live="polite">
+                <div class="sample-coordinate">
+                  <span>同步取样坐标</span>
+                  <b id="sample-coordinate">u 0.48 · v 0.48</b>
+                  <small>三张图读取完全相同的 UV</small>
+                </div>
+                <div class="sample-responses" aria-label="三个材质通道在当前坐标的变化强度">
+                  <div><span>Albedo 亮度变化</span><i><b id="albedo-response-bar"></b></i><output id="albedo-response">0%</output></div>
+                  <div><span>Normal 方向变化</span><i><b id="normal-response-bar"></b></i><output id="normal-response">0°</output></div>
+                  <div><span>Roughness 数值变化</span><i><b id="roughness-response-bar"></b></i><output id="roughness-response">0%</output></div>
+                </div>
+                <div class="event-summary">
+                  <span id="shared-structure">等待取样</span>
+                  <p id="correlation-explanation">把取样点放到裂缝上，观察三种不同数值是否在同一坐标发生变化。</p>
+                </div>
               </div>
-              <p class="demo-note">上面的 units 是为了解释趋势而设的教学量，不对应论文 BPPC。论文的实际结果见第 5 节。</p>
+              <p class="demo-note">观察的是“变化发生在哪里”，不是比较 RGB、法线和粗糙度的数值是否相等。这里只解释相关性；论文的实际 BPPC 与质量结果见第 5 节。</p>
             </div>
           </section>
 

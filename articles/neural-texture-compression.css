@@ -463,24 +463,90 @@
   line-height: 1.75 !important;
 }
 
-.lab-controls {
+.correlation-primer {
   display: grid;
-  grid-template-columns: auto minmax(140px, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 20px;
+  border-top: 1px solid var(--ntc-line);
+  border-bottom: 1px solid var(--ntc-line);
 }
 
-.lab-controls label,
+.correlation-primer > div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px 0;
+}
+
+.correlation-primer > div + div {
+  padding-left: 18px;
+  border-left: 1px solid var(--ntc-line);
+}
+
+.correlation-primer span {
+  color: var(--ntc-muted);
+  font: 10px/1.7 var(--ntc-mono);
+}
+
+.correlation-primer p {
+  margin: 0;
+  color: var(--ntc-copy);
+  font-size: 12px;
+  line-height: 1.7 !important;
+}
+
+.correlation-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.correlation-slider label,
 .decoder-controls label {
   color: var(--ntc-copy);
   font-size: 12px;
 }
 
-.lab-controls output,
+.correlation-slider label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.correlation-slider output,
 .decoder-controls output {
   color: var(--ntc-text);
   font-family: var(--ntc-mono);
+}
+
+.correlation-slider > div {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  color: var(--ntc-muted);
+  font: 9px/1.5 var(--ntc-mono);
+}
+
+.correlation-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.correlation-view {
+  display: flex;
+  gap: 6px;
+}
+
+.sample-instruction {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  color: var(--ntc-muted) !important;
+  background: var(--ntc-bg);
+  border-left: 2px solid var(--ntc-accent);
+  font-size: 11px;
+  line-height: 1.75 !important;
 }
 
 .ntc-page input[type="range"] {
@@ -519,11 +585,19 @@
 
 .texture-triptych figcaption {
   display: flex;
+  align-items: start;
   justify-content: space-between;
+  gap: 12px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--ntc-line);
   color: var(--ntc-muted);
   font: 10px/1.4 var(--ntc-mono);
+}
+
+.texture-triptych figcaption > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .texture-triptych figcaption b {
@@ -531,53 +605,111 @@
   font-size: 11px;
 }
 
+.texture-triptych figcaption small {
+  color: var(--ntc-muted);
+  font: 9px/1.5 var(--ntc-mono);
+}
+
+.texture-triptych figcaption i {
+  color: var(--ntc-text);
+  font-style: normal;
+  white-space: nowrap;
+}
+
 .texture-triptych canvas {
   display: block;
   width: 100%;
   height: auto;
   background: var(--ntc-bg);
+  cursor: crosshair;
 }
 
-.lab-readout {
+.texture-triptych canvas:focus-visible {
+  outline: 2px solid var(--ntc-accent);
+  outline-offset: -3px;
+}
+
+.sample-panel {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 16px 24px;
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid var(--ntc-line);
 }
 
-.lab-readout dl {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  margin: 0;
+.sample-coordinate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 20px;
+  border-right: 1px solid var(--ntc-line);
 }
 
-.lab-readout dl > div {
-  padding: 0 14px;
-  border-left: 1px solid var(--ntc-line);
-}
-
-.lab-readout dl > div:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.lab-readout dt,
-.lab-readout dd {
-  margin: 0;
-}
-
-.lab-readout dt {
+.sample-coordinate span,
+.sample-coordinate small {
   color: var(--ntc-muted);
-  font: 10px/1.5 var(--ntc-mono);
+  font: 9px/1.55 var(--ntc-mono);
 }
 
-.lab-readout dd {
-  margin-top: 5px;
+.sample-coordinate b {
+  font: 500 12px/1.55 var(--ntc-mono);
+}
+
+.sample-responses {
+  display: grid;
+  gap: 8px;
+}
+
+.sample-responses > div {
+  display: grid;
+  grid-template-columns: 148px minmax(80px, 1fr) 52px;
+  align-items: center;
+  gap: 10px;
+}
+
+.sample-responses span,
+.sample-responses output {
+  color: var(--ntc-muted);
+  font: 9px/1.5 var(--ntc-mono);
+}
+
+.sample-responses output {
   color: var(--ntc-text);
-  font: 500 13px/1.5 var(--ntc-mono);
+  text-align: right;
 }
 
-.lab-readout > p {
-  margin: 14px 0 0;
+.sample-responses i {
+  display: block;
+  height: 7px;
+  background: var(--ntc-bg);
+  border: 1px solid var(--ntc-line);
+}
+
+.sample-responses i b {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--ntc-accent);
+  transition: width .16s ease;
+}
+
+.event-summary {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ntc-line);
+}
+
+.event-summary > span {
+  color: var(--ntc-text);
+  font: 500 11px/1.6 var(--ntc-mono);
+}
+
+.event-summary p {
+  margin: 0;
   color: var(--ntc-copy);
   font-size: 12px;
   line-height: 1.8 !important;
@@ -1192,6 +1324,31 @@
     border-left: 0;
   }
 
+  .correlation-primer,
+  .correlation-toolbar,
+  .sample-panel,
+  .event-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .correlation-primer > div + div {
+    padding-left: 0;
+    border-top: 1px solid var(--ntc-line);
+    border-left: 0;
+  }
+
+  .correlation-actions {
+    flex-wrap: wrap;
+  }
+
+  .correlation-view {
+    flex: 1 1 210px;
+  }
+
+  .correlation-view button {
+    flex: 1 1 auto;
+  }
+
   .texture-triptych {
     grid-template-columns: 1fr;
   }
@@ -1201,17 +1358,22 @@
     object-fit: cover;
   }
 
-  .lab-controls {
-    grid-template-columns: 1fr;
+  .sample-coordinate {
+    padding-right: 0;
+    padding-bottom: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ntc-line);
   }
 
-  .lab-readout dl,
+  .event-summary {
+    gap: 7px;
+  }
+
   .material-output,
   .mode-diagram dl {
     grid-template-columns: 1fr;
   }
 
-  .lab-readout dl > div,
   .material-output > div,
   .mode-diagram dl > div {
     padding: 10px 0;
@@ -1219,7 +1381,6 @@
     border-left: 0;
   }
 
-  .lab-readout dl > div:first-child,
   .material-output > div:first-child,
   .mode-diagram dl > div:first-child {
     border-top: 0;

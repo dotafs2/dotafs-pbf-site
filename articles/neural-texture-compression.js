@@ -13,122 +13,254 @@ function seededNoise(value) {
   return raw - Math.floor(raw);
 }
 
-// Interactive 01: channel-correlation teaching textures.
+// Interactive 01: spatial correlation across material channels.
 const correlationInput = document.querySelector("#correlation");
 const textureCanvases = {
   albedo: document.querySelector("#albedo-canvas"),
   normal: document.querySelector("#normal-canvas"),
   roughness: document.querySelector("#roughness-canvas"),
 };
+const baseCrack = [
+  { x: .08, y: .28 },
+  { x: .22, y: .36 },
+  { x: .34, y: .53 },
+  { x: .48, y: .46 },
+  { x: .61, y: .55 },
+  { x: .75, y: .39 },
+  { x: .91, y: .52 },
+];
+const channelDrift = {
+  albedo: { x: 0, y: 0, phase: 0 },
+  normal: { x: .055, y: .15, phase: 2.4 },
+  roughness: { x: -.07, y: -.14, phase: 4.7 },
+};
+let correlationView = "material";
+let samplePoint = { u: .48, v: .46 };
 
-function crackPoint(index, channel, correlation, width, height) {
-  const sharedX = width * (0.12 + index * 0.115) + Math.sin(index * 1.73) * 14;
-  const sharedY = height * (0.22 + index * 0.075) + Math.sin(index * .88) * 28;
-  const independence = 1 - correlation;
-  const channelOffset = { albedo: 0, normal: 29, roughness: 61 }[channel];
-  return {
-    x: sharedX + independence * (seededNoise(index + channelOffset) - .5) * width * .7,
-    y: sharedY + independence * (seededNoise(index * 3 + channelOffset) - .5) * height * .65,
-  };
+function correlationPoints(channel, alignment) {
+  const independence = 1 - alignment;
+  const drift = channelDrift[channel];
+  return baseCrack.map((point, index) => ({
+    x: clamp(point.x + independence * (drift.x + Math.sin(index * 1.27 + drift.phase) * .025), .04, .96),
+    y: clamp(point.y + independence * (drift.y + Math.cos(index * 1.11 + drift.phase) * .028), .08, .92),
+  }));
 }
 
-function drawBaseTexture(context, width, height, channel) {
-  const background = channel === "normal" ? "#727a86" : channel === "roughness" ? "#626667" : "#6e685b";
-  context.fillStyle = background;
+function drawMaterialSurface(context, width, height, channel) {
+  const backgrounds = { albedo: "#6d675b", normal: "#737c8a", roughness: "#666a69" };
+  context.fillStyle = correlationView === "mask" ? "#1b1d1f" : backgrounds[channel];
   context.fillRect(0, 0, width, height);
 
-  for (let y = 0; y < height; y += 8) {
-    for (let x = 0; x < width; x += 8) {
-      const n = seededNoise(x * .41 + y * 1.17 + (channel === "normal" ? 40 : channel === "roughness" ? 80 : 0));
-      const alpha = .025 + n * .065;
-      context.fillStyle = channel === "normal" ? `rgba(32, 39, 50, ${alpha})` : `rgba(236, 232, 218, ${alpha})`;
-      context.fillRect(x, y, 7, 7);
+  if (correlationView === "mask") return;
+  for (let y = 0; y < height; y += 9) {
+    for (let x = 0; x < width; x += 9) {
+      const offset = channel === "normal" ? 37 : channel === "roughness" ? 79 : 0;
+      const value = seededNoise(x * .37 + y * 1.09 + offset);
+      context.fillStyle = channel === "normal"
+        ? `rgba(27, 31, 39, ${.025 + value * .055})`
+        : `rgba(235, 231, 216, ${.022 + value * .05})`;
+      context.fillRect(x, y, 8, 8);
     }
   }
 }
 
-function drawCrack(context, points, channel) {
-  context.save();
+function traceCrack(context, points, width, height) {
   context.beginPath();
   points.forEach((point, index) => {
-    if (index === 0) context.moveTo(point.x, point.y);
-    else context.lineTo(point.x, point.y);
+    const x = point.x * width;
+    const y = point.y * height;
+    if (index === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
   });
   context.lineJoin = "round";
   context.lineCap = "round";
+}
+
+function drawMaterialChange(context, points, width, height, channel) {
+  if (correlationView === "mask") {
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(227, 225, 220, .88)";
+    context.lineWidth = 6;
+    context.stroke();
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(137, 149, 153, .72)";
+    context.lineWidth = 2;
+    context.stroke();
+    return;
+  }
 
   if (channel === "albedo") {
-    context.strokeStyle = "rgba(25, 27, 26, .82)";
-    context.lineWidth = 8;
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(24, 25, 24, .9)";
+    context.lineWidth = 11;
     context.stroke();
-    context.strokeStyle = "rgba(205, 195, 170, .24)";
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(210, 202, 181, .24)";
     context.lineWidth = 2;
     context.stroke();
   } else if (channel === "normal") {
-    context.strokeStyle = "rgba(42, 48, 60, .68)";
-    context.lineWidth = 10;
-    context.stroke();
-    context.translate(3, -3);
-    context.strokeStyle = "rgba(188, 196, 211, .72)";
-    context.lineWidth = 5;
-    context.stroke();
-  } else {
-    context.strokeStyle = "rgba(30, 32, 32, .72)";
+    context.save();
+    context.translate(-3, 3);
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(33, 38, 48, .82)";
     context.lineWidth = 13;
     context.stroke();
-    context.strokeStyle = "rgba(184, 188, 187, .30)";
-    context.lineWidth = 4;
+    context.restore();
+    context.save();
+    context.translate(3, -3);
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(199, 207, 219, .78)";
+    context.lineWidth = 8;
+    context.stroke();
+    context.restore();
+  } else {
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(30, 31, 31, .66)";
+    context.lineWidth = 18;
+    context.stroke();
+    traceCrack(context, points, width, height);
+    context.strokeStyle = "rgba(190, 194, 190, .38)";
+    context.lineWidth = 9;
     context.stroke();
   }
+}
+
+function drawSampleCursor(context, width, height) {
+  const x = samplePoint.u * width;
+  const y = samplePoint.v * height;
+  context.save();
+  context.setLineDash([4, 4]);
+  context.strokeStyle = "rgba(227, 225, 220, .58)";
+  context.lineWidth = 1;
+  context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke();
+  context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke();
+  context.setLineDash([]);
+  context.beginPath();
+  context.arc(x, y, 7, 0, Math.PI * 2);
+  context.fillStyle = "#1b1d1f";
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = "#e3e1dc";
+  context.stroke();
   context.restore();
 }
 
-function drawTexture(canvas, channel, correlation) {
+function drawCorrelationTexture(canvas, channel, alignment) {
   const context = canvas.getContext("2d");
   const { width, height } = canvas;
-  drawBaseTexture(context, width, height, channel);
-
-  const points = Array.from({ length: 8 }, (_, index) => crackPoint(index, channel, correlation, width, height));
-  drawCrack(context, points, channel);
-
-  const branchStart = points[4];
-  const branch = [
-    branchStart,
-    { x: branchStart.x + 28 + (1 - correlation) * (channel === "normal" ? 22 : -12), y: branchStart.y - 25 },
-    { x: branchStart.x + 58 + (1 - correlation) * (channel === "roughness" ? -36 : 20), y: branchStart.y - 42 },
-  ];
-  drawCrack(context, branch, channel);
-
-  context.fillStyle = "rgba(227, 225, 220, .72)";
+  const points = correlationPoints(channel, alignment);
+  drawMaterialSurface(context, width, height, channel);
+  drawMaterialChange(context, points, width, height, channel);
+  drawSampleCursor(context, width, height);
+  context.fillStyle = "rgba(227, 225, 220, .7)";
   context.font = "10px IBM Plex Mono, monospace";
-  context.fillText(channel.toUpperCase(), 11, 17);
+  context.fillText(correlationView === "mask" ? "CHANGE POSITION" : channel.toUpperCase(), 11, 17);
+}
+
+function pointSegmentDistance(point, first, second) {
+  const dx = second.x - first.x;
+  const dy = second.y - first.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const amount = lengthSquared === 0 ? 0 : clamp(((point.u - first.x) * dx + (point.v - first.y) * dy) / lengthSquared, 0, 1);
+  const x = first.x + amount * dx;
+  const y = first.y + amount * dy;
+  return Math.hypot(point.u - x, point.v - y);
+}
+
+function channelResponse(channel, alignment) {
+  const points = correlationPoints(channel, alignment);
+  let distance = Infinity;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    distance = Math.min(distance, pointSegmentDistance(samplePoint, points[index], points[index + 1]));
+  }
+  return Math.exp(-(distance * distance) / (2 * .042 * .042));
 }
 
 function renderCorrelation() {
   const value = Number(correlationInput.value);
-  const correlation = value / 100;
-  Object.entries(textureCanvases).forEach(([channel, canvas]) => drawTexture(canvas, channel, correlation));
+  const alignment = value / 100;
+  const responses = {
+    albedo: channelResponse("albedo", alignment),
+    normal: channelResponse("normal", alignment),
+    roughness: channelResponse("roughness", alignment),
+  };
+  Object.entries(textureCanvases).forEach(([channel, canvas]) => drawCorrelationTexture(canvas, channel, alignment));
 
+  const albedoChange = Math.round(responses.albedo * 78);
+  const normalChange = Math.round(responses.normal * 72);
+  const roughnessChange = Math.round(responses.roughness * 56);
   document.querySelector("#correlation-value").textContent = `${value}%`;
-  const sharedCost = Math.round(300 * (1 - correlation * .44));
-  document.querySelector("#shared-cost").textContent = `${sharedCost} units`;
+  document.querySelector("#sample-coordinate").textContent = `u ${samplePoint.u.toFixed(2)} · v ${samplePoint.v.toFixed(2)}`;
+  document.querySelector("#albedo-state").textContent = `变暗 ${albedoChange}%`;
+  document.querySelector("#normal-state").textContent = `转向 ${normalChange}°`;
+  document.querySelector("#roughness-state").textContent = `改变 ${roughnessChange}%`;
+  document.querySelector("#albedo-response").textContent = `−${albedoChange}%`;
+  document.querySelector("#normal-response").textContent = `${normalChange}°`;
+  document.querySelector("#roughness-response").textContent = `+${roughnessChange}%`;
+  document.querySelector("#albedo-response-bar").style.width = `${responses.albedo * 100}%`;
+  document.querySelector("#normal-response-bar").style.width = `${responses.normal * 100}%`;
+  document.querySelector("#roughness-response-bar").style.width = `${responses.roughness * 100}%`;
 
-  let label = "低";
-  let copy = "三个通道的结构位置差异很大，共享表示难以复用同一条边缘，联合压缩的收益会减弱。";
-  if (value >= 67) {
-    label = "高";
-    copy = "裂缝与凸起在三张图中大体对齐，decoder 可以复用一份空间描述，再分别输出不同通道。";
-  } else if (value >= 34) {
-    label = "中";
-    copy = "大轮廓仍能共享，但局部细节开始错位；latent 既要保存公共结构，也要补充各通道差异。";
+  const active = Object.values(responses).filter((response) => response >= .38).length;
+  const summary = document.querySelector("#shared-structure");
+  const explanation = document.querySelector("#correlation-explanation");
+  if (active === 3) {
+    summary.textContent = "3 / 3 个通道在同一坐标响应";
+    explanation.textContent = `Albedo 变暗 ${albedoChange}%，Normal 改变 ${normalChange}°，Roughness 改变 ${roughnessChange}%。三个数字不同，但变化发生在同一个 UV；共享 latent 可以先记录一次裂缝形状，再让 decoder 输出三种响应。`;
+  } else if (active > 0) {
+    summary.textContent = `${active} / 3 个通道在当前坐标响应`;
+    explanation.textContent = `当前取样点只靠近 ${active} 个通道的裂缝。结构位置发生错位后，一份共享描述不能同时解释三张图，还需要分别保存更多残差。`;
+  } else {
+    summary.textContent = "0 / 3：当前坐标不在裂缝上";
+    explanation.textContent = "把十字取样点移动到任意一张图的裂缝上，再比较另外两张图在同一 UV 是否也发生变化。";
   }
-  document.querySelector("#shared-structure").textContent = label;
-  document.querySelector("#correlation-explanation").textContent = copy;
 }
+
+function setCorrelationSample(event, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  samplePoint = {
+    u: clamp((event.clientX - rect.left) / rect.width, 0, 1),
+    v: clamp((event.clientY - rect.top) / rect.height, 0, 1),
+  };
+  renderCorrelation();
+  canvas.focus();
+}
+
+Object.values(textureCanvases).forEach((canvas) => {
+  canvas.addEventListener("pointerdown", (event) => setCorrelationSample(event, canvas));
+  canvas.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === "ArrowLeft") samplePoint.u = clamp(samplePoint.u - .01, 0, 1);
+    if (event.key === "ArrowRight") samplePoint.u = clamp(samplePoint.u + .01, 0, 1);
+    if (event.key === "ArrowUp") samplePoint.v = clamp(samplePoint.v - .01, 0, 1);
+    if (event.key === "ArrowDown") samplePoint.v = clamp(samplePoint.v + .01, 0, 1);
+    renderCorrelation();
+  });
+});
+
+document.querySelectorAll("[data-correlation-view]").forEach((button) => {
+  button.addEventListener("click", () => {
+    correlationView = button.dataset.correlationView;
+    document.querySelectorAll("[data-correlation-view]").forEach((item) => {
+      const active = item === button;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+    renderCorrelation();
+  });
+});
 
 correlationInput.addEventListener("input", renderCorrelation);
 document.querySelector("#correlation-reset").addEventListener("click", () => {
-  correlationInput.value = "78";
+  correlationInput.value = "82";
+  correlationView = "material";
+  samplePoint = { u: .48, v: .46 };
+  document.querySelectorAll("[data-correlation-view]").forEach((item) => {
+    const active = item.dataset.correlationView === "material";
+    item.classList.toggle("is-active", active);
+    item.setAttribute("aria-pressed", String(active));
+  });
   renderCorrelation();
   correlationInput.focus();
 });
