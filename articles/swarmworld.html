@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="A close reading of SwarmWorld: how persistent artifacts, reuse, and cross-author forks support technological evolution in LLM-agent societies." />
+    <meta name="theme-color" content="#1b1d1f" />
+    <title>SwarmWorld: Artifacts as the Long-Term Memory of an Agent Society — DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <link rel="stylesheet" href="agent-worlds.css" />
+    <script src="agent-worlds.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page agent-world-page">
+    <a class="research-skip-link" href="#overview">Skip to the article</a>
+    <div class="next-headband" aria-hidden="true"></div>
+
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column"><a class="next-brand" href="/home/en/">DOTAFS</a><p>Personal learning notes</p></div>
+        <div class="next-header-content"><nav class="next-menu" aria-label="Site navigation"><a href="/home/en/">Home</a><a href="/home/en/#articles">Archive</a><a href="/learn-ai.html">AI Notes</a><a href="/">PBF Demo</a><a href="https://github.com/dotafs2" target="_blank" rel="noreferrer">GitHub</a></nav></div>
+      </div>
+    </header>
+
+    <div class="next-page-layout wm-layout">
+      <main class="next-main wm-main">
+        <article>
+          <header class="wm-intro" id="overview">
+            <p class="paper-kicker"><span>Paper note / 2026-09-15</span><span>arXiv:2608.26081v1</span><span>22 min read</span></p>
+            <h1>SwarmWorld: Artifacts as the Long-Term Memory of an Agent Society</h1>
+            <p class="wm-deck">SwarmWorld is an experimental platform for studying how LLM agents build technological culture through persistent artifacts, observation, modification, and reuse in a shared world. It asks a harder question than whether agents can converse: <strong>can participants with no assigned professions leave a technical inheritance that later participants genuinely use?</strong></p>
+            <dl class="paper-meta">
+              <div><dt>Paper</dt><dd>SwarmWorld: Stigmergic technological evolution in societies of language-model agents</dd></div>
+              <div><dt>Authors</dt><dd>Subhadeep Pal · Fiona Y. Wang · Markus J. Buehler</dd></div>
+              <div><dt>Institution / date</dt><dd>MIT · 2026-08-26</dd></div>
+              <div><dt>Code</dt><dd>Apache-2.0 simulator, traces, Observatory, replay tools, and human client</dd></div>
+            </dl>
+            <p class="evidence-note"><b>In one sentence:</b> shared societies preserve a more disturbance-resistant portfolio of solutions, while isolated search can still discover the strongest individual artifact. The paper supports artifact-mediated social learning, not a universal claim that groups always beat individuals.</p>
+          </header>
+
+          <section class="paper-section" id="problem" aria-labelledby="problem-title">
+            <header class="section-heading"><span>01 / RESEARCH QUESTION</span><h2 id="problem-title">From conversational memory to world state another agent can inherit</h2></header>
+            <div class="prose">
+              <p>Many multi-agent systems place cooperation inside messages, plans, or short tasks. When the run ends, most of the useful work disappears with the context. SwarmWorld changes the medium of cooperation to <strong>persistent objects and executable controllers</strong>. Materials, structures, and programs remain in its two-dimensional world, where other agents can inspect, use, modify, and fork them.</p>
+              <p>This is <em>stigmergy</em>: participants influence one another through traces left in the environment rather than requiring continuous direct communication. The paper therefore measures whether a society develops a broader technological portfolio, whether artifacts evolve across authors, and whether the world remains useful under disturbances the agents did not see while building it.</p>
+            </div>
+            <div class="abstract-block" aria-label="Breakdown of the research design">
+              <div><span>Participants</span><p>50, 100, or 200 initially homogeneous agents, with no assigned roles or crafting recipes.</p></div>
+              <div><span>Shared medium</span><p>A spatial environment, resources, persistent artifacts, and executable controllers.</p></div>
+              <div><span>Evolution</span><p>Exploration, construction, testing, cross-author reuse, and forks produce an emergent division of labor.</p></div>
+              <div><span>Independent test</span><p>Agents are removed before a deterministic simulator applies eight held-out disturbance schedules.</p></div>
+            </div>
+            <h3>What it adds to earlier approaches</h3>
+            <div class="table-wrap">
+              <table class="paper-table">
+                <thead><tr><th>Approach</th><th>Carrier of inheritance</th><th>Can successors modify it?</th><th>SwarmWorld's distinction</th></tr></thead>
+                <tbody>
+                  <tr><td>Generative towns</td><td>Memory, relationships, dialogue</td><td>Mostly changes social narrative</td><td>Treats executable artifacts as public memory</td></tr>
+                  <tr><td>Best-of-N search</td><td>Mutually isolated candidates</td><td>No cross-agent inheritance</td><td>Preserves authorship, use, and fork lineages</td></tr>
+                  <tr><td>Role-assigned teams</td><td>Task plans and messages</td><td>Within a predefined organization</td><td>Roles emerge from building, use, and maintenance</td></tr>
+                  <tr class="is-emphasis"><td>SwarmWorld</td><td>Persistent artifacts in a shared world</td><td>Use, rewrite, combine, and fork</td><td>Tests the surviving portfolio under unseen disturbances</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="paper-section" id="method" aria-labelledby="method-title">
+            <header class="section-heading"><span>02 / METHOD MAP</span><h2 id="method-title">What happens during one cycle of technological evolution</h2></header>
+            <div class="method-rail" aria-label="SwarmWorld method sequence">
+              <div><span>01 / SENSE</span><b>Read a local world slice</b><small>Resources, nearby objects, memory, and work left by other agents</small></div>
+              <div><span>02 / PLAN</span><b>Produce a bounded plan</b><small>One model, prompt, and action schema; at most 12 planned actions</small></div>
+              <div><span>03 / BUILD</span><b>Leave an artifact</b><small>Research materials, construct objects, or write an executable controller</small></div>
+              <div><span>04 / REUSE</span><b>Fork across authors</b><small>Use, inspect, and modify other agents' work to create a lineage</small></div>
+              <div><span>05 / TEST</span><b>Remove the builders</b><small>Freeze the world and evaluate it under eight unseen disturbances</small></div>
+            </div>
+            <div class="prose">
+              <p>The experiment keeps model capability fixed: <code>gpt-5.6-luna</code>, temperature 0.7, low reasoning, and the same prompt and action schema. The main grid runs for 800 ticks at N=50, 100, and 200, with four matched seeds per cell. Long-horizon runs use N=100 for 3,200 ticks.</p>
+              <p>“Culture” here is not a personality preset. It is an explicit mechanism for recording and transmitting experience. A shared-society condition without explicit culture helps separate the effect of the common environment from the effect of formal knowledge-sharing tools.</p>
+            </div>
+            <p class="boundary-note"><b>Evidence boundary:</b> each experimental cell has only four paired seeds. The results support effect sizes and mechanism-level interpretation, not a stable population-wide “win rate” for swarms.</p>
+          </section>
+
+          <section class="paper-section" id="evidence" aria-labelledby="evidence-title">
+            <header class="section-heading"><span>03 / EVIDENCE</span><h2 id="evidence-title">The shared society wins on portfolios, not on every objective</h2></header>
+            <div class="metric-grid">
+              <div class="metric-card"><span>LONG HORIZON</span><strong>3,200 ticks</strong><p>N=100 runs expose cumulative development rather than a short burst of search.</p></div>
+              <div class="metric-card"><span>NON-CREATOR USE</span><strong>&gt;95%</strong><p>More than 95% of artifacts were eventually used by an agent other than their creator.</p></div>
+              <div class="metric-card"><span>LINEAGE</span><strong>9.75</strong><p>Mean executable-lineage depth with explicit culture; the deepest path reached 12.</p></div>
+            </div>
+            <div class="evidence-lab" data-swarm-lab>
+              <header><span>INTERACTIVE EVIDENCE LEDGER</span><p>Switch metrics to compare three organizational conditions at the same endpoint. Bar lengths are normalized within each metric and should not be compared across tabs.</p></header>
+              <div class="lab-controls" role="group" aria-label="Choose a SwarmWorld metric">
+                <button type="button" class="is-active" data-swarm-metric="resilience" aria-pressed="true">Portfolio resilience</button>
+                <button type="button" data-swarm-metric="inventions" aria-pressed="false">Validated inventions</button>
+                <button type="button" data-swarm-metric="strongest" aria-pressed="false">Strongest artifact</button>
+              </div>
+              <div class="bar-plot" aria-live="polite">
+                <div class="bar-row"><span></span><div class="bar-track"><div class="bar-fill"></div></div><output></output></div>
+                <div class="bar-row"><span></span><div class="bar-track"><div class="bar-fill"></div></div><output></output></div>
+                <div class="bar-row"><span></span><div class="bar-track"><div class="bar-fill"></div></div><output></output></div>
+              </div>
+              <p class="lab-caption" data-swarm-caption></p>
+            </div>
+            <div class="prose">
+              <p>Endpoint portfolio resilience is 0.2474 with explicit culture, 0.2365 without explicit culture, and 0.1794 for isolated search. Shared societies leave a collection that covers more disruptions rather than one single champion solution.</p>
+              <p>Change the objective to the strongest artifact and isolated search reaches 0.3488, above explicit culture at 0.2380. The no-explicit-culture condition also produces 7.00 validated inventions on average, compared with 5.75 under explicit culture. The evidence does not support “more communication is always better” or “groups always beat individuals.”</p>
+              <p>Explicit culture instead makes cumulative development more visible: at tick 3,200 it produces 277.5 artifacts on average versus 238.5 without explicit culture. Executable lineages are deeper, and about half of eligible forks cross an author boundary.</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="limits" aria-labelledby="limits-title">
+            <header class="section-heading"><span>04 / CLAIMS &amp; LIMITS</span><h2 id="limits-title">Separating paper evidence from project inference</h2></header>
+            <div class="claim-ledger">
+              <article class="is-paper"><span class="ledger-label">PAPER CLAIM</span><p><b>Supported:</b> shared worlds improve endpoint portfolio resilience; non-creators widely use artifacts, and executable work develops cross-author lineages.</p></article>
+              <article class="is-inference"><span class="ledger-label">OUR INFERENCE</span><p><b>Useful for an SAO-like world:</b> objects, scripts, and use histories can form a more reliable social-memory layer than conversation summaries. Occupations can emerge from what residents build, use, and maintain.</p></article>
+              <article class="is-unknown"><span class="ledger-label">NOT SHOWN</span><p><b>Still unproven:</b> a playable 3D world, migration across releases, an economic loop, long-running service governance, or residents independently shipping entirely new game mechanics.</p></article>
+            </div>
+            <ul class="limits-list">
+              <li><b>The physics is a surrogate.</b> Normalized material properties support a game-level simulator; they are not an SI-calibrated physical predictor.</li>
+              <li><b>Knockout is not live recovery.</b> Topological disturbances on a frozen world do not prove that a running society can detect, repair, and recover from failure.</li>
+              <li><b>The scale remains small.</b> Fifty to 200 agents, at most 3,200 ticks, and four seeds are orders of magnitude away from an open world operating for months.</li>
+              <li><b>Strong individuals still matter.</b> Isolated search leads on the strongest artifact. Diversity and peak performance are separate objectives.</li>
+            </ul>
+          </section>
+
+          <section class="paper-section" id="mapping" aria-labelledby="mapping-title">
+            <header class="section-heading"><span>05 / PROJECT MAPPING</span><h2 id="mapping-title">For InfiniteAincrad: build an auditable inheritance chain first</h2></header>
+            <div class="application-map">
+              <article><span>WORLD STATE</span><h3>Leave work inside the world</h3><p>Give buildings, recipes, tool scripts, and quest templates stable IDs, authors, versions, dependencies, and use counts instead of leaving them only in resident context.</p></article>
+              <article><span>ACCEPTANCE</span><h3>Let the environment test value</h3><p>Before release, artifacts pass physics, performance, safety, and economic constraints. After release, real use, repair, and reuse determine whether they become infrastructure.</p></article>
+              <article><span>LINEAGE</span><h3>Record who inherited whom</h3><p>Every fork keeps its parent version, intent, and validation result. Emergent occupations then become observable through lineages and use—not declared by a prompt.</p></article>
+            </div>
+            <div class="paper-takeaway"><span>Why this is the primary reference</span><p>SwarmWorld already connects autonomous exploration, persistent work, successor use, and cross-author lineages into one measurable sequence. The first thing worth reproducing is not the 2D presentation; it is the <strong>artifact contract, lineage model, and post-agent acceptance test</strong>.</p></div>
+          </section>
+
+          <footer class="wm-reference" id="reference">
+            <span>REFERENCES &amp; ATTRIBUTION</span>
+            <ol>
+              <li>Pal, Wang, Buehler. <a href="https://arxiv.org/html/2608.26081v1" target="_blank" rel="noreferrer">SwarmWorld: Stigmergic technological evolution in societies of language-model agents</a>, arXiv:2608.26081v1, 2026.</li>
+              <li><a href="https://github.com/lamm-mit/SwarmWorld" target="_blank" rel="noreferrer">lamm-mit/SwarmWorld</a>: Apache-2.0 source, scenarios, traces, replay tools, and clients.</li>
+            </ol>
+            <p>Numbers come from the paper's text and tables. The process diagram and interactive chart are independent redrawings from reported data; no paper figures are reproduced, and this page is not a replication of the experiment.</p>
+            <a href="/home/en/#articles">← Back to learning notes</a>
+          </footer>
+        </article>
+      </main>
+      <aside class="next-sidebar next-article-toc wm-toc" aria-label="Article contents">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/en/">Back to home</a></div>
+        <p>Contents</p>
+        <nav><a class="is-current" href="#overview">Paper information</a><a href="#problem">1. Research question</a><a href="#method">2. Method</a><a href="#evidence">3. Evidence</a><a href="#limits">4. Boundaries</a><a href="#mapping">5. Project mapping</a><a href="#reference">References</a></nav>
+      </aside>
+    </div>
+    <footer class="next-footer"><p>© 2026 DOTAFS · SwarmWorld</p><p>Paper note · evidence before inference</p></footer>
+  </body>
+</html>

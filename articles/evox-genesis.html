@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="A close reading of EvoX Genesis: how persistent software worlds, recursive delegation, and acceptance history support long-running autonomous development." />
+    <meta name="theme-color" content="#1b1d1f" />
+    <title>EvoX Genesis: A Project History That Outlives Its Agents — DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <link rel="stylesheet" href="agent-worlds.css" />
+    <script src="agent-worlds.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page agent-world-page">
+    <a class="research-skip-link" href="#overview">Skip to the article</a>
+    <div class="next-headband" aria-hidden="true"></div>
+
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column"><a class="next-brand" href="/home/en/">DOTAFS</a><p>Personal learning notes</p></div>
+        <div class="next-header-content"><nav class="next-menu" aria-label="Site navigation"><a href="/home/en/">Home</a><a href="/home/en/#articles">Archive</a><a href="/learn-ai.html">AI Notes</a><a href="/">PBF Demo</a><a href="https://github.com/dotafs2" target="_blank" rel="noreferrer">GitHub</a></nav></div>
+      </div>
+    </header>
+
+    <div class="next-page-layout wm-layout">
+      <main class="next-main wm-main">
+        <article>
+          <header class="wm-intro" id="overview">
+            <p class="paper-kicker"><span>Paper note / 2026-09-15</span><span>arXiv:2608.10450v1</span><span>21 min read</span></p>
+            <h1>EvoX Genesis: A Project History That Outlives Its Agents</h1>
+            <p class="wm-deck">EvoX Genesis is an autonomous-development system that treats a repository, its accepted versions, and recursive responsibility paths as a persistent “software world.” It addresses a structural problem in long-running agent work: <strong>when every agent has a finite context and lifetime, how can a large project continue across more than a thousand work episodes without losing its verified history?</strong></p>
+            <dl class="paper-meta">
+              <div><dt>Paper</dt><dd>Persistent Recursive Worlds Enable Autonomous Software Evolution</dd></div>
+              <div><dt>Authors</dt><dd>Beichen Huang · Zhenyu Liang · Bowen Zheng · Ran Cheng</dd></div>
+              <div><dt>Institution / date</dt><dd>Hong Kong Polytechnic University · 2026-08-11</dd></div>
+              <div><dt>Formation run</dt><dd>C compiler · 123.4 hours · 1,019 archived episodes</dd></div>
+            </dl>
+            <p class="evidence-note"><b>In one sentence:</b> Genesis does not try to keep one agent alive forever. It makes agents replaceable and accepted world state unambiguous: only a candidate change that passes parent-level acceptance advances persistent history.</p>
+          </header>
+
+          <section class="paper-section" id="problem" aria-labelledby="problem-title">
+            <header class="section-heading"><span>01 / RESEARCH QUESTION</span><h2 id="problem-title">Why a longer context window still does not solve long-term development</h2></header>
+            <div class="prose">
+              <p>Large software projects operate on three different clocks. One model call lasts minutes, a delegated task may last hours, and a repository evolves for months. Packing more logs into context only delays forgetting. It does not define which version was accepted, whether a failed branch contaminated the baseline, or which constraints remain binding after a model is replaced.</p>
+              <p>Genesis moves persistent identity from the agent to the software world. The paper represents that world as <code>w = (v, p)</code>: <code>v</code> is the accepted version and history, while <code>p</code> is the repository-relative path of responsibility. An agent is a finite-lived worker operating on that world, not the owner of continuity.</p>
+            </div>
+            <div class="abstract-block" aria-label="Genesis core objects">
+              <div><span>World version v</span><p>Accepted code, test state, and traceable history; the only valid baseline for later work.</p></div>
+              <div><span>Responsibility path p</span><p>A repository-relative scope that aligns recursive delegation with code structure.</p></div>
+              <div><span>Finite-lived agent</span><p>Receives a bounded task, produces a candidate diff, and may delegate into deeper paths.</p></div>
+              <div><span>Acceptance event</span><p>The transition <code>(v,p) → (v′,p′)</code> occurs only after parent acceptance. A rejection does not silently advance history.</p></div>
+            </div>
+            <h3>How it differs from ordinary coding-agent workflows</h3>
+            <div class="table-wrap">
+              <table class="paper-table">
+                <thead><tr><th>Approach</th><th>Where continuity lives</th><th>Typical risk</th><th>Genesis response</th></tr></thead>
+                <tbody>
+                  <tr><td>Single agent, long context</td><td>Conversation history</td><td>Compression, drift, incomplete evidence</td><td>Repository and acceptance history persist outside context</td></tr>
+                  <tr><td>Parallel agents</td><td>Shared task list</td><td>Branch conflict and ambiguous ownership</td><td>Delegation binds to a repo-relative path</td></tr>
+                  <tr><td>Scripted pipeline</td><td>Fixed stages</td><td>Cannot reorganize around unknown structure</td><td>Agents recursively create narrower work worlds</td></tr>
+                  <tr class="is-emphasis"><td>Genesis</td><td>Accepted world history</td><td>A flawed acceptance gate can still compound errors</td><td>Candidate diff, constraints, and provenance are archived together</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="paper-section" id="method" aria-labelledby="method-title">
+            <header class="section-heading"><span>02 / PERSISTENT WORLD</span><h2 id="method-title">Delegation can recurse; history advances only through acceptance</h2></header>
+            <div class="method-rail" aria-label="Genesis software-evolution sequence">
+              <div><span>01 / ANCHOR</span><b>Read accepted v</b><small>Current constraints, tests, and history form the factual task baseline</small></div>
+              <div><span>02 / DELEGATE</span><b>Descend by path</b><small>A parent delegates a bounded subproblem to a deeper repository path</small></div>
+              <div><span>03 / PROPOSE</span><b>Generate candidate Δ</b><small>An agent changes an isolated worktree; the world version has not changed yet</small></div>
+              <div><span>04 / VERIFY</span><b>Check constraints</b><small>Tests, compilation, numerical agreement, and the parent goal decide the outcome</small></div>
+              <div><span>05 / COMMIT</span><b>Accept to evolve</b><small>Archive the episode and provenance; the next worker begins from v′</small></div>
+            </div>
+            <div class="evidence-lab version-lab" data-version-lab>
+              <header><span>INTERACTIVE ACCEPTANCE GATE</span><p>Change the parent's decision to see the difference between candidate work and persistent history. This is a teaching redraw of the paper's state transition.</p></header>
+              <div class="version-flow" aria-live="polite">
+                <div class="version-node"><span>ACCEPTED WORLD</span><strong>v₄₁</strong><p>tests: 1,812 / 1,812<br />path: compiler/backend</p></div>
+                <div class="version-arrow" data-version-arrow aria-hidden="true">→</div>
+                <div class="version-node is-candidate" data-candidate><span>ACCEPTED WORLD</span><strong>v₄₂</strong><p>candidate Δ: add switch lowering<br />delegated episode: #1,019</p></div>
+              </div>
+              <div class="decision-controls" role="group" aria-label="Choose the candidate acceptance result">
+                <button type="button" class="is-active" data-decision="accept" aria-pressed="true">Accept candidate</button>
+                <button type="button" data-decision="reject" aria-pressed="false">Reject candidate</button>
+              </div>
+              <div class="version-ledger">
+                <div><span>HISTORY</span><output data-history>v₄₁ → v₄₂</output></div>
+                <div><span>CONSTRAINT</span><output data-tests>Constraints pass</output></div>
+                <div><span>PROVENANCE</span><output data-provenance>Episode + diff stored</output></div>
+              </div>
+              <p class="lab-caption" data-version-message>The parent accepts the candidate. Persistent history advances, and the next finite-lived agent continues from v₄₂.</p>
+            </div>
+            <p class="boundary-note"><b>Do not confuse infrastructure with the model:</b> worktrees, BEAM processes, and the scheduler enable concurrent execution. Continuity comes from the accepted version, responsibility path, constraints, and provenance—not from a permanently running agent process.</p>
+          </section>
+
+          <section class="paper-section" id="compiler" aria-labelledby="compiler-title">
+            <header class="section-heading"><span>03 / FORMATION RUN</span><h2 id="compiler-title">123.4 hours: forming a C compiler from an empty world</h2></header>
+            <div class="metric-grid">
+              <div class="metric-card"><span>WALL CLOCK</span><strong>123.4 h</strong><p>One formation run with DeepSeek V4 Flash at xhigh effort.</p></div>
+              <div class="metric-card"><span>EPISODES</span><strong>1,019</strong><p>Archived agent work episodes, reaching recursive depth 5.</p></div>
+              <div class="metric-card"><span>TOKEN CHARGES</span><strong>$44.38</strong><p>Reported token charges only; infrastructure, storage, and labor are excluded.</p></div>
+            </div>
+            <div class="table-wrap">
+              <table class="paper-table">
+                <thead><tr><th>Acceptance suite</th><th>Passed</th><th>Total</th><th>What it establishes</th></tr></thead>
+                <tbody>
+                  <tr><td>c-testsuite</td><td>220</td><td>220</td><td>Coverage of common C language features</td></tr>
+                  <tr><td>Evaluated LLVM cases</td><td>32</td><td>36</td><td>Four failures remain; this is not complete compatibility</td></tr>
+                  <tr><td>Csmith</td><td>93</td><td>93</td><td>All random-program tests in this batch passed</td></tr>
+                  <tr><td>Rust tests</td><td>2,904</td><td>2,904</td><td>Internal project test scale, not independent certification</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="prose"><p>The repository reached 248,989 physical lines and 750 tracked text files, while also passing LZ4 and SQLite checks. The scale demonstrates sustained maintenance across many files, but <strong>line count is not a substitute for complexity, correctness, or production readiness</strong>.</p></div>
+          </section>
+
+          <section class="paper-section" id="continuation" aria-labelledby="continuation-title">
+            <header class="section-heading"><span>04 / CONTINUATION &amp; REWRITE</span><h2 id="continuation-title">The critical test: replace the agent and model, then keep going</h2></header>
+            <div class="prose">
+              <p>The continuation experiment starts from a completed GLM 5.2 jcc world. The GLM branch retains 1,445 of 1,448 LLVM cases; the DeepSeek continuation retains 1,820 of 1,820. Because the branches use different retained test sets and unmatched budgets, these numbers are not a head-to-head model comparison. The narrower supported claim is that <strong>a persistent software world can continue across model replacement</strong>.</p>
+              <p>A second case rewrites part of MESA's Fortran scientific code in Rust: 13 mapped module directories and 139,414 physical Fortran lines including tests. It runs for 33.22 hours with 272 agents, producing 89,946 Rust lines including tests and benchmarks. A total of 1,052 tests pass, 18 remain ignored, token charges are $10.64, and relative checksum differences range from 5.1e-15 to 3.1e-9.</p>
+            </div>
+            <div class="table-wrap">
+              <table class="paper-table">
+                <thead><tr><th>Experiment</th><th>Continuity evidence</th><th>What it does not establish</th></tr></thead>
+                <tbody>
+                  <tr><td>Compiler formation</td><td>One new world survives 1,019 episodes</td><td>A repeat-run success rate</td></tr>
+                  <tr><td>Model continuation</td><td>A new model inherits accepted world state</td><td>DeepSeek outperforming GLM in a controlled comparison</td></tr>
+                  <tr><td>MESA rewrite</td><td>Cross-directory decomposition, tests, and numerical checks</td><td>A rewrite of all MESA; higher-level star, astero, and binary modules are excluded</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="paper-section" id="limits" aria-labelledby="limits-title">
+            <header class="section-heading"><span>05 / CLAIMS &amp; LIMITS</span><h2 id="limits-title">A strong capability demonstration with narrow statistical evidence</h2></header>
+            <div class="claim-ledger">
+              <article class="is-paper"><span class="ledger-label">PAPER CLAIM</span><p><b>Supported in these cases:</b> accepted world history enables hundred-hour development, more than a thousand agent episodes, recursive delegation, and continuation after a model replacement.</p></article>
+              <article class="is-inference"><span class="ledger-label">OUR INFERENCE</span><p><b>Useful for a GM layer:</b> residents can submit bounded mechanic proposals, finite-lived development agents can implement them, and tests, performance budgets, and replay checks can decide whether they enter the world version.</p></article>
+              <article class="is-unknown"><span class="ledger-label">NOT SHOWN</span><p><b>Still unproven:</b> zero human supervision, safe long-running production service, correct prioritization of open-ended needs, or continued adoption of generated mechanics by the original residents.</p></article>
+            </div>
+            <ul class="limits-list">
+              <li><b>Each case has very few runs.</b> One formation, two continuations, and one rewrite demonstrate feasibility but cannot estimate success probability.</li>
+              <li><b>Human actions are incompletely archived.</b> The record cannot strictly prove zero intervention, so “autonomous” should not be read as a mathematical no-human guarantee.</li>
+              <li><b>The cost boundary is narrow.</b> Reported charges cover tokens, excluding compute, storage, monitoring, evaluation design, and labor.</li>
+              <li><b>Test retention is not independent correctness.</b> Agents can overfit an acceptance suite; external behavior, performance, and safety still require separate evaluation.</li>
+              <li><b>The acceptance gate can be wrong.</b> Once a bad version is accepted, persistence propagates it to every successor. The longer the world lives, the more important rollback and provenance become.</li>
+            </ul>
+          </section>
+
+          <section class="paper-section" id="mapping" aria-labelledby="mapping-title">
+            <header class="section-heading"><span>06 / PROJECT MAPPING</span><h2 id="mapping-title">For InfiniteAincrad: make GM development a reversible world evolution</h2></header>
+            <div class="application-map">
+              <article><span>PROPOSAL</span><h3>Residents state bounded needs</h3><p>A request must identify world objects, affected modules, acceptance conditions, and a resource budget—not merely ask for “a new game mechanic.”</p></article>
+              <article><span>WORLD BRANCH</span><h3>Build mechanics on isolated branches</h3><p>Finite-lived agents may delegate recursively but cannot edit the live world directly. Every diff, test, and execution replay enters provenance.</p></article>
+              <article><span>ADOPTION</span><h3>Measure use after release</h3><p>Technical acceptance only moves v to v′. Resident use, maintenance, forks, and abandonment determine whether a mechanic becomes social infrastructure.</p></article>
+            </div>
+            <div class="paper-takeaway"><span>My assessment</span><p>Genesis supplies a layer that SwarmWorld does not explore deeply. When a resident artifact becomes code or a game mechanic, the project needs a <strong>version history that outlives every agent and advances only through explicit acceptance</strong>. It is a model for the GM development backend, not the resident society itself.</p></div>
+          </section>
+
+          <footer class="wm-reference" id="reference">
+            <span>REFERENCES &amp; ATTRIBUTION</span>
+            <ol>
+              <li>Huang et al. <a href="https://arxiv.org/html/2608.10450v1" target="_blank" rel="noreferrer">Persistent Recursive Worlds Enable Autonomous Software Evolution</a>, arXiv:2608.10450v1, 2026.</li>
+              <li><a href="https://genesis.evox.group/" target="_blank" rel="noreferrer">EvoX Genesis project</a>, project explanation, code entry point, and experiment overview.</li>
+              <li><a href="https://github.com/EMI-Group/genesis" target="_blank" rel="noreferrer">EMI-Group/genesis</a>, project repository.</li>
+            </ol>
+            <p>The state diagram and tables are independent redrawings from paper data. Costs use the paper's token-charge boundary and exclude infrastructure, storage, and labor.</p>
+            <a href="/home/en/#articles">← Back to learning notes</a>
+          </footer>
+        </article>
+      </main>
+      <aside class="next-sidebar next-article-toc wm-toc" aria-label="Article contents">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/en/">Back to home</a></div>
+        <p>Contents</p>
+        <nav><a class="is-current" href="#overview">Paper information</a><a href="#problem">1. Research question</a><a href="#method">2. Persistent world</a><a href="#compiler">3. Compiler run</a><a href="#continuation">4. Continuation</a><a href="#limits">5. Boundaries</a><a href="#mapping">6. Project mapping</a><a href="#reference">References</a></nav>
+      </aside>
+    </div>
+    <footer class="next-footer"><p>© 2026 DOTAFS · EvoX Genesis</p><p>Paper note · accepted history outlives agents</p></footer>
+  </body>
+</html>

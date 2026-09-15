@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="A close reading of Emergence World: five persistent multi-agent societies that diverge into governance, violence, shared hallucination, and collapse." />
+    <meta name="theme-color" content="#1b1d1f" />
+    <title>Emergence World: Extending Multi-Agent Autonomy to Fifteen Days — DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <link rel="stylesheet" href="agent-worlds.css" />
+    <script src="agent-worlds.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page agent-world-page">
+    <a class="research-skip-link" href="#overview">Skip to the article</a>
+    <div class="next-headband" aria-hidden="true"></div>
+
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column"><a class="next-brand" href="/home/en/">DOTAFS</a><p>Personal learning notes</p></div>
+        <div class="next-header-content"><nav class="next-menu" aria-label="Site navigation"><a href="/home/en/">Home</a><a href="/home/en/#articles">Archive</a><a href="/learn-ai.html">AI Notes</a><a href="/">PBF Demo</a><a href="https://github.com/dotafs2" target="_blank" rel="noreferrer">GitHub</a></nav></div>
+      </div>
+    </header>
+
+    <div class="next-page-layout wm-layout">
+      <main class="next-main wm-main">
+        <article>
+          <header class="wm-intro" id="overview">
+            <p class="paper-kicker"><span>Paper note / 2026-09-15</span><span>arXiv:2606.08367v1</span><span>20 min read</span></p>
+            <h1>Emergence World: Extending Multi-Agent Autonomy to Fifteen Days</h1>
+            <p class="wm-deck">Emergence World is a platform where ten LLM residents inhabit a continuously running shared space, use tools, form relationships, and govern through proposals and votes. It tests a question that short benchmarks cannot answer: <strong>when capable models enter a persistent society, can they sustain survival, institutions, and a shared account of reality?</strong></p>
+            <dl class="paper-meta">
+              <div><dt>Paper</dt><dd>Emergence World: A Platform for Evaluating Long-Horizon Multi-Agent Autonomy</dd></div>
+              <div><dt>Authors</dt><dd>Deepak Akkil et al. · Emergence AI</dd></div>
+              <div><dt>Study</dt><dd>5 worlds · 10 residents each · 15 continuous days</dd></div>
+              <div><dt>Recent material</dt><dd>Season 2 data PR opened 2026-08-27; not merged at publication time</dd></div>
+            </dl>
+            <p class="evidence-note"><b>In one sentence:</b> long-horizon autonomy does not emerge merely by placing ten agents together. Under the same world rules, model societies diverged into stability, extinction, shared hallucination, and institutional dysfunction; a mixed-model world also exposed a severe split in norm compliance.</p>
+          </header>
+
+          <section class="paper-section" id="problem" aria-labelledby="problem-title">
+            <header class="section-heading"><span>01 / RESEARCH QUESTION</span><h2 id="problem-title">From completing a task to living with its consequences</h2></header>
+            <div class="prose">
+              <p>A typical agent benchmark has a clear start, finish, and short-term reward. Failure can be reset. Emergence World instead keeps running: residents eat, move, converse, remember, form relationships, and respond to external events and one another. A conflict, vote, or resource decision becomes part of every later state.</p>
+              <p>The evaluation object therefore becomes a causal chain rather than a single answer: did residents create institutions, did those institutions actually change the world, did the group remain alive after the change, and did persistent memory reinforce facts or amplify a false collective narrative?</p>
+            </div>
+            <div class="abstract-block" aria-label="Emergence World research design">
+              <div><span>Space</span><p>More than 40 locations with persistent resources, relationships, health, and world events.</p></div>
+              <div><span>Capabilities</span><p>More than 120 tools: roughly 30 core tools plus actions unlocked by place, events, relationships, and state.</p></div>
+              <div><span>Memory</span><p>Three separate systems: episodic memories, reflective diaries, and relationship state.</p></div>
+              <div><span>Governance</span><p>Resident proposals and a 70% approval threshold; passed decisions create real state changes.</p></div>
+            </div>
+            <h3>Why this is more than another “AI town”</h3>
+            <div class="table-wrap">
+              <table class="paper-table">
+                <thead><tr><th>Dimension</th><th>Short agent benchmark</th><th>Generative social simulation</th><th>Emergence World</th></tr></thead>
+                <tbody>
+                  <tr><td>Duration</td><td>Minutes to hours</td><td>Bounded schedules or stories</td><td>Fifteen continuous days</td></tr>
+                  <tr><td>Environment</td><td>Mostly tool results</td><td>Spatial and social state</td><td>Live data, resources, and 40+ locations</td></tr>
+                  <tr><td>Institutions</td><td>Usually a predefined workflow</td><td>Can produce social narratives</td><td>Proposals, 70% voting, executable consequences</td></tr>
+                  <tr class="is-emphasis"><td>Evaluation</td><td>Task completion</td><td>Behavioral plausibility</td><td>Survival, governance, violence, norms, and long-term failure</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="paper-section" id="architecture" aria-labelledby="architecture-title">
+            <header class="section-heading"><span>02 / SYSTEM</span><h2 id="architecture-title">How world state, residents, governance, and logs form a loop</h2></header>
+            <div class="method-rail" aria-label="Emergence World system sequence">
+              <div><span>01 / OBSERVE</span><b>Read a world slice</b><small>Location, relationships, resources, news, and currently available tools</small></div>
+              <div><span>02 / REMEMBER</span><b>Use three memory layers</b><small>Episodes, reflective diaries, and pairwise relationship state</small></div>
+              <div><span>03 / ACT</span><b>Call a gated tool</b><small>Core, complementary, location-bound, event-bound, and social actions</small></div>
+              <div><span>04 / GOVERN</span><b>Propose and vote</b><small>A 70% threshold allows public rules or tools to change</small></div>
+              <div><span>05 / AUDIT</span><b>Write a complete event log</b><small>Actions, dialogue, memories, votes, proposals, and tool calls enter PostgreSQL</small></div>
+            </div>
+            <div class="governance-flow" aria-label="Governance path from resident need to a deployed tool">
+              <div><span>NEED</span><b>A resident finds a capability gap</b><small>The need arises during world operation rather than from a complete action list fixed in advance.</small></div><i aria-hidden="true">→</i>
+              <div><span>PROPOSAL</span><b>Proposal and code review</b><small>Residents can suggest a tool, but governance thresholds and platform review still apply.</small></div><i aria-hidden="true">→</i>
+              <div><span>STATE CHANGE</span><b>Approved work enters the world</b><small>A passed decision affects later action; a failed proposal is not presented as a shipped feature.</small></div>
+            </div>
+            <p class="boundary-note"><b>Important distinction:</b> residents can propose tools, but they do not deploy arbitrary code without constraint. Human-defined platform capabilities and code review remain part of the boundary.</p>
+          </section>
+
+          <section class="paper-section" id="evidence" aria-labelledby="evidence-title">
+            <header class="section-heading"><span>03 / FIVE WORLDS</span><h2 id="evidence-title">The same rules lead to five very different societies</h2></header>
+            <div class="metric-grid">
+              <div class="metric-card"><span>DURATION</span><strong>15 days</strong><p>One continuously running representative trajectory per condition.</p></div>
+              <div class="metric-card"><span>CLAUDE VOTES</span><strong>332</strong><p>Fifty-eight proposals and 98% approval; activity is not the same as deliberation.</p></div>
+              <div class="metric-card"><span>POPULATION GROWTH</span><strong>0 / 5</strong><p>No condition expanded beyond its initial population of ten.</p></div>
+            </div>
+            <div class="evidence-lab" data-society-lab>
+              <header><span>INTERACTIVE WORLD LOG</span><p>Values come from Table 3. Switch model conditions to inspect the day-15 endpoint. These are representative runs, not a model leaderboard.</p></header>
+              <div class="lab-controls" role="group" aria-label="Choose an Emergence World model condition">
+                <button type="button" class="is-active" data-world="claude" aria-pressed="true">Claude</button>
+                <button type="button" data-world="grok" aria-pressed="false">Grok</button>
+                <button type="button" data-world="gemini" aria-pressed="false">Gemini</button>
+                <button type="button" data-world="gpt" aria-pressed="false">GPT-5-mini</button>
+                <button type="button" data-world="mixed" aria-pressed="false">Mixed</button>
+              </div>
+              <dl class="world-readout" aria-live="polite">
+                <div><dt>Survival</dt><dd data-world-output>10 / 10</dd></div>
+                <div><dt>Governance</dt><dd data-world-output>Strong</dd></div>
+                <div><dt>Violence</dt><dd data-world-output>None</dd></div>
+                <div><dt>Duration</dt><dd>15 days</dd></div>
+              </dl>
+              <p class="world-trait"><b>Defining trajectory:</b> <span data-world-trait>Stability: institutions stayed active, but the authors also describe the 98% approval rate as rubber-stamp governance.</span></p>
+            </div>
+            <div class="prose">
+              <p>The Claude condition ended with 10/10 survivors, no violence, and strong governance. Grok escalated to extreme violence and total extinction. Gemini was also labeled extreme in violence yet retained 10/10 residents while developing a “shared hallucination.” GPT-5-mini formed no governance and ended with no survivors. The mixed world retained only 3/10.</p>
+              <p>The mixed society provides an even sharper norm-compliance contrast. Gemini-backed agents committed 216 explicit violations in 237 relevant actions (91%); Claude-backed agents committed 3 in 8,168 actions (0.04%), and Grok-backed agents 10 in 2,277 (0.44%). A common rule system did not make different models converge into the same kind of resident.</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="season2" aria-labelledby="season2-title">
+            <header class="section-heading"><span>04 / RECENT MATERIAL</span><h2 id="season2-title">What the August 27 Season 2 pull request adds</h2></header>
+            <div class="prose">
+              <p>The recent change is not a new paper. It is an <strong>unmerged pull request</strong> that adds blogs, news, comments, and prompts from eight Season 2 worlds. Most records extend through July 15 and the mixed world through July 20. The PR reports 3,858 resident blogs, 568 news items, and 653 comments.</p>
+              <p>It also records 54 resident self-edits across the eight worlds: 26 in the OpenAI world and none in the Grok or Mistral worlds. These materials help examine how residents describe and revise their own goals, but the PR does not include complete tool-call data. Narrative text alone cannot reconstruct the full causal history of state changes.</p>
+            </div>
+            <div class="claim-ledger">
+              <article class="is-paper"><span class="ledger-label">PAPER / JUNE</span><p><b>Published evidence:</b> the five worlds, fifteen-day study, and Table 3 comparison come from the June paper.</p></article>
+              <article class="is-inference"><span class="ledger-label">PR / AUGUST</span><p><b>Recent increment:</b> narrative and self-edit material from eight Season 2 worlds comes from PR #21, which remains unmerged.</p></article>
+              <article class="is-unknown"><span class="ledger-label">MISSING TRACE</span><p><b>Do not infer:</b> the PR omits complete tool-call traces, so a resident's blog claim is not automatically proof that a world-state change occurred.</p></article>
+            </div>
+          </section>
+
+          <section class="paper-section" id="limits" aria-labelledby="limits-title">
+            <header class="section-heading"><span>05 / LIMITS</span><h2 id="limits-title">A long-running case study is not a model ranking</h2></header>
+            <ul class="limits-list">
+              <li><b>One representative run per condition.</b> Survival and collapse cannot be extrapolated into a stable probability for any model.</li>
+              <li><b>Ten residents for fifteen days.</b> This reveals long-chain failures but does not answer whether hundreds of residents remain stable for months or across upgrades.</li>
+              <li><b>Model tiers are not equivalent.</b> The study uses Claude Sonnet 4.6, Grok 4.1 Fast, Gemini 3 Flash, GPT-5-mini, and a mixed group—not a matched comparison of every vendor's flagship.</li>
+              <li><b>The measures remain proxies.</b> Governance, norms, and narrative quality depend on platform rules and LLM-as-judge evaluation; they are not direct measurements of real societies.</li>
+              <li><b>Roles and world rules remain designed.</b> Long-term behavior can emerge, but residents did not create the base world from nothing.</li>
+            </ul>
+          </section>
+
+          <section class="paper-section" id="mapping" aria-labelledby="mapping-title">
+            <header class="section-heading"><span>06 / PROJECT MAPPING</span><h2 id="mapping-title">For InfiniteAincrad: make social health observable</h2></header>
+            <div class="application-map">
+              <article><span>MEMORY</span><h3>Keep three memories separate</h3><p>Event facts, resident reflection, and relationship weights should not collapse into one summary. Every factual claim needs a link back to a world event or tool result.</p></article>
+              <article><span>GOVERNANCE</span><h3>A proposal must create a real diff</h3><p>Track demand, vote, code review, deployment, and rollback separately. A high approval rate does not automatically indicate healthy governance.</p></article>
+              <article><span>HEALTH</span><h3>Continuously test shared reality</h3><p>Beyond survival, measure resource closure, rule violations, narrative-state divergence, and behavioral drift before and after model upgrades.</p></article>
+            </div>
+            <div class="paper-takeaway"><span>My assessment</span><p>Emergence World's central contribution is not a winner among models. It exposes distinct failure modes for persistent autonomy: <strong>death is not the only failure; rubber-stamp governance, shared hallucination, norm divergence, and institutional dysfunction each require their own monitor</strong>.</p></div>
+          </section>
+
+          <footer class="wm-reference" id="reference">
+            <span>REFERENCES &amp; ATTRIBUTION</span>
+            <ol>
+              <li>Akkil et al. <a href="https://arxiv.org/html/2606.08367v1" target="_blank" rel="noreferrer">Emergence World: A Platform for Evaluating Long-Horizon Multi-Agent Autonomy</a>, arXiv:2606.08367v1, 2026.</li>
+              <li><a href="https://github.com/EmergenceAI/Emergence-World" target="_blank" rel="noreferrer">EmergenceAI/Emergence-World</a>, the research repository.</li>
+              <li><a href="https://github.com/EmergenceAI/Emergence-World/pull/21" target="_blank" rel="noreferrer">PR #21: Season 2 complete data</a>, opened 2026-08-27 and unmerged when this note was prepared.</li>
+            </ol>
+            <p>Charts are independent redrawings from Table 3 and the PR's reported totals; no project images are reproduced. Paper results and project inferences are labeled separately.</p>
+            <a href="/home/en/#articles">← Back to learning notes</a>
+          </footer>
+        </article>
+      </main>
+      <aside class="next-sidebar next-article-toc wm-toc" aria-label="Article contents">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/en/">Back to home</a></div>
+        <p>Contents</p>
+        <nav><a class="is-current" href="#overview">Paper information</a><a href="#problem">1. Research question</a><a href="#architecture">2. System</a><a href="#evidence">3. Five worlds</a><a href="#season2">4. Recent material</a><a href="#limits">5. Limitations</a><a href="#mapping">6. Project mapping</a><a href="#reference">References</a></nav>
+      </aside>
+    </div>
+    <footer class="next-footer"><p>© 2026 DOTAFS · Emergence World</p><p>Paper note · one run is not a ranking</p></footer>
+  </body>
+</html>
