@@ -1,0 +1,55 @@
+.vehicle-page { --vehicle-accent: #9caeaa; }
+.vehicle-page .next-main { min-width: 0; }
+.vehicle-intro { padding: 43px 54px 42px; border-bottom: 1px solid var(--wm-line); scroll-margin-top: 24px; }
+.vehicle-intro .wm-kicker { margin-bottom: 13px; }
+.wm-main .vehicle-intro h1 { max-width: 740px; margin: 0 0 14px; font-size: clamp(29px, 3.2vw, 36px) !important; line-height: 1.18 !important; letter-spacing: -.025em; }
+.vehicle-deck { max-width: 720px; color: #c5c4bf !important; font-size: 15px !important; line-height: 1.8; }
+.vehicle-scope { max-width: 750px; margin: 17px 0 0; font-size: 12px !important; line-height: 1.8; }
+.vehicle-meta { max-width: 750px; margin: 21px 0 0; border-top: 1px solid var(--wm-line); }
+.vehicle-meta div { display: grid; grid-template-columns: 125px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--wm-line); }
+.vehicle-meta dt, .model-label, .equation-strip > span, .lab-header > span { color: var(--vehicle-accent); font: 11px/1.5 var(--wm-mono); letter-spacing: .04em; }
+.vehicle-meta dd { margin: 0; color: var(--wm-text); font-size: 12px; line-height: 1.6; }
+.vehicle-page .paper-section { padding-top: 42px; padding-bottom: 48px; }
+.vehicle-page .section-heading { margin-bottom: 24px; }
+.vehicle-page .prose p { font-size: 15px !important; line-height: 1.82; }
+.vehicle-page .prose p + p { margin-top: 9px; }
+.vehicle-page .prose i, .vehicle-page .model-entry i, .vehicle-page .vehicle-steps i { color: var(--wm-text); font-style: italic; }
+.vehicle-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 25px 0; padding: 18px 0; border-top: 1px solid var(--wm-line); border-bottom: 1px solid var(--wm-line); font: 11px/1.5 var(--wm-mono); }
+.vehicle-flow span { color: var(--wm-text); }.vehicle-flow b { color: var(--vehicle-accent) !important; }
+.vehicle-diagram { margin: 27px 0; padding: 12px; border: 1px solid var(--wm-line); background: var(--wm-panel); }
+.vehicle-diagram svg { display: block; width: 100%; height: auto; }
+.vehicle-diagram text { fill: var(--wm-text); font: 12px var(--wm-mono); }
+.diagram-body { fill: #35393b; stroke: var(--wm-muted); }.diagram-wheel { fill: #393d3f; stroke: var(--wm-text); stroke-width: 2; }
+.diagram-road { fill: none; stroke: var(--wm-muted); stroke-width: 2; }.diagram-axis { fill: none; stroke: #858a88; stroke-width: 1; stroke-dasharray: 5 4; }
+.diagram-spring { fill: none; stroke: var(--vehicle-accent); stroke-width: 2; }.diagram-normal { fill: none; stroke: var(--vehicle-accent); stroke-width: 2; }.diagram-measure { fill: none; stroke: var(--wm-text); stroke-width: 1; }
+.vehicle-diagram figcaption { padding: 10px 3px 1px; color: var(--wm-muted); font: 11px/1.7 var(--wm-mono); }
+.equation-strip { margin: 24px 0 26px; padding: 16px 18px; border-left: 2px solid var(--vehicle-accent); background: var(--wm-panel); }
+.equation-strip strong { display: block; margin: 8px 0; overflow-wrap: anywhere; font: 500 15px/1.7 var(--wm-mono); }
+.equation-strip p { max-width: 750px; margin: 0; font-size: 12px !important; line-height: 1.8; }
+.vehicle-lab { margin: 28px 0; padding: 18px; border: 1px solid var(--wm-line); background: var(--wm-panel); }
+.lab-header h3 { margin: 6px 0 5px; font-size: 17px !important; }.lab-header p { margin: 0 0 17px; font-size: 13px !important; line-height: 1.7; }
+.lab-controls { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)) auto; align-items: end; gap: 12px; }
+.lab-controls-two { grid-template-columns: minmax(0,1.1fr) minmax(0,1.6fr) auto; }
+.lab-controls label { display: flex; flex-direction: column; gap: 5px; min-width: 0; color: var(--wm-text); font: 11px/1.5 var(--wm-mono); }
+.lab-controls output { display: inline; color: var(--vehicle-accent); }.lab-controls input { width: 100%; accent-color: var(--vehicle-accent); }
+.lab-controls select { min-height: 36px; width: 100%; padding: 5px; border: 1px solid var(--wm-line); color: var(--wm-text); background: var(--wm-panel-2); font: 12px var(--wm-body); }
+.lab-controls button { min-height: 36px; }.lab-plot { display: block; width: 100%; max-width: 100%; height: 270px; margin-top: 16px; border: 1px solid var(--wm-line); background: #1b1d1f; }
+.lab-plot-square { height: 280px; }.lab-readout { margin: 12px 0 0; color: var(--wm-text) !important; font: 12px/1.8 var(--wm-mono); }
+.lab-caveat { margin: 8px 0 0; font-size: 11px !important; line-height: 1.7; }
+.vehicle-page .model-entry { margin: 29px 0; padding-top: 22px; border-top: 1px solid var(--wm-line); }
+.model-entry h3 { margin: 8px 0 14px !important; }.model-entry ol { max-width: 770px; margin: 0; padding-left: 23px; }
+.model-entry li { padding: 0 0 12px 3px; color: #c5c4bf; font-size: 14px; line-height: 1.85; }.model-entry li::marker { color: var(--vehicle-accent); font: 12px var(--wm-mono); }
+.vehicle-comparison { min-width: 850px; }.vehicle-comparison th:first-child { width: 15%; }.vehicle-comparison th:not(:first-child) { width: 28.3%; }
+.vehicle-steps { max-width: 770px; padding: 0; list-style: none; }.vehicle-steps li { padding: 15px 0; border-top: 1px solid var(--wm-line); }
+.vehicle-steps b { display: block; margin-bottom: 6px; color: var(--wm-text); font-size: 14px; }.vehicle-steps p { margin: 0; color: #c5c4bf !important; font-size: 14px !important; line-height: 1.8; }
+.vehicle-reference i { font-style: italic; }.vehicle-toc nav a { line-height: 1.55; }
+@media (max-width: 760px) {
+  .vehicle-intro { padding: 32px 22px; }.lab-controls, .lab-controls-two { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .lab-controls button { grid-column: 1 / -1; }.vehicle-diagram text { font-size: 12px; }
+}
+@media (max-width: 480px) {
+  .vehicle-intro { padding-right: 17px; padding-left: 17px; }.vehicle-meta div { grid-template-columns: 93px minmax(0,1fr); }
+  .lab-controls, .lab-controls-two { grid-template-columns: 1fr; }.vehicle-lab { padding: 12px; }.lab-plot { height: 245px; }
+  .vehicle-diagram { margin-left: -3px; margin-right: -3px; padding: 2px; }.vehicle-diagram figcaption { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .vehicle-page *, .vehicle-page *::before, .vehicle-page *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }

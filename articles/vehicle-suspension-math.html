@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="An interactive, source-checked study of vehicle suspension and tire mathematics: forces, slip, rigid-body motion, and three distinct simulation approaches." />
+    <meta name="theme-color" content="#1b1d1f" />
+    <meta property="og:title" content="Vehicle Suspension and Tire Physics · DOTAFS" />
+    <meta property="og:description" content="From a quarter-car equation to tire force envelopes: compare Chaos Vehicles, Advanced Vehicle System, and FGear with interactive experiments." />
+    <meta property="og:type" content="article" />
+    <title>Vehicle Suspension and Tire Physics · DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <link rel="stylesheet" href="vehicle-suspension-math.css" />
+    <script src="vehicle-suspension-math.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page vehicle-page">
+    <a class="skip-link" href="#content">Skip to the article</a>
+    <div class="next-headband" aria-hidden="true"></div>
+    <header class="next-header">
+      <div class="next-header-inner">
+        <div class="next-brand-column"><a class="next-brand" href="/home/en/">DOTAFS</a><p>Personal learning notes</p></div>
+        <nav class="next-menu" aria-label="Site navigation">
+          <a href="/home/en/">Home</a><a class="is-active" href="/home/en/#articles">Archive</a>
+          <a href="/learn-ai.html">AI Lab</a><a href="/">PBF Demo</a>
+          <a href="#sources">Sources</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="next-page-layout wm-layout" id="top">
+      <main id="content" class="next-main wm-main">
+        <article>
+          <header class="vehicle-intro" id="overview">
+            <p class="wm-kicker">ENGINEERING NOTE · VEHICLE DYNAMICS · 23 SEPTEMBER 2026</p>
+            <h1>Vehicle Suspension and Tire Physics</h1>
+            <p class="vehicle-deck">How does a wheel discover the ground, support a car, turn torque into acceleration, and lose grip? A mathematical guide to the shared physics and three different game-vehicle implementations.</p>
+            <dl class="vehicle-meta">
+              <div><dt>Input</dt><dd>Body pose, wheel geometry, road contact, controls</dd></div>
+              <div><dt>Output</dt><dd>Contact loads, tire forces, body motion</dd></div>
+              <div><dt>Comparisons</dt><dd>Chaos Vehicles · AVS · FGear</dd></div>
+              <div><dt>Reading time</dt><dd>About 22 minutes · three interactive labs</dd></div>
+            </dl>
+            <p class="vehicle-scope">This is an implementation study, not a controlled handling benchmark. Equations marked <strong>teaching model</strong> are simplified explanatory models; implementation claims are grounded in the inspected source revisions identified at the end. No commercial source code is reproduced here.</p>
+          </header>
+
+          <section class="paper-section" id="question" aria-labelledby="question-title">
+            <header class="section-heading"><span>01 / THE QUESTION</span><h2 id="question-title">What must a vehicle simulation actually compute?</h2></header>
+            <div class="prose">
+              <p>A rigid chassis alone can fall, bounce, and collide, but it cannot explain driving. At each wheel we need a contact state, a normal load from the suspension, longitudinal and lateral forces from the tire, and the opposing torque that changes wheel spin. Those forces act away from the center of mass, so they also produce pitch, roll, and yaw.</p>
+              <p>The useful abstraction is <strong>one rigid body plus four contact-and-wheel models</strong>. The tire is not simply a source of friction proportional to throttle: it can transmit only the forces allowed by its load, surface, slip, and chosen tire law. A suspension matters partly because it sets that normal load. “Better physics” therefore cannot be judged from spring motion alone.</p>
+            </div>
+            <div class="vehicle-flow" aria-label="Simulation data flow"><span>Road geometry</span><b>→</b><span>Wheel contact</span><b>→</b><span>Spring load</span><b>→</b><span>Tire slip &amp; forces</span><b>→</b><span>Chassis &amp; wheel integration</span></div>
+            <div class="abstract-block">
+              <div><span>STATE</span><p>Position <i>p</i>, orientation <i>q</i>, linear/angular velocity <i>v, ω</i>, and each wheel’s spin and suspension travel.</p></div>
+              <div><span>CONSTRAINT</span><p>The road can push on a wheel, not pull it into the road: normal load is nonnegative.</p></div>
+              <div><span>CONTROLS</span><p>Steering changes the local tire frame; engine and brakes change wheel torque, then slip and tire force.</p></div>
+              <div><span>BOUNDARY</span><p>This article concerns playable vehicle dynamics, not detailed deformation of each rubber tread block.</p></div>
+            </div>
+          </section>
+
+          <section class="paper-section" id="geometry" aria-labelledby="geometry-title">
+            <header class="section-heading"><span>02 / CONTACT GEOMETRY</span><h2 id="geometry-title">From a road query to one loaded wheel</h2></header>
+            <div class="prose">
+              <p>Let <i>aᵢ</i> be wheel <i>i</i>’s chassis attachment, <i>dᵢ</i> its suspension direction, <i>R</i> its radius, and <i>hᵢ</i> the hit point reported by a road query. A ray or swept shape along <i>dᵢ</i> estimates the wheel center and the available suspension length <i>ℓᵢ</i>. Compression is <i>xᵢ = clamp(ℓ₀ − ℓᵢ, 0, travel)</i>, where <i>ℓ₀</i> is the uncompressed length. This is a geometric measurement, not a force yet.</p>
+              <p>Ray contacts are cheap and stable for smooth roads but a thin ray can miss a kerb beside the tire. A sphere/shape sweep samples a larger footprint but is costlier and still does not reproduce a deformable tire. A fully physical wheel is another choice: its collision body and constraints resolve contact instead of a single synthetic patch. Never confuse the visible wheel mesh with the contact representation.</p>
+            </div>
+            <figure class="vehicle-diagram" aria-labelledby="contact-caption">
+              <svg viewBox="0 0 640 270" role="img" aria-labelledby="contact-title contact-description">
+                <title id="contact-title">Wheel contact and suspension travel</title><desc id="contact-description">A chassis attachment sits above a wheel. A spring follows the suspension axis. The wheel touches a road at a contact patch; ground reaction points upward.</desc>
+                <path class="diagram-road" d="M35 227 H250 L282 210 H606"/><rect class="diagram-body" x="90" y="25" width="425" height="41" rx="1"/>
+                <path class="diagram-axis" d="M340 66 V192"/><path class="diagram-spring" d="M340 76 l-19 12 38 12 -38 12 38 12 -38 12 38 12 -38 12 19 12"/>
+                <circle class="diagram-wheel" cx="340" cy="184" r="27"/><path class="diagram-normal" d="M340 223 V178"/><path class="diagram-normal" d="m333 187 7 -10 7 10"/>
+                <path class="diagram-measure" d="M397 72 V156 M391 72 h12 M391 156 h12"/>
+                <text x="105" y="48">chassis · mass + inertia</text><text x="416" y="108">available travel ℓ</text><text x="378" y="202">radius R</text><text x="393" y="244">road / contact patch</text><text x="123" y="171">spring k · damper c</text><text x="287" y="255">normal load F<tspan baseline-shift="sub">z</tspan> ↑</text>
+              </svg>
+              <figcaption id="contact-caption">Original explanatory diagram. A contact query finds geometry; the spring/damper model converts compression and its rate into force.</figcaption>
+            </figure>
+            <h3>Why the point of application matters</h3>
+            <div class="equation-strip"><span>Rigid-body update</span><strong>m v̇ = ΣF + mg &nbsp; · &nbsp; I ω̇ + ω × (Iω) = Σ(rᵢ × Fᵢ) + Στᵢ</strong><p><i>rᵢ</i> is the vector from center of mass to contact <i>i</i>; <i>Fᵢ</i> is the wheel force. The cross product explains why the same upward load can roll or pitch the chassis when applied at a different point.</p></div>
+          </section>
+
+          <section class="paper-section" id="spring" aria-labelledby="spring-title">
+            <header class="section-heading"><span>03 / SPRING &amp; DAMPER</span><h2 id="spring-title">Ride height, oscillation, and load transfer</h2></header>
+            <div class="prose">
+              <p>A linear spring creates force proportional to compression. A damper resists <em>speed of compression or rebound</em>; it is not another spring and does not determine the final static ride height. With <i>x</i> positive in compression, an idealized support-force magnitude is <i>Fs = max(0, kx + c ẋ)</i>, where <i>k</i> is in N/m, <i>c</i> in N·s/m, and <i>ẋ</i> in m/s. The tire normal load <i>Fz</i> is related to this support force but need not equal its magnitude on banked ground, with force offsets, load blending, or a separate constraint. Some implementations apply support along the suspension axis and others along the road normal.</p>
+              <p>At rest on level ground, a symmetric four-wheel vehicle has approximately <i>Fz ≈ mg/4</i> per wheel; therefore <i>x₀ ≈ mg/(4k)</i> if the springs are identical and there is no preload. If <i>m = 1200 kg</i> and <i>k = 30,000 N/m</i> per wheel, <i>x₀ ≈ 0.098 m</i>. The spring travel must leave room both to compress further over a bump and to extend into a dip.</p>
+            </div>
+            <div class="equation-strip"><span>One-corner teaching model</span><strong>mₛ ÿ + c(ẏ − ṙ) + k(y − r) = 0</strong><p><i>mₛ</i> is the supported corner mass, <i>y</i> its displacement from static equilibrium, and <i>r</i> road displacement. Natural frequency <i>fₙ = √(k/mₛ)/(2π)</i>; critical damping <i>c₍crit₎ = 2√(kmₛ)</i>; damping ratio <i>ζ = c/c₍crit₎</i>. A one-mass model does not represent unsprung wheel mass, tire compliance, bump stops, or an anti-roll bar.</p></div>
+            <div class="vehicle-lab" id="suspension-lab">
+              <div class="lab-header"><span>INTERACTIVE 01 / BUMP RESPONSE</span><h3>What happens when stiffness or damping changes?</h3><p>Apply a small road step to one corner. Compare body height, road height, and the instantaneous support force.</p></div>
+              <div class="lab-controls">
+                <label>Spring rate <output id="k-value">30</output> kN/m<input id="k-input" type="range" min="10" max="80" step="1" value="30" /></label>
+                <label>Damping ratio <output id="zeta-value">0.55</output><input id="zeta-input" type="range" min="0.05" max="1.5" step="0.05" value="0.55" /></label>
+                <label>Road step <output id="bump-value">60</output> mm<input id="bump-input" type="range" min="10" max="120" step="5" value="60" /></label>
+                <button type="button" id="suspension-reset">Reset</button>
+              </div>
+              <canvas id="suspension-plot" class="lab-plot" height="270" role="img" aria-label="Body and road height against time after a bump"></canvas>
+              <p class="lab-readout" id="suspension-readout" aria-live="polite"></p>
+              <p class="lab-caveat">Teaching model: a mass–spring–damper in continuous contact. The step’s instantaneous road velocity is ignored; impacts and tire deformation require a richer model.</p>
+            </div>
+            <div class="prose"><p>A more complete <strong>quarter-car</strong> has sprung mass <i>mₛ</i>, wheel/axle mass <i>mᵤ</i>, suspension <i>kₛ,cₛ</i>, and tire stiffness <i>kₜ</i>. In one sign convention: <i>mₛ z̈ₛ = −kₛ(zₛ−zᵤ)−cₛ(żₛ−żᵤ)</i> and <i>mᵤ z̈ᵤ = kₛ(zₛ−zᵤ)+cₛ(żₛ−żᵤ)−kₜ(zᵤ−r)</i>, after gravity is removed by measuring displacement from equilibrium. It predicts both body bounce and wheel hop; a single ray wheel approximates or omits the latter.</p></div>
+            <h3>Load transfer is a torque balance, not extra weight</h3>
+            <div class="prose"><p>In a turn, lateral acceleration <i>aᵧ</i> at center-of-mass height <i>h</i> creates roll moment approximately <i>m aᵧ h</i>. With track width <i>t</i>, transferring load <i>Δ</i> from the inside side to the outside side creates opposing moment <i>Δt</i>, so <i>Δ ≈ m aᵧ h/t</i> for the entire car under a simple rigid, flat-road assumption. Total vertical load is still roughly <i>mg</i>: outside tires gain what inside tires lose. Front and rear load-transfer shares depend on roll stiffness, geometry, and unsprung effects; this formula alone cannot allocate the transfer to each axle.</p><p>During straight-line acceleration or braking, a first approximation for load transferred between axles is <i>Δfront↔rear ≈ m aₓ h/L</i>, where <i>L</i> is wheelbase. An anti-roll bar couples left and right suspension travel: a schematic axle model applies opposing increments <i>Fbar,L = kbar(xL − xR)</i> and <i>Fbar,R = −Fbar,L</i>, with signs chosen for the local axes. It changes the <em>distribution</em> of load, not total grip for free. Many tires exhibit load sensitivity: doubling normal load produces less than double peak lateral force, so an uneven load split can reduce axle grip.</p></div>
+            <div class="equation-strip"><span>Effective tire loading</span><strong>Fz,inside + Fz,outside ≈ axle load &nbsp; · &nbsp; Fbar,L + Fbar,R = 0</strong><p>This balance assumes no aerodynamic downforce change, road bank, curb impact, or vertical chassis acceleration. A suspension force may point along the suspension axis or the road normal; the tire law should use its actual normal component.</p></div>
+            <div class="paper-takeaway"><span>SEPARATE THE ROLES</span><p>Stiffness primarily sets static compression and body frequency. Damping sets transient oscillation. Travel, bump stops, anti-roll coupling, center of mass, and tire contact determine whether the wheel stays loaded.</p></div>
+          </section>
+
+          <section class="paper-section" id="tire" aria-labelledby="tire-title">
+            <header class="section-heading"><span>04 / TIRE FORCES</span><h2 id="tire-title">Why a tire needs slip to make force</h2></header>
+            <div class="prose">
+              <p>At the contact patch, let <i>Vx</i> be forward ground-relative speed, <i>Vy</i> sideways speed, <i>Ω</i> wheel angular speed, and <i>R</i> effective radius. A common pedagogical longitudinal slip ratio is <i>κ = (RΩ − Vx)/max(|Vx|, vₑ)</i>; slip angle is <i>α = atan2(Vy, max(|Vx|, vₑ))</i>. Here <i>vₑ</i> is a low-speed regularizer. <strong>Different implementations use different denominators, clamping, and sign conventions</strong>, so these are shared concepts, not a claimed literal formula from every codebase.</p>
+              <p>Positive drive torque tends to raise <i>Ω</i>, producing <i>κ &gt; 0</i>; braking lowers it. Steering changes the wheel’s local frame, creating <i>α</i> even while the chassis moves forward. The tire force is a function of slip, normal load, surface, camber, and sometimes pressure and speed: <i>(Fx,Fy,Mz) = T(κ,α,Fz,γ,p,V)</i>. <i>Mz</i> is self-aligning torque. A game tire model may omit some arguments; no universal single “correct” tire curve exists.</p>
+            </div>
+            <figure class="vehicle-diagram" aria-labelledby="force-caption">
+              <svg viewBox="0 0 640 245" role="img" aria-labelledby="force-title force-description">
+                <title id="force-title">Contact patch and combined tire force</title><desc id="force-description">A top-down wheel faces right; velocity tilts relative to it by slip angle alpha. Forward force Fx and lateral force Fy combine under a grip boundary set by normal load.</desc>
+                <path class="diagram-axis" d="M120 172 H430"/><path class="diagram-axis" d="M282 204 V30"/><rect class="diagram-wheel" x="224" y="105" width="105" height="50" rx="2"/>
+                <path class="diagram-normal" d="M278 128 L439 82 M278 128 L415 128 M278 128 L278 31"/><path class="diagram-measure" d="M348 128 A72 72 0 0 0 346 108"/>
+                <text x="427" y="74">velocity V</text><text x="419" y="151">forward Fx</text><text x="287" y="35">lateral Fy</text><text x="352" y="108">α</text><text x="74" y="194">top view</text><text x="367" y="204">RΩ − Vx → κ</text>
+              </svg>
+              <figcaption id="force-caption">Original top-view diagram. Longitudinal slip and slip angle compete for a finite contact force; the direction/sign of forces depends on the chosen coordinate convention.</figcaption>
+            </figure>
+            <div class="equation-strip"><span>Simple shared limit · teaching model</span><strong>√[(Fx/(μx Fz))² + (Fy/(μy Fz))²] ≤ 1</strong><p>A friction ellipse is a useful budget model: using more force to accelerate leaves less available to turn. Actual tire data may have asymmetric, load-dependent peaks and non-elliptical combined-slip behavior. On no contact, <i>Fz = 0</i> and this tire-force budget vanishes.</p></div>
+            <div class="vehicle-lab" id="grip-lab">
+              <div class="lab-header"><span>INTERACTIVE 02 / COMBINED GRIP</span><h3>Brake and turn on the same contact patch</h3><p>Request forward and lateral forces; the dot is the feasible force after clipping to a simplified friction circle.</p></div>
+              <div class="lab-controls">
+                <label>Longitudinal demand <output id="fx-value">0.60</output> × load<input id="fx-input" type="range" min="-1.8" max="1.8" step="0.05" value="0.6" /></label>
+                <label>Lateral demand <output id="fy-value">0.65</output> × load<input id="fy-input" type="range" min="-1.8" max="1.8" step="0.05" value="0.65" /></label>
+                <label>Surface grip μ <output id="mu-value">0.90</output><input id="mu-input" type="range" min="0.2" max="1.5" step="0.05" value="0.9" /></label>
+                <button type="button" id="grip-reset">Reset</button>
+              </div>
+              <canvas id="grip-plot" class="lab-plot lab-plot-square" height="280" role="img" aria-label="Longitudinal versus lateral force demand and grip limit"></canvas>
+              <p class="lab-readout" id="grip-readout" aria-live="polite"></p><p class="lab-caveat">Teaching model: isotropic circle, fixed <i>Fz</i>. Not the exact combined-slip law of any one implementation.</p>
+            </div>
+            <div class="prose"><p>Close to zero slip, the tire’s initial lateral slope is <strong>cornering stiffness</strong> <i>Cα = |∂Fy/∂α|₍α≈0₎</i>, measured in N/rad. Near the peak, the response saturates; after the peak, some fitted tires lose force as slip grows. Load sensitivity, camber, pressure, road material, temperature, and wetness can shift the curve. Transient tire response can be modeled with a relaxation length <i>λ</i>: approximately <i>τ ≈ λ/max(|Vx|,vₑ)</i> and <i>τ Ḟy + Fy = Fy,steady(α)</i>. This prevents an instantaneous jump to the steady-state curve; whether a particular game implementation actually models it must be checked separately.</p><p>For a driven wheel, an idealized angular equation is <i>Iʷ Ω̇ = Tdrive − Tbrake − Fx R − Trolling</i>. Newton’s third law couples the ground force to wheel spin. Integrating wheel rotation solely from chassis speed would hide wheelspin and wheel lock. At almost zero speed, avoid dividing by <i>Vx = 0</i>; low-speed blending or a static-friction treatment is necessary.</p></div>
+          </section>
+
+          <section class="paper-section" id="implementations" aria-labelledby="implementations-title">
+            <header class="section-heading"><span>05 / THREE IMPLEMENTATIONS</span><h2 id="implementations-title">What mathematics does each system choose?</h2></header>
+            <div class="prose"><p>The core laws are shared; what differs is how contact is represented, how spring load is coupled to the chassis, and especially how slip becomes tire force. These observations describe the inspected source, not the full set of possible configurations or a ranking of measured realism.</p></div>
+            <div class="model-entry" id="chaos"><p class="model-label">A / CHAOS VEHICLES</p><h3>Spring load plus a grip-limited wheel</h3>
+              <ol>
+                <li><strong>Contact.</strong> Each wheel queries a road along its suspension axis; the inspected path supports raycasts and sphere sweeps. The chassis carries suspension targets into a constraint path, with a direct-force fallback.</li>
+                <li><strong>Vertical force.</strong> A displacement-based spring uses <i>Fspring = kx</i> and two damping coefficients selected by the direction of displacement change, of the form <i>Fdamp = −c ẋ</i> under the code’s displacement sign. Normal load can blend computed spring force with a resting-force setting. An anti-roll calculation couples the two wheels on an axle.</li>
+                <li><strong>Tire.</strong> Drive/brake torque divided by radius proposes longitudinal force. Lateral force comes from cornering stiffness or a lateral-slip graph. A circle-like clamp scales the joint force when <i>√(Fx²+Fy²) &gt; μ Fz</i>, with additional low-speed and assist logic.</li>
+                <li><strong>Trade-off.</strong> Easy to tune through direct grip and steering quantities; the inspected default tire path is not a calibrated Pacejka law. Constraint-based suspension and force fallback should not be conflated.</li>
+              </ol>
+            </div>
+            <div class="model-entry" id="avs"><p class="model-label">B / ADVANCED VEHICLE SYSTEM (AVS 1.4.3)</p><h3>Custom slip dynamics, with two wheel modes</h3>
+              <ol>
+                <li><strong>Contact.</strong> The inspected vehicle code line-traces from a compressed-wheel start to an extended-wheel end, subtracts wheel diameter from the hit distance, and clamps spring length.</li>
+                <li><strong>Vertical force.</strong> It explicitly converts configured spring rate from N/mm to N/m and compression from cm to m; the force is <i>k·compression + c·compression speed</i>. In this path it applies the force along the hit normal. Excess-compression handling adds an extra support term.</li>
+                <li><strong>Raycast tire mode.</strong> It computes contact-plane forward/right axes; a target longitudinal slip is driven by torque versus <i>Fz R μx</i>, lateral target slip blends a low-speed sign response with slip angle, and both slips are interpolated over time. A normalized combined-slip vector and a square-root lateral shaping turn <i>Fz μx</i> and <i>Fz μy</i> into force.</li>
+                <li><strong>Physical wheel mode.</strong> A wheel collision body receives the opposite suspension force. Contact friction and drive torque then rely on the rigid-body contact solution instead of the preceding synthetic tire-force branch. <strong>These modes should not be described as one tire law.</strong></li>
+              </ol>
+            </div>
+            <div class="model-entry" id="fgear"><p class="model-label">C / FGEAR VEHICLE PHYSICS</p><h3>Spring preload plus interchangeable tire curves</h3>
+              <ol>
+                <li><strong>Contact.</strong> The inspected wheel code can use ray contacts or shape-based detection and computes wheel travel from the hit geometry. The contact normal participates in spring force.</li>
+                <li><strong>Vertical force.</strong> Configurable up/down travel, preload, spring rate, and separate compression/relaxation dampers produce load; the effective damping coefficient depends on the direction of travel. An optional suspension-limit constraint can prevent excessive chassis penetration.</li>
+                <li><strong>Slip.</strong> Longitudinal slip starts from <i>RΩ − Vx</i>; slip angle starts from <i>atan(Vy/(|Vx|+ε))</i>. Ratios and angles are bounded near difficult low-speed cases. The tire object receives load, slip, camber, pressure, radius, and speed.</li>
+                <li><strong>Tire choices.</strong> The inspected Simple tire uses a load-scaled sine/arctangent curve; Tire96 and MF61 include load-dependent Magic Formula terms and combined-slip adjustments. MF61 additionally includes pressure and moment terms. These are model families, not proof that a bundled parameter set matches any measured tire.</li>
+              </ol>
+            </div>
+            <div class="equation-strip"><span>Shape of a fitted tire curve</span><strong>F(s) = D sin{ C atan[ B s − E(B s − atan(B s)) ] }</strong><p>This schematic Magic Formula explains FGear’s Simple tire family: <i>s</i> is slip (ratio or angle), <i>B</i> controls slope, <i>C</i> shape, <i>D</i> peak, and <i>E</i> curvature. The detailed 1996/MF6.1 families add many load, camber, pressure, shift, and combined-slip coefficients. This is not the exact equation used for Chaos or AVS.</p></div>
+            <div class="vehicle-lab" id="tire-lab">
+              <div class="lab-header"><span>INTERACTIVE 03 / CURVE FAMILIES</span><h3>How does longitudinal force change with slip?</h3><p>Switch an illustrative tire response and move the slip marker. The plot teaches curve shape, not measured force from a particular tire or an exact code replay.</p></div>
+              <div class="lab-controls lab-controls-two">
+                <label>Tire response<select id="tire-model"><option value="grip">Grip-limited / Chaos-inspired</option><option value="state">Slip-state / AVS-inspired</option><option value="magic">Magic Formula / FGear-inspired</option></select></label>
+                <label>Longitudinal slip <output id="slip-value">0.12</output><input id="slip-input" type="range" min="-0.5" max="0.5" step="0.01" value="0.12" /></label>
+                <button type="button" id="tire-reset">Reset</button>
+              </div>
+              <canvas id="tire-plot" class="lab-plot" height="270" role="img" aria-label="Illustrative tire force versus slip for three model families"></canvas>
+              <p class="lab-readout" id="tire-readout" aria-live="polite"></p><p class="lab-caveat">Normalized illustrative curves. Grip-limited and slip-state curves are explanatory abstractions, not extracted tire curves. The Magic Formula coefficients here are illustrative, not fitted test data.</p>
+            </div>
+          </section>
+
+          <section class="paper-section" id="comparison" aria-labelledby="comparison-title">
+            <header class="section-heading"><span>06 / COMPARISON</span><h2 id="comparison-title">Where the models actually diverge</h2></header>
+            <div class="table-wrap"><table class="paper-table vehicle-comparison"><thead><tr><th>Question</th><th>Chaos Vehicles</th><th>AVS 1.4.3</th><th>FGear (inspected version)</th></tr></thead><tbody>
+              <tr><td>Road contact</td><td>Ray or sphere sweep</td><td>Ray; alternate physical collision wheel</td><td>Ray or shape-based wheel queries</td></tr>
+              <tr><td>Vertical model</td><td>Spring + separate damping, constraint or force path; load blend and axle coupling</td><td>Explicit spring/damper + excess-compression support; physical-wheel alternative</td><td>Spring + preload + asymmetric damping; optional penetration constraint</td></tr>
+              <tr><td>Tire force</td><td>Torque/radius + lateral stiffness/graph, shared grip clamp</td><td>Interpolated target slip, shaped normalized longitudinal/lateral force; physical wheel uses contact friction</td><td>Interchangeable tire models: Simple, 1996, MF61, with combined slip</td></tr>
+              <tr><td>Useful strength</td><td>Direct, low-parameter baseline and force budget</td><td>Choice of synthetic or physical contact and explicit transient slip behavior</td><td>Broad tire-model controls, including camber/pressure effects in richer models</td></tr>
+              <tr><td>Model limitation</td><td>Grip law is stylized unless tuned from data</td><td>Ray and physical modes do not share a single behavior; custom heuristics need validation</td><td>Many coefficients create calibration burden; elaborate formulas cannot repair poor input data</td></tr>
+            </tbody></table></div>
+            <div class="prose"><p><strong>No published head-to-head accuracy or CPU benchmark is claimed here.</strong> To compare them fairly, hold chassis mass/inertia, wheelbase, radius, surface, control inputs, fixed step, and vehicle speed constant; record tire force, normal load, skidpad lateral acceleration, brake distance, bump response, and missed contacts. A system with a longer parameter list does not automatically look or feel better.</p></div>
+          </section>
+
+          <section class="paper-section" id="game-loop" aria-labelledby="game-loop-title">
+            <header class="section-heading"><span>07 / BUILDING A GAME CAR</span><h2 id="game-loop-title">A practical simulation loop and tuning order</h2></header>
+            <ol class="vehicle-steps">
+              <li><b>01 · Establish units and chassis state</b><p>Use consistent mass, length, force, torque, time, and inertia units. Put the center of mass and inertia tensor in a plausible location. Start with a fixed physics step.</p></li>
+              <li><b>02 · Measure contact</b><p>For every wheel: determine contact, hit normal/position, suspension length, road-relative velocity at the hit, and surface properties. A contact point on a moving platform must use relative velocity.</p></li>
+              <li><b>03 · Compute suspension</b><p>Set travel and spring rate from static sag; choose damping from a target fraction of <i>2√(km)</i>. Limit compression at bump stops and set load to zero when airborne. Add left–right anti-roll coupling only after individual wheels work.</p></li>
+              <li><b>04 · Compute wheel spin and tires</b><p>Transform contact velocity into each steered wheel frame; compute slip with a low-speed rule, evaluate tire forces from the chosen model, enforce combined-slip behavior, then update <i>Ω</i> using drive/brake/contact torques.</p></li>
+              <li><b>05 · Apply and integrate</b><p>Apply force at each contact or prescribed suspension point; integrate rigid-body linear and angular motion. Use substeps when wheel rotation, contact, or stiff springs change faster than the render frame. Interpolate graphics separately from physics.</p></li>
+              <li><b>06 · Instrument before adding assists</b><p>Plot per-wheel compression, <i>Fz</i>, <i>κ</i>, <i>α</i>, <i>Fx</i>, <i>Fy</i>, angular speed, and stability-control interventions. Tune the bare car before ABS, traction control, camera shake, or visual wheel motion.</p></li>
+            </ol>
+            <div class="equation-strip"><span>Processor work</span><strong>CPU: contact queries → wheel/tire updates → rigid-body solve &nbsp; | &nbsp; GPU: chiefly rendering</strong><p>These inspected implementations calculate their core forces in processor-side simulation code; a GPU draws the result and may compute unrelated visual effects. A GPU-based vehicle solver is possible, but is not implied by high visual quality. Fixed-step cost scales approximately with wheel count, contact-query complexity, constraint iterations, and substeps—not only the number of tire coefficients.</p></div>
+          </section>
+
+          <section class="paper-section" id="evidence" aria-labelledby="evidence-title">
+            <header class="section-heading"><span>08 / EVIDENCE &amp; LIMITS</span><h2 id="evidence-title">What the sources establish—and what they do not</h2></header>
+            <div class="table-wrap"><table class="paper-table"><thead><tr><th>Test</th><th>What to measure</th><th>What would reveal a problem</th></tr></thead><tbody>
+              <tr><td>Static load and drop</td><td>Corner load ≈ mg/4; sag, overshoot, settling</td><td>Incorrect units, bottoming, oscillation or negative ground load</td></tr>
+              <tr><td>Skidpad and steering ramp</td><td>Lateral acceleration, slip angle, load transfer</td><td>Unlimited turning force or abrupt sign changes at low speed</td></tr>
+              <tr><td>Acceleration and hard braking</td><td>κ, wheel speed, stopping distance, combined force</td><td>No wheelspin/lock, traction increasing with zero load</td></tr>
+              <tr><td>Single-wheel kerb</td><td>Contact hit rate, suspension travel, body roll</td><td>Ray misses, excessive impulse, chassis penetration</td></tr>
+              <tr><td>Variable frame rate</td><td>Same maneuver at different render rates</td><td>Physics changes with visual frame duration</td></tr>
+            </tbody></table></div>
+            <div class="prose"><p>Source inspection confirms specific algorithms but does <strong>not</strong> provide calibrated real-world error, equal-hardware runtime, tire test data, or a controlled comparison among the three. Formula-rich FGear settings can be physically motivated yet still wrong without fitting; simplified AVS or Chaos settings can be more convincing for a target game after careful tuning. All three abstract away distributed rubber deformation, temperature, wear, and many contact-patch effects. Contact query choices can fail on sharp geometry; numerical substeps and solver constraints influence stability.</p></div>
+            <div class="paper-takeaway"><span>DECISION RULE</span><p>Choose the contact representation and tire law according to the phenomenon you need to reproduce, then validate the same maneuvers and telemetry under the same conditions. Evaluate physical behavior and control feel separately.</p></div>
+          </section>
+
+          <footer class="wm-reference vehicle-reference" id="sources">
+            <span>SOURCES, PROVENANCE &amp; IMAGE NOTES</span>
+            <ol>
+              <li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/chaos-vehicles" target="_blank" rel="noreferrer">Epic Games: Chaos Vehicles documentation</a>. Implementation evidence inspected locally: <i>SuspensionSystem.cpp</i>, <i>WheelSystem.cpp</i>, and <i>ChaosWheeledVehicleMovementComponent.cpp</i> in the installed 5.8 source.</li>
+              <li><a href="https://sites.google.com/view/vehicle-system-documentation/home" target="_blank" rel="noreferrer">Advanced Vehicle System documentation</a>. Implementation evidence inspected locally: version 1.4.3 <i>VehicleSystemBase.cpp</i> and <i>VehicleWheelBase.h</i>.</li>
+              <li>FGear Vehicle Physics, locally supplied plugin source: <i>FGearWheel.cpp</i>, <i>FGearTireSimple.cpp</i>, <i>FGearTire96.cpp</i>, <i>FGearTireMF61.cpp</i>, and <i>FGearWheelOptions.h</i>. Mathematical descriptions are original paraphrases; proprietary code is neither embedded nor redistributed.</li>
+              <li>Hans B. Pacejka, <i>Tire and Vehicle Dynamics</i>, 3rd ed., Butterworth-Heinemann, 2012. Used as background for slip, Magic Formula families, and tire force terminology; no empirical coefficients are claimed from the book.</li>
+            </ol>
+            <p>All figures and interactive charts on this page were drawn specifically for this article. Experiments are teaching models and do not benchmark or replay any of the three implementations. Mathematical signs depend on the local axes and on the implementation.</p>
+            <a href="/home/en/#articles">← Back to learning notes</a>
+          </footer>
+        </article>
+      </main>
+      <aside class="next-sidebar next-article-toc wm-toc vehicle-toc" aria-label="Article contents">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/en/">Personal homepage</a></div>
+        <p>CONTENTS</p><nav>
+          <a href="#overview">Overview</a><a href="#question">1. The question</a><a href="#geometry">2. Contact geometry</a><a href="#spring">3. Spring and damper</a><a href="#tire">4. Tire forces</a><a href="#implementations">5. Three implementations</a><a href="#comparison">6. Comparison</a><a href="#game-loop">7. Game simulation</a><a href="#evidence">8. Evidence &amp; limits</a><a href="#sources">Sources</a>
+        </nav>
+      </aside>
+    </div>
+    <footer class="next-footer"><p>© 2026 DOTAFS · Vehicle dynamics study</p><p>Three models · one shared physical foundation</p></footer>
+  </body>
+</html>
