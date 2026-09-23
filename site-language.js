@@ -9,7 +9,9 @@
     "/home/en/": { zh: "/home/", en: "/home/en/" },
     "/home/en/index.html": { zh: "/home/", en: "/home/en/" },
     "/articles/vehicle-suspension-math.html": { zh: "/articles/vehicle-suspension-math-zh.html", en: "/articles/vehicle-suspension-math.html" },
-    "/articles/vehicle-suspension-math-zh.html": { zh: "/articles/vehicle-suspension-math-zh.html", en: "/articles/vehicle-suspension-math.html" }
+    "/articles/vehicle-suspension-math-zh.html": { zh: "/articles/vehicle-suspension-math-zh.html", en: "/articles/vehicle-suspension-math.html" },
+    "/articles/jev-vs-gpt.html": { zh: "/articles/jev-vs-gpt-zh.html", en: "/articles/jev-vs-gpt.html" },
+    "/articles/jev-vs-gpt-zh.html": { zh: "/articles/jev-vs-gpt-zh.html", en: "/articles/jev-vs-gpt.html" }
   };
   let choice;
   try { choice = localStorage.getItem(key); } catch (_) { choice = null; }

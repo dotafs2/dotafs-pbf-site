@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Jev 与 GPT 的底层机制比较：自回归生成、约束解码、并行结构化决策、RLCD、概率校准和评测局限。" />
+  <meta name="theme-color" content="#1b1d1f" />
+  <meta property="og:title" content="Jev 与 GPT：生成语言和并行决策 · DOTAFS" />
+  <meta property="og:description" content="有公开证据的技术比较：究竟换了输出接口、解码方式，还是神经网络架构？" />
+  <meta property="og:type" content="article" />
+  <meta property="article:published_time" content="2026-09-20" />
+  <link rel="alternate" hreflang="zh-CN" href="/articles/jev-vs-gpt-zh.html" />
+  <link rel="alternate" hreflang="en" href="/articles/jev-vs-gpt.html" />
+  <link rel="alternate" hreflang="x-default" href="/articles/jev-vs-gpt.html" />
+  <title>Jev 与 GPT：生成语言和并行决策 · DOTAFS</title>
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../research-system.css" />
+  <link rel="stylesheet" href="../next-theme.css" />
+  <link rel="stylesheet" href="world-models.css" />
+  <link rel="stylesheet" href="jev-vs-gpt.css" />
+  <link rel="stylesheet" href="/site-language.css" />
+  <script src="jev-vs-gpt.js" defer></script>
+  <script src="/site-language.js" defer></script>
+</head>
+<body class="research-page next-site next-article world-models-page jev-page">
+  <a class="skip-link" href="#content">跳到正文</a><div class="next-headband" aria-hidden="true"></div>
+  <header class="next-header"><div class="next-header-inner">
+    <div class="next-brand-column"><a class="next-brand" href="/home/">DOTAFS</a><p>Personal learning notes</p></div>
+    <nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/">PBF Demo</a><a href="#sources">参考资料</a></nav>
+  </div></header>
+  <div class="next-page-layout wm-layout" id="top">
+    <main id="content" class="next-main wm-main"><article>
+      <header class="jev-intro" id="overview">
+        <p class="wm-kicker">模型研究笔记 · <time datetime="2026-09-20">2026 年 9 月 20 日</time> · 约 18 分钟</p>
+        <h1>Jev 与 GPT：生成语言，还是直接作出决策？</h1>
+        <p class="jev-deck">Jev 是 TypeSafe AI 的 System One 模型。它把“读入状态、回答有限选项的问题”做成一等接口；GPT 系列以逐 Token 生成语言为基础，也可以通过约束解码返回结构化值。真正需要比较的是计算路径、训练目标、输出语义和适用边界。</p>
+        <dl class="jev-meta">
+          <div><dt>主要资料</dt><dd>Diogo Almeida / TypeSafe AI，《Introducing System One Models &amp; Jev》，2026-09-15，官方技术发布；非同行评审论文</dd></div>
+          <div><dt>对照资料</dt><dd>Brown 等，GPT-3 论文（2020）；Ouyang 等，InstructGPT 论文（2022）；OpenAI Structured Outputs 技术文章（2024）</dd></div>
+          <div><dt>输入 → 输出</dt><dd>Jev：文本或结构化文本状态 + 预定义问题 → 选项、分数或二元概率；GPT：上下文 → 续写 Token，也可按 Schema 输出</dd></div>
+          <div><dt>范围</dt><dd>比较可公开验证的接口与推理方式；不猜测 Jev 的隐藏层、参数量或加速硬件</dd></div>
+        </dl>
+        <p class="jev-scope"><strong>证据等级：</strong>Jev 尚无可复现的架构与训练技术论文公开。下面的“Jev 如何工作”仅包含官方描述和 API 可见行为；图和交互是原创教学抽象，不是其网络结构图或跑分。</p>
+      </header>
+
+      <section class="paper-section" id="problem"><header class="section-heading"><span>01 / 问题</span><h2>把语言模型接入软件，究竟卡在哪里？</h2></header>
+        <div class="prose"><p>一个客服流程需要的可能只是“是否要求退款”“属于哪个部门”“风险有多高”。自由文本模型可以回答，但代码要从回复中抽取字段、检验类型、处理拒绝或截断，并为每个判断决定能否自动执行。<strong>格式正确并不代表判断正确</strong>，而漂亮的解释也不等于概率可靠。[<a href="#s1">1</a>][<a href="#s5">5</a>]</p><p>TypeSafe 提出的 Jev 把输出空间先写在请求里，返回有限选项上的概率，让应用程序执行显式的业务规则。它不回答开放式“写一封邮件”，也不生成代码或长篇推理；这与 GPT 的通用语言接口目标不同。OpenAI 的 Structured Outputs 已能对 GPT 的输出施加 Schema 约束，所以差异不能简化成“GPT 一定会生成无效 JSON”。[<a href="#s2">2</a>][<a href="#s5">5</a>]</p></div>
+        <div class="abstract-block"><div><span>问题</span><p>软件需要大量低延迟、可组合的判断，通用续写往往要花时间生成与解析文本。</p></div><div><span>提出</span><p>Jev 用 State + Choice / Score / Noul 提交一批独立问题，返回类型受限的概率分布。</p></div><div><span>成立条件</span><p>答案空间事先可枚举；复杂业务分解成窄问题，跨问题逻辑由代码负责。</p></div><div><span>不解决</span><p>长篇写作、开放式代码生成、从零构造未知输出类型，也不自动保证语义真实。</p></div></div>
+      </section>
+
+      <section class="paper-section" id="routes"><header class="section-heading"><span>02 / 路线比较</span><h2>三条技术路线，不要混成两个产品标签</h2></header>
+        <div class="table-wrap"><table class="paper-table"><thead><tr><th>维度</th><th>GPT 自由生成</th><th>GPT + Structured Outputs</th><th>Jev + 类型化问题</th></tr></thead><tbody>
+          <tr><td>状态表示</td><td>上下文 Token 序列；现代具体架构未全部公开</td><td>同一类语言模型输入，另有 Schema</td><td>文本、JSON 对象或文本数组构成的 state；问题有预设类型与候选项</td></tr>
+          <tr><td>输出机制</td><td>条件于之前 Token，逐步生成下一 Token</td><td>仍逐步生成；每步只允许当前 Schema 合法的 Token</td><td>官方描述：同一 state 上多个独立问题并行给出有限空间的概率</td></tr>
+          <tr><td>训练目标</td><td>GPT-3：语言建模；InstructGPT：示范与偏好反馈后训练</td><td>语言模型加 Schema 理解训练与确定性的解码约束</td><td>官方称 RLCD 优化校准决策；损失函数、数据、训练细节未披露</td></tr>
+          <tr><td>适用输出</td><td>文章、代码、解释、开放式回答</td><td>可变字段与嵌套 JSON，仍可表达文字</td><td>Choice、Score、Noul；不能自由生成字符串</td></tr>
+          <tr><td>代价与边界</td><td>长输出需要更多串行步骤</td><td>格式可保证，内容仍可能错；拒绝、截断要处理</td><td>窄判断适合批量处理；候选项不全、状态错误仍会导致错误决策</td></tr>
+        </tbody></table></div>
+        <div class="prose"><p>这里的 GPT 数学机制来自 GPT-3 的公开论文，RLHF 例子来自 InstructGPT；<strong>不能由此推定 GPT-6 的全部隐藏实现</strong>。同样，官方把 Jev 叫作新架构并提到并行 sampler，但没有公开足以判断它是 Transformer、其他骨干，还是哪种算子融合的材料。[<a href="#s1">1</a>][<a href="#s6">6</a>][<a href="#s7">7</a>]</p></div>
+      </section>
+
+      <section class="paper-section" id="map"><header class="section-heading"><span>03 / 方法地图</span><h2>先看数据怎样进入、怎样离开</h2></header>
+        <figure class="jev-figure"><svg viewBox="0 0 760 310" role="img" aria-labelledby="map-title map-desc">
+          <title id="map-title">GPT 自由生成、约束输出与 Jev 决策管线</title><desc id="map-desc">三条路径均由输入开始。GPT 自由生成逐个选择 Token；约束输出仍逐 Token 但每步施加 Schema 掩码；Jev 接收共享状态和独立问题并行返回类型化概率，交给代码决定行动。</desc>
+          <rect class="node" x="20" y="23" width="165" height="51"/><text x="40" y="53">上下文 / state</text>
+          <path class="path" d="M185 48 H229 V114 H259 M229 114 V182 H259"/><path class="path-jev" d="M185 48 H229 V255 H259"/>
+          <rect class="node" x="259" y="88" width="197" height="53"/><text x="275" y="112">GPT: p(tₙ | t&lt;ₙ)</text><text class="note" x="275" y="130">逐 Token 依赖</text>
+          <rect class="node" x="259" y="154" width="197" height="58"/><text x="275" y="178">GPT + Schema</text><text class="note" x="275" y="197">逐步掩掉无效 Token</text>
+          <rect class="decision" x="259" y="226" width="197" height="59"/><text x="275" y="251">Jev: q₁, q₂, … qₙ</text><text class="note" x="275" y="270">同一状态 / 并行评估</text>
+          <path class="path" d="M456 114 H504 M456 182 H504"/><path class="path-jev" d="M456 255 H504"/>
+          <rect class="node" x="504" y="88" width="225" height="52"/><text x="519" y="112">续写 → 解析 / 执行</text><text class="note" x="519" y="130">可生成任意文本</text>
+          <rect class="node" x="504" y="154" width="225" height="58"/><text x="519" y="179">合规 JSON → 校验值</text><text class="note" x="519" y="198">类型合规 ≠ 事实正确</text>
+          <rect class="decision" x="504" y="226" width="225" height="59"/><text x="519" y="251">概率 → 阈值 / 规则</text><text class="note" x="519" y="270">无自由文本回复</text>
+        </svg><figcaption>原创教学数据流，依据 TypeSafe 的发布与文档、GPT-3 和 OpenAI Structured Outputs。框图只描述可观察接口与公开解码方式；Jev 内部网络层数和硬件实现未公开。[<a href="#s1">1</a>][<a href="#s2">2</a>][<a href="#s5">5</a>]</figcaption></figure>
+        <div class="prose"><p>例如输入是“订单 A-104 有两笔相同扣款，客户要求退款”，程序同时询问：是否要求退款（Noul）、属于账单还是技术问题（Choice）、情绪等级（Score）。三个结果用同一个 state，但互相不读取前一个答案。若第二步必须先根据第一步结果查数据库，那么依赖是真实存在的，代码应再发一次请求；“并行”不能抹掉依赖。[<a href="#s2">2</a>]</p></div>
+      </section>
+
+      <section class="paper-section" id="math"><header class="section-heading"><span>04 / 数学与实现</span><h2>哪些公式有依据，哪些只是接口抽象？</h2></header>
+        <div class="prose"><h3>GPT：下一个 Token 的条件分布</h3><p>设输入和输出拼成 Token 序列 <i>t₁,…,tₙ</i>。自回归语言建模将联合概率分解为一串条件概率；生成第 <i>i</i> 个 Token 时，前面已生成的 Token 构成条件。训练时可并行计算许多位置的损失，<strong>但输出阶段的下一步依赖上一步结果</strong>。这不等于 GPU 对每一层内部都串行计算。[<a href="#s6">6</a>]</p></div>
+        <div class="jev-eq"><span>公开 GPT 家族的基础数学</span><strong>p(t₁,…,tₙ) = ∏ᵢ p(tᵢ | t₁,…,tᵢ₋₁)</strong><p>右侧乘积说明输出顺序上的依赖；Transformer 每一步仍有矩阵运算可在加速器上并行执行。</p></div>
+        <div class="prose"><h3>GPT 的类型约束：仍然生成，但每步裁掉非法选项</h3><p>OpenAI 的 Structured Outputs 将支持的 JSON Schema 预处理成上下文无关文法（CFG），在已生成前缀 <i>t&lt;ᵢ</i> 下计算合法 Token 集 <i>A(t&lt;ᵢ,S)</i>。从概念上可将不合法 Token 的概率设为零，再归一化。这保证符合可支持 Schema 的格式；安全拒绝、未完成输出和字段内容错误仍需要应用程序处理。<strong>所以“Jev 有类型、GPT 没有类型”不是准确比较。</strong>[<a href="#s5">5</a>]</p></div>
+        <div class="jev-eq"><span>受限采样的解释式，不是 OpenAI 的逐行源码</span><strong>p<sub>S</sub>(tᵢ | t&lt;ᵢ) ∝ p(tᵢ | t&lt;ᵢ) · 1[tᵢ ∈ A(t&lt;ᵢ,S)]</strong><p><i>S</i> 为 Schema，指示函数在 Token 不合法时取 0。它改变可输出集合，并没有从根本上取消自回归依赖。</p></div>
+        <div class="prose"><h3>Jev：状态、候选空间和并行的问题</h3><p>官方文档提供三种原语：<strong>Choice</strong> 在预定义候选项中选择并返回概率；<strong>Score</strong> 在定义好的等级上给出分布及连续位置；<strong>Noul</strong> 给一个二元命题为真的概率（0 到 1）。Choice/Score 的 confidence 是从概率分布形状得到的摘要，Noul 没有单独 confidence。若候选集合遗漏“都不是”，模型仍被限制在错误的选项表内。[<a href="#s2">2</a>][<a href="#s3">3</a>]</p></div>
+        <div class="jev-eq"><span>API 层的教学记号；不是 Jev 训练损失或内部电路</span><strong>(state, {(qⱼ, Cⱼ)}ⱼ₌₁…ₘ) → {Pⱼ(y | state, qⱼ, Cⱼ)}ⱼ₌₁…ₘ</strong><p><i>Cⱼ</i> 是第 <i>j</i> 题允许的候选项或等级，<i>Pⱼ</i> 是返回的概率。TypeSafe 称这些问题同批并行且彼此独立；无法由 API 推导网络层数、注意力形式或 FLOPs。</p></div>
+        <div class="prose"><h3>训练目标不是一个神奇的缩写</h3><p>GPT-3 公开的是自回归语言建模；InstructGPT 先用示范做监督微调，再通过人类偏好排序与强化学习改善遵从指令。TypeSafe 的资料另把有可程序验证奖励的训练称为 RLVR，作为数学题等路线的背景；不能断言所有 GPT 版本都只用 RLHF。TypeSafe 把自己的后训练路线命名为 <strong>RLCD（Reinforcement Learning for Calibrated Decisions）</strong>，声称使输出概率与正确率更一致。然而公开资料没有足够信息重建其奖励函数、优化器、数据构成、模型结构或训练规模。不能凭“RL”三个字替它写出损失函数，也不能声称 GPT 的概率从不校准。[<a href="#s1">1</a>][<a href="#s4">4</a>][<a href="#s7">7</a>]</p></div>
+        <div class="paper-takeaway"><span>硬件边界</span><p>GPT 输出逐 Token 依赖，不妨碍每个 Token 的矩阵运算使用 GPU 等加速器。Jev 官方称有并行 sampler、硬件感知效率，却未公开完整部署拓扑；不能把 Jev 简单写成“CPU 算”、GPT 写成“GPU 算”。网页演示不是芯片测量。</p></div>
+      </section>
+
+      <section class="paper-section" id="interaction"><header class="section-heading"><span>05 / 交互实验</span><h2>看依赖链，再理解校准</h2></header>
+        <div class="jev-lab" id="parallel-lab"><header><span>实验 01 / 输出形状</span><h3>输出变长，和问题变多，是同一件事吗？</h3><p>滑动控制项；格子表示对外输出步骤，不表示 FLOPs 或实际毫秒数。</p></header>
+          <div class="jev-controls"><label>GPT 输出 Token 数 <output id="steps-value">8</output><input id="steps-input" type="range" min="1" max="32" value="8" /></label><label>Jev 独立问题数 <output id="questions-value">4</output><input id="questions-input" type="range" min="1" max="16" value="4" /></label><button id="steps-reset" type="button">重置</button></div>
+          <div class="step-display" role="img" aria-label="GPT 的顺序 Token 与 Jev 的并行独立问题"><span class="jev-label">GPT / 顺序生成</span><div id="token-row"></div><span class="jev-label">JEV / 同批提问</span><div id="decision-row"></div></div>
+          <p class="jev-readout" id="steps-readout" aria-live="polite"></p><p class="jev-lab-note">教学抽象。真实延迟还取决于输入长度、模型大小、批处理、排队、网络、硬件和推理设置；复杂问题并不会因一次调用而自动变简单。</p>
+        </div>
+        <div class="prose"><p>所谓<strong>校准</strong>是跨一组问题的频率性质：如果模型给许多事件都报 80%，其中约 80% 最终为真，才称这组 80% 预测得到良好校准。单个判断不能证明自己已校准。选择适当的阈值还要看错误的代价，例如读取页面和执行转账的阈值不能一样。[<a href="#s3">3</a>][<a href="#s4">4</a>]</p></div>
+        <div class="jev-lab" id="calibration-lab"><header><span>实验 02 / 概率的意义</span><h3>模型说 80%，事后只有 40% 正确，会怎样？</h3><p>把同一概率区间内的一组二元事件当作玩具数据，观察校准差与 Brier 分数。</p></header>
+          <div class="jev-controls"><label>预测概率 p <output id="prob-value">80%</output><input id="prob-input" type="range" min="0" max="100" step="5" value="80" /></label><label>实际频率 f <output id="rate-value">80%</output><input id="rate-input" type="range" min="0" max="100" step="5" value="80" /></label><button id="cal-reset" type="button">重置</button></div>
+          <div class="cal-bars" aria-hidden="true"><div><span>预测 p</span><i><b id="predicted-bar" style="width:80%"></b></i><span></span></div><div><span>实测 f</span><i><b id="observed-bar" style="width:80%"></b></i><span></span></div></div>
+          <p class="jev-readout" id="cal-readout" aria-live="polite"></p><p class="jev-lab-note">教学数据，由滑块人为设置，绝非 Jev 或 GPT 的真实校准测试。Brier = f(1−p)² + (1−f)p²；分数低不保证单个事件正确。</p>
+        </div>
+      </section>
+
+      <section class="paper-section" id="evidence"><header class="section-heading"><span>06 / 实验与证据</span><h2>漂亮的速度数字测了什么？</h2></header>
+        <div class="table-wrap"><table class="paper-table evidence-table"><thead><tr><th>公开报告</th><th>设置 / 指标方向</th><th>结果和可解释范围</th><th>仍缺什么</th></tr></thead><tbody>
+          <tr><td>TypeSafe 发布演示 [1]</td><td>短而密的文本状态，多个可读键名问题；与 GPT-5.6 Terra 默认推理比较。端到端延迟越低越好。</td><td>官方给 Jev 的响应范围 70–500 ms，并称某些同类 System One 查询快 40–200 倍。</td><td>特意缩短的输入对 Jev 有利；单个演示不是通用能力测试。</td></tr>
+          <tr><td>四个工作流 [1][8]</td><td>安全事件、代理轨迹、发票、客服；精度相对于 GPT-6 Astra 与 Fable 5.1 的平均“共识标签”，成本/时延越低越好，精度越高越好。</td><td>官方从其工作流得出最高 193.6× 更快、444.6× 更便宜；作者也说这些属于真实收益的高端。</td><td>标签不是独立的人类真值；工作流出自能力团队；模型默认推理设置和封装影响公平性。</td></tr>
+          <tr><td>Schema 合规 [1][5]</td><td>Jev 输出受预设选项限制；OpenAI 自有复杂 JSON Schema 评测中 GPT-4o-2024-08-06 加约束解码。格式合规率越高越好。</td><td>Jev 的类型保证属于接口设计；OpenAI 在其自有评测报告 100% Schema 合规，说明 GPT 也可可靠遵守格式。</td><td>两者的任务与 Schema 不同，不能横向拿百分比排名；格式合规不测语义真伪。</td></tr>
+          <tr><td>校准和语义正确</td><td>应按同一真实标注数据比较准确率、Brier、ECE、拒绝覆盖率与分布外错误。</td><td>本笔记没有可复现的 Jev 对 GPT 独立校准曲线或成对部署测量。</td><td>缺独立地面真值、消融、训练资源、长期故障率和多语言压力测试。</td></tr>
+        </tbody></table></div>
+        <div class="prose"><p>发布文案中的“不会幻觉”必须缩小为<strong>不会返回候选集合之外的类型值</strong>。输入有误、候选集合漏项、语义判断不对，都仍然可能发生。TypeSafe 把自己的类型错误设为结构上不可能；这不能证明对现实世界的判断没有错误。OpenAI 也明确说 Schema 合规的字段内容可能错误。[<a href="#s1">1</a>][<a href="#s5">5</a>]</p><p>目前没有公开的 Jev 训练数据、参数量、骨干网络详图或 RLCD 消融，不能做架构层的因果归因。有限早期访问与厂商自建测试也限制了外部复现。公开的 System One LLM adapter 是把别的 LLM 转成兼容接口的<strong>适配器</strong>，不是 Jev 权重或训练源码。[<a href="#s1">1</a>][<a href="#s9">9</a>]</p></div>
+      </section>
+
+      <section class="paper-section" id="limits"><header class="section-heading"><span>07 / 优势与边界</span><h2>该选哪一个，取决于你要输出什么</h2></header>
+        <div class="prose"><p><strong>Jev 的有利场景：</strong>一个已知状态要回答很多相互独立的窄问题，代码先定义候选项，再根据概率、成本和风险分流。这样可减少不必要的生成步骤。文档把图像、音频、视频列为暂不支持的输入；英文是目前表现最好的语言，中文任务应单独测。[<a href="#s2">2</a>][<a href="#s10">10</a>]</p><p><strong>产品约束：</strong>官方发布称直接 Choice 最多支持 255 个候选项，更多选项需要分阶段评分和选择。发布时列出的价格为每百万输入 Token 0.042 美元，输出不单独计费；这是厂商报价，不是 Jev 的真实硬件成本证明，也不能与不同任务的 GPT 每 Token 单价直接比较。[<a href="#s1">1</a>][<a href="#s10">10</a>]</p><p><strong>GPT 的有利场景：</strong>输出空间事先不知道、需要解释、生成代码、长文写作、多步推理，或希望在一个模型中处理多种任务。严格 Schema 能解决许多类型问题，但不会给每个字段自动提供经过外部核验的语义概率。使用更强推理也可能提高判断质量，代价是额外的时间和费用。[<a href="#s5">5</a>][<a href="#s7">7</a>]</p><p><strong>共同风险：</strong>遇到缺失证据、提示注入、模糊标签或分布变化，两类系统都要通过独立测试和应用侧的拒绝路径。Jev 的“每题独立”限制了同一批次里题目之间的真实依赖；GPT 的多步骤工作流则需要检查自由文本、Schema 和工具调用结果。两者不是一个绝对替代关系。</p></div>
+      </section>
+
+      <section class="paper-section" id="practice"><header class="section-heading"><span>08 / 实际映射</span><h2>怎样做一项能验证的项目小实验？</h2></header>
+        <div class="prose"><p>以你的论文资料库为例：先把文章元数据、摘要和链接构成 state，提出“是否主要讲 PBD”“是否有可复现的代码”“是否需要人工核实引用”等窄问题。Jev 返回概率后，代码做阈值分流；GPT 只在需要写摘要或解释原因时介入。不要让“论文链接是否真实”成为无证据的模型猜测，要通过 DOI/原站检查。</p><p>固定 200–500 条人工标注样本、同一输入和输出 Schema；同时测试 Jev、GPT + Structured Outputs、简单关键词/规则基线。报告：宏平均 F1、每类混淆矩阵、Brier、可靠性图、端到端 p50/p95 时延、实际账单、拒绝率。对中文资料和新领域各留一组独立测试，并记录模型版本及提供商区域。只在达到目标精度时比较速度，才能回答“对我的系统是否值得”。</p></div>
+        <div class="jev-eq"><span>可以执行的流水线</span><strong>原始资料 → 可信字段/人工标签 → 三条同条件路线 → 概率校准 + 错误代价 → 阈值分流 → GPT 解释 / 人工复核</strong><p>先做小规模离线评测。Jev 的公开源码适配器可用于统一接口比较，但不能代替使用真正的 Jev API 评测其模型。</p></div>
+      </section>
+
+      <footer class="wm-reference" id="sources"><span>09 / 原始来源与素材声明</span>
+        <ol class="jev-source-notes">
+          <li id="s1"><a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev" target="_blank" rel="noreferrer">Diogo Almeida, TypeSafe AI, “Introducing System One Models &amp; Jev”</a>，2026-09-15，产品与技术发布，包含自述数据及评测限制；不是经同行评审的 Jev 论文。</li>
+          <li id="s2"><a href="https://docs.typesafe.ai/primitives" target="_blank" rel="noreferrer">TypeSafe AI, “Primitives (Questions)”</a>；<a href="https://docs.typesafe.ai/concepts/system-one" target="_blank" rel="noreferrer">“System One”</a>，API 的输入、输出与问题依赖。</li>
+          <li id="s3"><a href="https://docs.typesafe.ai/confidence" target="_blank" rel="noreferrer">TypeSafe AI, “Confidence”</a>，Choice/Score 的分布摘要与风险阈值；文档中的演示公式不是模型底层损失。</li>
+          <li id="s4"><a href="https://docs.typesafe.ai/introduction/machine-learning-primer" target="_blank" rel="noreferrer">TypeSafe AI, “AI primer”</a>，RLCD 的公开定性描述。</li>
+          <li id="s5"><a href="https://openai.com/index/introducing-structured-outputs-in-the-api/" target="_blank" rel="noreferrer">OpenAI, “Introducing Structured Outputs in the API”</a>，2024-08-06，CFG 约束解码、内部合规评测及明确限制。</li>
+          <li id="s6"><a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noreferrer">Brown et al., “Language Models are Few-Shot Learners”</a>，2020，GPT-3 自回归模型论文。</li>
+          <li id="s7"><a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noreferrer">Ouyang et al., “Training language models to follow instructions with human feedback”</a>，2022，InstructGPT/RLHF 论文。</li>
+          <li id="s8"><a href="https://evals.typesafe.ai/" target="_blank" rel="noreferrer">TypeSafe AI, “Workflow evals”</a>，四种工作流、标签构造、成本/时延/精度图；属于厂商自建评测。</li>
+          <li id="s9"><a href="https://github.com/typesafe-ai/system-one-adapter-python" target="_blank" rel="noreferrer">TypeSafe AI, System One LLM adapter</a>，兼容 LLM 的封装代码，不是 Jev 模型源码。</li>
+          <li id="s10"><a href="https://docs.typesafe.ai/models" target="_blank" rel="noreferrer">TypeSafe AI, “Models”</a>，文本输入、语言支持、版本及动态价格/限制。</li>
+        </ol>
+        <p>本文所有示意图、表格组织与交互均为原创；未转载第三方图片。厂商数据按原文条件转述，不代表本站独立复现。页面显示的 2026-09-20 为文章日期，链接中的在线文档可能继续更新。</p>
+        <a href="/home/#articles">← 返回学习笔记</a>
+      </footer>
+    </article></main>
+    <aside class="next-sidebar next-article-toc wm-toc jev-toc" aria-label="文章目录"><div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/">返回个人主页</a></div><p>目录</p><nav><a href="#overview">概览</a><a href="#problem">1. 问题</a><a href="#routes">2. 路线比较</a><a href="#map">3. 方法地图</a><a href="#math">4. 数学与实现</a><a href="#interaction">5. 交互实验</a><a href="#evidence">6. 实验与证据</a><a href="#limits">7. 优势与边界</a><a href="#practice">8. 实际映射</a><a href="#sources">参考资料</a></nav></aside>
+  </div>
+  <footer class="next-footer"><p>© 2026 DOTAFS · 模型研究笔记</p><p>结构化决策与语言生成</p></footer>
+</body>
+</html>
