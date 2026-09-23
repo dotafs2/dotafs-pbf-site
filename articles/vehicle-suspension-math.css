@@ -26,6 +26,13 @@
 .equation-strip { margin: 24px 0 26px; padding: 16px 18px; border-left: 2px solid var(--vehicle-accent); background: var(--wm-panel); }
 .equation-strip strong { display: block; margin: 8px 0; overflow-wrap: anywhere; font: 500 15px/1.7 var(--wm-mono); }
 .equation-strip p { max-width: 750px; margin: 0; font-size: 12px !important; line-height: 1.8; }
+.vehicle-rigid-equations strong + strong { margin-top: 2px; }
+.vehicle-rigid-equations p { margin-top: 12px; }
+.vehicle-derivation { margin: 20px 0 8px; }
+.vehicle-derivation h3 { margin: 22px 0 8px !important; font-size: 16px !important; line-height: 1.6 !important; }
+.vehicle-derivation h3:first-child { margin-top: 0 !important; }
+.vehicle-derivation p { overflow-wrap: anywhere; }
+.vehicle-moment-diagram { max-width: 760px; }
 .vehicle-lab { margin: 28px 0; padding: 18px; border: 1px solid var(--wm-line); background: var(--wm-panel); }
 .lab-header h3 { margin: 6px 0 5px; font-size: 17px !important; }.lab-header p { margin: 0 0 17px; font-size: 13px !important; line-height: 1.7; }
 .lab-controls { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)) auto; align-items: end; gap: 12px; }
