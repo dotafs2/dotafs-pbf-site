@@ -1,11 +1,11 @@
 :root {
-  --wm-bg: #1b1d1f;
-  --wm-panel: #202225;
-  --wm-panel-2: #25282b;
-  --wm-text: #e3e1dc;
-  --wm-muted: #989b9d;
-  --wm-line: #3b3e41;
-  --wm-accent: #899599;
+  --wm-bg: #333;
+  --wm-panel: #393939;
+  --wm-panel-2: #404040;
+  --wm-text: #f0ede7;
+  --wm-muted: #b6b1aa;
+  --wm-line: #54504d;
+  --wm-accent: #d0a187;
   --wm-body: "Noto Sans SC", system-ui, sans-serif;
   --wm-mono: "IBM Plex Mono", Consolas, monospace;
 }
@@ -15,7 +15,7 @@
   max-width: 100%;
   overflow-x: hidden;
   color: var(--wm-text);
-  background: var(--wm-bg);
+  background: var(--next-body);
   font-family: var(--wm-body);
 }
 

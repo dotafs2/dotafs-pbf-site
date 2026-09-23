@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const fmt = (v, n = 2) => Number(v).toFixed(n);
-  const ink = { grid: "#555958", text: "#c9cac5", muted: "#a1a5a2", main: "#9caeaa", second: "#e0dcd3", faint: "#797d7a" };
+  const ink = { grid: "#615c56", text: "#e2ddd5", muted: "#b5afa7", main: "#d0a187", second: "#f0ede7", faint: "#9a948d" };
   const zh = document.documentElement.lang.toLowerCase().startsWith("zh");
 
   function setupCanvas(canvas) {

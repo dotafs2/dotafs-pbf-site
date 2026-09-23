@@ -13,7 +13,7 @@
   padding: 0;
 }
 .next-language-switch a:focus-visible {
-  outline: 2px solid var(--next-accent, #969792);
+  outline: 2px solid var(--next-accent, #d0a187);
   outline-offset: 2px;
 }
 .site-language-floating {

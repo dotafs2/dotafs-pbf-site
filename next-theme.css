@@ -5,18 +5,20 @@
  */
 
 .next-site {
-  --next-body: #1b1d1f;
-  --next-content: #1b1d1f;
-  --next-card: rgb(227 225 220 / 4%);
-  --next-menu: #1b1d1f;
-  --next-text: #e3e1dc;
-  --next-heading: #e3e1dc;
-  --next-muted: rgb(227 225 220 / 56%);
-  --next-line: rgb(227 225 220 / 10%);
-  --next-line-strong: rgb(227 225 220 / 20%);
-  --next-accent: #899599;
-  --next-brand: #1b1d1f;
-  --next-brand-text: #e3e1dc;
+  /* NexT's dark Pisces layering: the canvas, reading sheet and header are
+     distinct. Warm type and one restrained copper accent keep long reads calm. */
+  --next-body: #282828;
+  --next-content: #333;
+  --next-card: rgb(240 237 231 / 5%);
+  --next-menu: #222;
+  --next-text: #d6d3cd;
+  --next-heading: #f0ede7;
+  --next-muted: #aba7a0;
+  --next-line: rgb(240 237 231 / 13%);
+  --next-line-strong: rgb(240 237 231 / 24%);
+  --next-accent: #d0a187;
+  --next-brand: #222;
+  --next-brand-text: #f0ede7;
   --next-sidebar-width: 240px;
   --next-offset: 12px;
   --next-content-padding: 40px;
@@ -73,8 +75,8 @@
 }
 
 .next-site ::selection {
-  color: #eee;
-  background: #262a30;
+  color: #222;
+  background: #d0a187;
 }
 
 .next-site .research-skip-link,
@@ -97,7 +99,7 @@
 .next-headband {
   width: 100%;
   height: 3px;
-  background: #222;
+  background: var(--next-accent);
 }
 
 /* Header: NexT Pisces/Gemini dual-column geometry. */
@@ -126,17 +128,17 @@
 
 .next-brand {
   padding: 1px 12px;
-  color: #fff !important;
+  color: var(--next-brand-text) !important;
   font-size: 22px;
   font-weight: 400;
   line-height: 1.5;
   letter-spacing: .08em;
-  -webkit-text-fill-color: #fff;
+  -webkit-text-fill-color: var(--next-brand-text);
 }
 
 .next-brand-column p {
   margin: 7px 0 0;
-  color: #aaa;
+  color: var(--next-muted);
   font-size: 12px;
   line-height: 1.5;
   letter-spacing: .02em;
@@ -182,7 +184,7 @@
   right: 5px;
   width: 6px;
   height: 6px;
-  background: #bbb;
+  background: var(--next-accent);
   border-radius: 50%;
   content: "";
 }
@@ -1198,9 +1200,8 @@
   }
 }
 
-/* Quiet dark reading system.
-   Three base colors only: ink, warm white and a desaturated blue-grey.
-   Surface, border and secondary-text values are alpha variations of warm white. */
+/* Shared dark reading system; surfaces and interactive states use the same
+   hierarchy as the NexT-inspired site shell. */
 .next-site {
   color-scheme: dark;
 }
@@ -1258,6 +1259,9 @@
   background: var(--next-content) !important;
   box-shadow: none !important;
 }
+
+.next-header,
+.next-brand-column { background: var(--next-menu) !important; }
 
 .next-brand,
 .next-site.worldclaw-page .next-brand,
@@ -1324,56 +1328,56 @@
 }
 
 .next-site.worldclaw-page {
-  --paper: #1b1d1f;
-  --white: #1b1d1f;
-  --ink: #e3e1dc;
-  --ink-soft: rgb(227 225 220 / 78%);
-  --muted: rgb(227 225 220 / 56%);
-  --line: rgb(227 225 220 / 10%);
-  --line-strong: rgb(227 225 220 / 20%);
-  --blue: #899599;
-  --blue-deep: #899599;
-  --blue-pale: rgb(227 225 220 / 4%);
-  --cyan: #899599;
-  --cyan-pale: rgb(227 225 220 / 4%);
-  --amber: #899599;
-  --amber-pale: rgb(227 225 220 / 4%);
-  --red: #899599;
-  --red-pale: rgb(227 225 220 / 4%);
-  --stage: #1b1d1f;
-  --stage-soft: rgb(227 225 220 / 4%);
+  --paper: var(--next-content);
+  --white: var(--next-content);
+  --ink: var(--next-heading);
+  --ink-soft: var(--next-text);
+  --muted: var(--next-muted);
+  --line: var(--next-line);
+  --line-strong: var(--next-line-strong);
+  --blue: var(--next-accent);
+  --blue-deep: var(--next-accent);
+  --blue-pale: var(--next-card);
+  --cyan: var(--next-accent);
+  --cyan-pale: var(--next-card);
+  --amber: var(--next-accent);
+  --amber-pale: var(--next-card);
+  --red: var(--next-accent);
+  --red-pale: var(--next-card);
+  --stage: var(--next-body);
+  --stage-soft: var(--next-card);
   --serif: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --mono: "IBM Plex Mono", Consolas, monospace;
 }
 
 .next-site.nala-page {
-  --ink: #1b1d1f;
-  --ink-2: #1b1d1f;
-  --paper: #e3e1dc;
-  --paper-2: rgb(227 225 220 / 4%);
-  --acid: #899599;
-  --mint: #899599;
-  --orange: #899599;
-  --line-dark: rgb(227 225 220 / 10%);
-  --line-light: rgb(227 225 220 / 10%);
-  --muted-dark: rgb(227 225 220 / 56%);
-  --muted-light: rgb(227 225 220 / 56%);
+  --ink: var(--next-heading);
+  --ink-2: var(--next-heading);
+  --paper: var(--next-content);
+  --paper-2: var(--next-card);
+  --acid: var(--next-accent);
+  --mint: var(--next-accent);
+  --orange: var(--next-accent);
+  --line-dark: var(--next-line);
+  --line-light: var(--next-line);
+  --muted-dark: var(--next-muted);
+  --muted-light: var(--next-muted);
   --shadow: none;
 }
 
 .next-learning {
-  --bg: #1b1d1f;
-  --surface: #1b1d1f;
-  --surface-2: rgb(227 225 220 / 4%);
-  --line: rgb(227 225 220 / 10%);
-  --text: #e3e1dc;
-  --muted: rgb(227 225 220 / 56%);
-  --cyan: #899599;
-  --cyan-soft: rgb(227 225 220 / 4%);
-  --orange: #899599;
-  --orange-soft: rgb(227 225 220 / 4%);
-  --yellow: #899599;
+  --bg: var(--next-body);
+  --surface: var(--next-content);
+  --surface-2: var(--next-card);
+  --line: var(--next-line);
+  --text: var(--next-text);
+  --muted: var(--next-muted);
+  --cyan: var(--next-accent);
+  --cyan-soft: var(--next-card);
+  --orange: var(--next-accent);
+  --orange-soft: var(--next-card);
+  --yellow: var(--next-accent);
 }
 
 .next-article :where(
@@ -1688,14 +1692,14 @@
 }
 
 .next-learning .neuron-core {
-  fill: #1b1d1f;
-  stroke: #899599;
+  fill: var(--next-body);
+  stroke: var(--next-accent);
 }
 
 .next-learning .neuron-value,
 .next-learning .neuron-label,
 .next-learning .layer-label {
-  fill: #e3e1dc;
+  fill: var(--next-heading);
 }
 
 .next-site.next-learning :where(
@@ -1750,8 +1754,8 @@
   color: var(--next-muted) !important;
 }
 
-/* Home modules: one graphite layer, differentiated through alpha, borders and
-   physical press feedback rather than additional colours or decoration. */
+/* Home modules: readable sheets against the darker canvas, with a soft
+   interaction state rather than a thick outline around every article. */
 .next-home .next-page-layout {
   gap: 16px;
 }
@@ -1764,8 +1768,8 @@
   position: relative;
   padding: 0;
   overflow: hidden;
-  background: var(--next-card) !important;
-  border: 1px solid var(--next-line-strong);
+  background: var(--next-content) !important;
+  border: 1px solid var(--next-line);
   transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
 }
 
@@ -1817,8 +1821,8 @@
 }
 
 .next-home .next-sidebar-inner {
-  background: var(--next-card);
-  border: 1px solid var(--next-line-strong);
+  background: var(--next-content);
+  border: 1px solid var(--next-line);
 }
 
 .next-home .next-profile-links {
@@ -1864,7 +1868,7 @@
 
 @media (hover: hover) {
   .next-home .next-post-index:hover {
-    background: rgb(227 225 220 / 7%) !important;
+    background: #393939 !important;
     border-color: var(--next-accent);
     transform: translateY(-3px);
   }
