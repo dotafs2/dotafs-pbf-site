@@ -4,6 +4,7 @@
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const fmt = (v, n = 2) => Number(v).toFixed(n);
   const ink = { grid: "#555958", text: "#c9cac5", muted: "#a1a5a2", main: "#9caeaa", second: "#e0dcd3", faint: "#797d7a" };
+  const zh = document.documentElement.lang.toLowerCase().startsWith("zh");
 
   function setupCanvas(canvas) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -52,16 +53,18 @@
       peak = Math.max(peak, y);
     }
     const { ctx, w, h } = setupCanvas($("suspension-plot"));
-    const a = base(ctx, w, h, "time (s) →", "height (mm) ↑");
+    const a = base(ctx, w, h, zh ? "时间 (s) →" : "time (s) →", zh ? "高度 (mm) ↑" : "height (mm) ↑");
     const range = Math.max(road * 1.7, peak * 1.22, .05);
     const sx = t => a.x0 + t / duration * (a.x1 - a.x0);
     const sy = d => a.y1 - d / range * (a.y1 - a.y0);
     for (let i = 0; i <= 4; i++) label(ctx, fmt((4 - i) * range * 250, 0), 5, a.y0 + i * (a.y1 - a.y0) / 4 + 3, ink.muted);
     const roadY = sy(road); line(ctx, [[a.x0, roadY], [a.x1, roadY]], ink.faint, 2);
     line(ctx, values.map(vv => [sx(vv.t), sy(vv.y)]), ink.main, 2.5);
-    label(ctx, "body", a.x0 + 9, a.y0 + 29, ink.main); label(ctx, "road", a.x0 + 9, a.y0 + 45, ink.faint);
+    label(ctx, zh ? "车身" : "body", a.x0 + 9, a.y0 + 29, ink.main); label(ctx, zh ? "路面" : "road", a.x0 + 9, a.y0 + 45, ink.faint);
     for (let i = 0; i <= 3; i++) label(ctx, fmt(duration * i / 3, 1), sx(duration * i / 3) - 5, a.y1 + 15, ink.muted);
-    $("suspension-readout").textContent = `Natural frequency ${fmt(wn / (2 * Math.PI))} Hz · c = ${fmt(c, 0)} N·s/m · static compression under 300 kg: ${fmt(mass * 9.81 / k * 1000, 0)} mm · step overshoot ${fmt(Math.max(0, peak - road) * 1000, 0)} mm.`;
+    $("suspension-readout").textContent = zh
+      ? `固有频率 ${fmt(wn / (2 * Math.PI))} Hz · 阻尼 c = ${fmt(c, 0)} N·s/m · 承载 300 kg 时的静态压缩量 ${fmt(mass * 9.81 / k * 1000, 0)} mm · 台阶响应超调 ${fmt(Math.max(0, peak - road) * 1000, 0)} mm。`
+      : `Natural frequency ${fmt(wn / (2 * Math.PI))} Hz · c = ${fmt(c, 0)} N·s/m · static compression under 300 kg: ${fmt(mass * 9.81 / k * 1000, 0)} mm · step overshoot ${fmt(Math.max(0, peak - road) * 1000, 0)} mm.`;
   }
 
   function grip() {
@@ -79,8 +82,10 @@
     line(ctx, [[cx, cy], [ax, ay]], ink.second, 2.5); dot(ctx, ax, ay, ink.second, 5);
     label(ctx, "Fy / Fz ↑", Math.max(5, cx - square / 2), 24, ink.muted);
     label(ctx, "Fx / Fz →", Math.min(w - 86, cx + square / 2 - 75), h - 9, ink.muted);
-    label(ctx, "requested · gray", 10, h - 34, ink.faint); label(ctx, "delivered · light", 10, h - 18, ink.second);
-    $("grip-readout").textContent = `Requested |F| / Fz = ${fmt(mag)}, available μ = ${fmt(mu)}. Delivered Fx / Fz = ${fmt(fx * scale)}, Fy / Fz = ${fmt(fy * scale)}. ${mag > mu ? "Both components are reduced because grip is shared." : "The request is inside the grip boundary."}`;
+    label(ctx, zh ? "需求 · 灰色" : "requested · gray", 10, h - 34, ink.faint); label(ctx, zh ? "实际 · 亮色" : "delivered · light", 10, h - 18, ink.second);
+    $("grip-readout").textContent = zh
+      ? `需求 |F| / Fz = ${fmt(mag)}，可用 μ = ${fmt(mu)}。实际 Fx / Fz = ${fmt(fx * scale)}，Fy / Fz = ${fmt(fy * scale)}。${mag > mu ? "纵横向分量共用抓地力，两者都按比例缩小。" : "所需合力位于抓地力边界以内。"}`
+      : `Requested |F| / Fz = ${fmt(mag)}, available μ = ${fmt(mu)}. Delivered Fx / Fz = ${fmt(fx * scale)}, Fy / Fz = ${fmt(fy * scale)}. ${mag > mu ? "Both components are reduced because grip is shared." : "The request is inside the grip boundary."}`;
   }
 
   function tire() {
@@ -94,7 +99,7 @@
       return D * Math.sin(C * Math.atan(B * x - E * (B * x - Math.atan(B * x))));
     };
     const { ctx, w, h } = setupCanvas($("tire-plot"));
-    const a = base(ctx, w, h, "slip ratio κ →", "Fx / reference load ↑");
+    const a = base(ctx, w, h, zh ? "滑移率 κ →" : "slip ratio κ →", zh ? "Fx / 参考载荷 ↑" : "Fx / reference load ↑");
     const sx = x => a.x0 + (x + .5) * (a.x1 - a.x0);
     const sy = y => a.y0 + (1.17 - y) / 2.34 * (a.y1 - a.y0);
     line(ctx, [[a.x0, sy(0)], [a.x1, sy(0)]], ink.grid, 1);
@@ -102,12 +107,18 @@
     for (const x of [-.5, -.25, 0, .25, .5]) label(ctx, fmt(x, 2), sx(x) - 14, a.y1 + 16, ink.muted);
     const values = []; for (let i = 0; i <= 200; i++) { let x = -.5 + i / 200; values.push([sx(x), sy(curve(x))]); }
     line(ctx, values, ink.main, 2.5); dot(ctx, sx(s), sy(curve(s)), ink.second, 5);
-    const messages = {
+    const messages = zh ? {
+      grip: "力先随滑移线性增长，之后达到平坦的抓地力上限；这是简化的教学模型。",
+      state: "有界的曲线在低滑移时响应更明显；真实 AVS 还会随时间插值滑移状态。",
+      magic: "正弦—反正切曲率形成峰值及过峰后的变化；拟合真实轮胎需要实测系数。"
+    } : {
       grip: "Force rises linearly then hits a flat grip limit; this is a teaching abstraction of a clamped force budget.",
       state: "A shaped, bounded slip response responds strongly at low slip; real AVS also interpolates slip state over time.",
       magic: "Sine–arctangent curvature creates a peak and changing post-peak behavior; real fitted tires require measured coefficients."
     };
-    $("tire-readout").textContent = `At κ = ${fmt(s)}, illustrative Fx / load = ${fmt(curve(s))}. ${messages[kind]}`;
+    $("tire-readout").textContent = zh
+      ? `当 κ = ${fmt(s)}，示意 Fx / 载荷 = ${fmt(curve(s))}。${messages[kind]}`
+      : `At κ = ${fmt(s)}, illustrative Fx / load = ${fmt(curve(s))}. ${messages[kind]}`;
   }
 
   const labs = [

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="车辆悬挂与轮胎物理教学笔记：弹簧、阻尼、载荷转移、轮胎滑移，以及 Chaos、AVS、FGear 的实现与交互实验。" />
+    <meta name="theme-color" content="#1b1d1f" />
+    <meta property="og:title" content="车辆悬挂与轮胎物理 · DOTAFS" />
+    <meta property="og:description" content="从四分之一车辆方程到轮胎力边界：比较三种车辆系统，亲手调节物理参数。" />
+    <meta property="og:type" content="article" />
+    <link rel="alternate" hreflang="zh-CN" href="/articles/vehicle-suspension-math-zh.html" />
+    <link rel="alternate" hreflang="en" href="/articles/vehicle-suspension-math.html" />
+    <link rel="alternate" hreflang="x-default" href="/articles/vehicle-suspension-math.html" />
+    <title>车辆悬挂与轮胎物理 · DOTAFS</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../research-system.css" />
+    <link rel="stylesheet" href="../next-theme.css" />
+    <link rel="stylesheet" href="world-models.css" />
+    <link rel="stylesheet" href="vehicle-suspension-math.css" />
+    <link rel="stylesheet" href="/site-language.css" />
+    <script src="vehicle-suspension-math.js" defer></script>
+    <script src="/site-language.js" defer></script>
+  </head>
+  <body class="research-page next-site next-article world-models-page vehicle-page">
+    <a class="skip-link" href="#content">跳到正文</a>
+    <div class="next-headband" aria-hidden="true"></div>
+    <header class="next-header"><div class="next-header-inner">
+      <div class="next-brand-column"><a class="next-brand" href="/home/">DOTAFS</a><p>Personal learning notes</p></div>
+      <nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/">PBF Demo</a><a href="#sources">参考资料</a></nav>
+    </div></header>
+    <div class="next-page-layout wm-layout" id="top">
+      <main id="content" class="next-main wm-main"><article>
+        <header class="vehicle-intro" id="overview">
+          <p class="wm-kicker">工程笔记 · 车辆动力学 · 2026 年 9 月 23 日</p>
+          <h1>车辆悬挂与轮胎物理</h1>
+          <p class="vehicle-deck">车轮怎样找到地面、支撑车身、把扭矩变成加速度，又怎样失去抓地力？从共同的数学基础，读懂三套游戏车辆实现。</p>
+          <dl class="vehicle-meta"><div><dt>输入</dt><dd>车身姿态、车轮几何、路面接触和控制量</dd></div><div><dt>输出</dt><dd>接触载荷、轮胎力和车身运动</dd></div><div><dt>比较对象</dt><dd>Chaos Vehicles · AVS · FGear</dd></div><div><dt>阅读时间</dt><dd>约 22 分钟 · 三个交互实验</dd></div></dl>
+          <p class="vehicle-scope">这是一篇实现原理笔记，不是同等条件下的操控性能评测。标为<strong>教学模型</strong>的方程只用于解释；对具体实现的描述来自文末列明的代码。不在本文转载商业插件源码。</p>
+        </header>
+
+        <section class="paper-section" id="question" aria-labelledby="question-title">
+          <header class="section-heading"><span>01 / 核心问题</span><h2 id="question-title">车辆模拟到底需要算什么？</h2></header>
+          <div class="prose"><p>一个刚体车身能够下落、弹跳和碰撞，但还不足以解释驾驶。对每个车轮，都要判断是否接地，计算悬挂提供的法向载荷、轮胎的纵向与横向力，以及改变车轮自转的反作用扭矩。力作用在质心以外，因此还会引起俯仰、侧倾和偏航。</p><p>有用的抽象是<strong>一个刚体车身，加上四组接触和车轮模型</strong>。轮胎摩擦并不简单地与油门成正比：载荷、路面、滑移和轮胎模型限制了它能传递的力。悬挂的重要作用之一正是决定轮胎载荷，因此不能只看弹簧运动来判断物理效果。</p></div>
+          <div class="vehicle-flow" aria-label="模拟计算流程"><span>路面几何</span><b>→</b><span>车轮接触</span><b>→</b><span>弹簧载荷</span><b>→</b><span>轮胎滑移与力</span><b>→</b><span>车身和车轮积分</span></div>
+          <div class="abstract-block"><div><span>状态</span><p>位置 <i>p</i>、朝向 <i>q</i>、线速度与角速度 <i>v、ω</i>，以及每个轮子的转速和悬挂行程。</p></div><div><span>接触约束</span><p>路面可以推动车轮，但不能把它吸进路面；法向载荷不能为负。</p></div><div><span>控制</span><p>转向改变轮胎局部坐标系；发动机和刹车改变轮上扭矩，继而改变滑移和轮胎力。</p></div><div><span>范围</span><p>本文讨论可操控车辆的动力学，不模拟每块橡胶胎面花纹的详细变形。</p></div></div>
+        </section>
+        <section class="paper-section" id="geometry" aria-labelledby="geometry-title">
+          <header class="section-heading"><span>02 / 接触几何</span><h2 id="geometry-title">从一次地面检测到一个受力车轮</h2></header>
+          <div class="prose"><p>令 <i>aᵢ</i> 为第 <i>i</i> 个轮子的车身连接点，<i>dᵢ</i> 为悬挂方向，<i>R</i> 为轮胎半径，<i>hᵢ</i> 为地面检测的命中点。沿 <i>dᵢ</i> 投射射线或形状，可以估计轮心位置与当前悬挂长度 <i>ℓᵢ</i>。压缩量是 <i>xᵢ = clamp(ℓ₀ − ℓᵢ, 0, 行程)</i>，其中 <i>ℓ₀</i> 是未压缩长度。这一步得到的只是几何长度，还不是力。</p><p>射线适合平整路面，便宜且稳定，但细线可能错过轮胎边缘碰到的路沿。球形或其他形状扫描覆盖更大的范围，代价更高，仍不等于可变形轮胎。另一条路线是真实刚体车轮：碰撞体与约束决定接触，而非人为合成一个接触斑。画出来的轮胎网格和实际用于检测接触的几何必须分清。</p></div>
+          <figure class="vehicle-diagram" aria-labelledby="contact-caption"><svg viewBox="0 0 640 270" role="img" aria-labelledby="contact-title contact-description"><title id="contact-title">车轮接触与悬挂行程</title><desc id="contact-description">上方车身与轮子之间有悬挂弹簧，轮子在地面接触处承受向上的法向载荷。</desc><path class="diagram-road" d="M35 227 H250 L282 210 H606"/><rect class="diagram-body" x="90" y="25" width="425" height="41" rx="1"/><path class="diagram-axis" d="M340 66 V192"/><path class="diagram-spring" d="M340 76 l-19 12 38 12 -38 12 38 12 -38 12 38 12 -38 12 19 12"/><circle class="diagram-wheel" cx="340" cy="184" r="27"/><path class="diagram-normal" d="M340 223 V178"/><path class="diagram-normal" d="m333 187 7 -10 7 10"/><path class="diagram-measure" d="M397 72 V156 M391 72 h12 M391 156 h12"/><text x="105" y="48">车身 · 质量和惯量</text><text x="416" y="108">当前行程 ℓ</text><text x="378" y="202">半径 R</text><text x="393" y="244">路面 / 接触斑</text><text x="123" y="171">弹簧 k · 阻尼 c</text><text x="287" y="255">法向载荷 F<tspan baseline-shift="sub">z</tspan> ↑</text></svg><figcaption id="contact-caption">自绘教学示意。地面检测先确定几何位置，弹簧与阻尼再把压缩量及其变化速度转化为力。</figcaption></figure>
+          <h3>为什么施力位置很重要？</h3>
+          <div class="equation-strip"><span>刚体运动方程</span><strong>m v̇ = ΣF + mg &nbsp; · &nbsp; I ω̇ + ω × (Iω) = Σ(rᵢ × Fᵢ) + Στᵢ</strong><p><i>rᵢ</i> 是质心到第 <i>i</i> 个接触点的向量，<i>Fᵢ</i> 是该处车轮施加的力。叉积说明：同样大小的向上支撑力，作用位置不同，也会使车身产生不同的侧倾或俯仰。</p></div>
+        </section>
+
+        <section class="paper-section" id="spring" aria-labelledby="spring-title">
+          <header class="section-heading"><span>03 / 弹簧与阻尼</span><h2 id="spring-title">车身高度、振荡与载荷转移</h2></header>
+          <div class="prose"><p>线性弹簧产生与压缩量成正比的力。阻尼器抵抗的是<strong>压缩或回弹的速度</strong>；它不是另一根弹簧，也不决定最终静止高度。令 <i>x</i> 向压缩方向为正，理想化支撑力的大小为 <i>Fs = max(0, kx + c ẋ)</i>，其中 <i>k</i> 的单位为 N/m，<i>c</i> 为 N·s/m，<i>ẋ</i> 为 m/s。轮胎法向载荷 <i>Fz</i> 与支撑力有关，但在斜坡、作用点偏置、载荷混合或另有约束时，未必与其大小相等。有的实现沿悬挂轴施力，有的沿路面法线施力。</p><p>水平路面上静止、四轮对称时，单轮载荷约为 <i>Fz ≈ mg/4</i>。相同弹簧且没有预载时，静态压缩约为 <i>x₀ ≈ mg/(4k)</i>。例如 <i>m = 1200 kg</i>，每轮 <i>k = 30,000 N/m</i>，则 <i>x₀ ≈ 0.098 m</i>。悬挂必须在这个静态位置上下都留有行程，才能跨越凸起或凹坑。</p></div>
+          <div class="equation-strip"><span>单角教学模型</span><strong>mₛ ÿ + c(ẏ − ṙ) + k(y − r) = 0</strong><p><i>mₛ</i> 是该角承载的车身质量，<i>y</i> 是相对静态平衡点的位移，<i>r</i> 是路面位移。固有频率 <i>fₙ = √(k/mₛ)/(2π)</i>；临界阻尼 <i>c₍crit₎ = 2√(kmₛ)</i>；阻尼比 <i>ζ = c/c₍crit₎</i>。单质量模型不包括轮组的簧下质量、轮胎弹性、缓冲限位和防倾杆。</p></div>
+          <div class="vehicle-lab" id="suspension-lab"><div class="lab-header"><span>交互实验 01 / 路面台阶</span><h3>改变弹簧或阻尼后，车身怎样响应？</h3><p>给车辆一个小台阶输入。观察车身高度、路面高度和超调。</p></div><div class="lab-controls"><label>弹簧刚度 <output id="k-value">30</output> kN/m<input id="k-input" type="range" min="10" max="80" step="1" value="30" /></label><label>阻尼比 <output id="zeta-value">0.55</output><input id="zeta-input" type="range" min="0.05" max="1.5" step="0.05" value="0.55" /></label><label>路面台阶 <output id="bump-value">60</output> mm<input id="bump-input" type="range" min="10" max="120" step="5" value="60" /></label><button type="button" id="suspension-reset">重置</button></div><canvas id="suspension-plot" class="lab-plot" height="270" role="img" aria-label="驶上台阶后车身和路面高度随时间的变化"></canvas><p class="lab-readout" id="suspension-readout" aria-live="polite"></p><p class="lab-caveat">教学模型：质量—弹簧—阻尼系统始终与路面接触。忽略台阶瞬间的路面速度；冲击与轮胎变形需要更完整的模型。</p></div>
+          <div class="prose"><p>更完整的<strong>四分之一车辆模型</strong>区分车身质量 <i>mₛ</i>、轮组簧下质量 <i>mᵤ</i>、悬挂 <i>kₛ,cₛ</i> 和轮胎刚度 <i>kₜ</i>。选定一组符号后，相对于静态平衡点有：<i>mₛ z̈ₛ = −kₛ(zₛ−zᵤ)−cₛ(żₛ−żᵤ)</i>，以及 <i>mᵤ z̈ᵤ = kₛ(zₛ−zᵤ)+cₛ(żₛ−żᵤ)−kₜ(zᵤ−r)</i>。它同时能表示车身起伏和轮组跳动；单根射线车轮对后者只能近似或省略。</p></div>
+          <h3>载荷转移是力矩平衡，不是凭空增加重量</h3>
+          <div class="prose"><p>转弯时，质心高度 <i>h</i> 处的横向加速度 <i>aᵧ</i> 产生约为 <i>m aᵧ h</i> 的侧倾力矩。若轮距为 <i>t</i>，内外侧转移载荷 <i>Δ</i> 可形成反向力矩 <i>Δt</i>；在简化的刚性、水平路面条件下，全车的 <i>Δ ≈ m aᵧ h/t</i>。总垂向载荷仍约为 <i>mg</i>：外轮增加的载荷来自内轮。前后轴的分配取决于侧倾刚度、悬挂几何和簧下质量，不能单靠这条式子计算。</p><p>直线加速或制动时，前后轴之间转移的载荷近似 <i>Δ前后 ≈ m aₓ h/L</i>，<i>L</i> 为轴距。防倾杆将左右轮行程耦合：一种示意模型令 <i>Fbar,L = kbar(xL − xR)</i>，<i>Fbar,R = −Fbar,L</i>，实际符号取决于坐标方向。它改变载荷<strong>分布</strong>，不会免费创造总抓地力。许多轮胎存在载荷敏感性：垂向载荷加倍，侧向最大力增长可能不到两倍，因此不均匀分配可能降低整根车轴的抓地力。</p></div>
+          <div class="equation-strip"><span>轮胎有效载荷</span><strong>Fz,内轮 + Fz,外轮 ≈ 该轴载荷 &nbsp; · &nbsp; Fbar,L + Fbar,R = 0</strong><p>以上平衡忽略空气下压力变化、道路倾斜、路沿冲击和车身垂向加速度。悬挂力可能沿悬挂轴或地面法线；轮胎模型需要使用实际法向分量。</p></div>
+          <div class="paper-takeaway"><span>分清各自作用</span><p>刚度主要决定静态下沉与车身振动频率，阻尼主要决定暂态振荡。行程、限位、防倾杆、质心和轮胎接触共同决定车轮是否保持载荷。</p></div>
+        </section>
+        <section class="paper-section" id="tire" aria-labelledby="tire-title">
+          <header class="section-heading"><span>04 / 轮胎力</span><h2 id="tire-title">轮胎为什么需要滑移才能产生力？</h2></header>
+          <div class="prose"><p>在接触斑，令 <i>Vx</i> 为相对地面的前向速度，<i>Vy</i> 为横向速度，<i>Ω</i> 为轮胎角速度，<i>R</i> 为有效半径。常见的教学定义是纵向滑移率 <i>κ = (RΩ − Vx)/max(|Vx|, vₑ)</i>，侧偏角 <i>α = atan2(Vy, max(|Vx|, vₑ))</i>。其中 <i>vₑ</i> 用于低速时避免除零。<strong>不同实现采用的分母、截断和正负号可能不同</strong>，因此这两式是共同概念，不宣称逐字等同于每套代码。</p><p>驱动扭矩倾向于增大 <i>Ω</i>，产生 <i>κ &gt; 0</i>；制动则使它降低。转向改变轮胎局部坐标系，即使车身继续向前，也会产生侧偏角 <i>α</i>。轮胎力可概括为滑移、法向载荷、路面、外倾角，甚至胎压和速度的函数：<i>(Fx,Fy,Mz) = T(κ,α,Fz,γ,p,V)</i>。<i>Mz</i> 为回正力矩。游戏模型可省略其中一些输入；不存在一条对所有车辆都正确的轮胎曲线。</p></div>
+          <figure class="vehicle-diagram" aria-labelledby="force-caption"><svg viewBox="0 0 640 245" role="img" aria-labelledby="force-title force-description"><title id="force-title">接触斑与纵横向轮胎力</title><desc id="force-description">俯视车轮向右，轮胎前向与速度之间存在侧偏角；纵向力和横向力分享法向载荷决定的抓地力。</desc><path class="diagram-axis" d="M120 172 H430"/><path class="diagram-axis" d="M282 204 V30"/><rect class="diagram-wheel" x="224" y="105" width="105" height="50" rx="2"/><path class="diagram-normal" d="M278 128 L439 82 M278 128 L415 128 M278 128 L278 31"/><path class="diagram-measure" d="M348 128 A72 72 0 0 0 346 108"/><text x="427" y="74">速度 V</text><text x="419" y="151">前向力 Fx</text><text x="287" y="35">侧向力 Fy</text><text x="352" y="108">α</text><text x="74" y="194">俯视图</text><text x="367" y="204">RΩ − Vx → κ</text></svg><figcaption id="force-caption">自绘俯视图。纵向滑移和侧偏角分享有限的接触力；实际力的方向和符号取决于坐标约定。</figcaption></figure>
+          <div class="equation-strip"><span>共同的简化边界 · 教学模型</span><strong>√[(Fx/(μx Fz))² + (Fy/(μy Fz))²] ≤ 1</strong><p>摩擦椭圆是很有用的“力预算”：更多加速或制动需求意味着更少转向余量。真实轮胎峰值可能不对称、随载荷变化，复合滑移边界也不一定是椭圆。离地时 <i>Fz = 0</i>，接触力预算消失。</p></div>
+          <div class="vehicle-lab" id="grip-lab"><div class="lab-header"><span>交互实验 02 / 复合抓地力</span><h3>同一个接触斑既制动又转向</h3><p>分别提出纵向和横向力需求；图中的亮点显示简化摩擦圆约束后的可实现值。</p></div><div class="lab-controls"><label>纵向需求 <output id="fx-value">0.60</output> × 载荷<input id="fx-input" type="range" min="-1.8" max="1.8" step="0.05" value="0.6" /></label><label>横向需求 <output id="fy-value">0.65</output> × 载荷<input id="fy-input" type="range" min="-1.8" max="1.8" step="0.05" value="0.65" /></label><label>路面摩擦系数 μ <output id="mu-value">0.90</output><input id="mu-input" type="range" min="0.2" max="1.5" step="0.05" value="0.9" /></label><button type="button" id="grip-reset">重置</button></div><canvas id="grip-plot" class="lab-plot lab-plot-square" height="280" role="img" aria-label="纵横向受力需求与抓地力边界"></canvas><p class="lab-readout" id="grip-readout" aria-live="polite"></p><p class="lab-caveat">教学模型：各向同性的摩擦圆，法向载荷 <i>Fz</i> 固定。这不是三种实现中任意一种的完整复合滑移公式。</p></div>
+          <div class="prose"><p>侧偏角接近零时，轮胎横向力的初始斜率叫<strong>侧偏刚度</strong>：<i>Cα = |∂Fy/∂α|₍α≈0₎</i>，单位为 N/rad。接近峰值时曲线开始饱和，有些拟合轮胎过峰后还会下降。载荷敏感性、外倾角、胎压、路面材料、温度和湿度均可改变曲线。暂态响应可用松弛长度 <i>λ</i> 表示：近似 <i>τ ≈ λ/max(|Vx|,vₑ)</i>，<i>τ Ḟy + Fy = Fy,steady(α)</i>。它避免力瞬间跃迁到稳态值；具体游戏实现是否真的采用这一模型，仍须逐一检查。</p><p>对驱动轮，理想化角运动方程为 <i>Iʷ Ω̇ = Tdrive − Tbrake − Fx R − Trolling</i>。牛顿第三定律将地面力与轮速联系起来。若只用车身速度计算视觉上的轮胎旋转，就无法表示轮胎空转和抱死。接近零速时，还需低速混合或静摩擦处理，避免除以 <i>Vx = 0</i>。</p></div>
+        </section>
+
+        <section class="paper-section" id="implementations" aria-labelledby="implementations-title">
+          <header class="section-heading"><span>05 / 三种实现</span><h2 id="implementations-title">它们的数学选择分别是什么？</h2></header>
+          <div class="prose"><p>基本物理规律相同；真正分歧在于接触的几何表示、弹簧力怎样传给车身，尤其是滑移怎样变成轮胎力。以下依据检查过的代码，不代表全部可配置选项，更不是对真实程度的排名。</p></div>
+          <div class="model-entry" id="chaos"><p class="model-label">A / CHAOS VEHICLES</p><h3>弹簧载荷，加上受抓地力限制的车轮</h3><ol>
+            <li><strong>接触：</strong>每个轮沿悬挂轴检测路面，检查过的路径支持射线和球形扫描。悬挂目标可以交给物理约束处理，也有直接施力的备选路径。</li>
+            <li><strong>垂向力：</strong>压缩弹簧用 <i>Fspring = kx</i>，根据位移变化方向选择两种阻尼系数；按代码的符号约定，可写为 <i>Fdamp = −c ẋ</i>。轮胎载荷可在弹簧力与静止载荷之间混合，防倾计算还耦合同轴左右轮。</li>
+            <li><strong>轮胎：</strong>扭矩除以半径给出纵向力请求；横向力来自侧偏刚度或侧向滑移曲线。当 <i>√(Fx²+Fy²) &gt; μ Fz</i> 时，类似摩擦圆的约束会缩放合力，此外还存在低速和辅助控制逻辑。</li>
+            <li><strong>取舍：</strong>抓地力与转向参数直接、调校门槛低；所检查的默认轮胎路径并非经过数据拟合的 Pacejka 轮胎。约束悬挂与直接施力路径不能混为一谈。</li>
+          </ol></div>
+          <div class="model-entry" id="avs"><p class="model-label">B / ADVANCED VEHICLE SYSTEM (AVS 1.4.3)</p><h3>自定义滑移动态，另有两种车轮模式</h3><ol>
+            <li><strong>接触：</strong>所检查的代码从最大压缩轮位置向最大伸展方向投射线段，从命中距离减去车轮直径，再截断得到悬挂长度。</li>
+            <li><strong>垂向力：</strong>配置中的 N/mm 弹簧刚度显式换算为 N/m，厘米压缩量换算为米，计算 <i>k·压缩量 + c·压缩速度</i>。这一路径沿地面命中法线施力，过度压缩时另加支撑项。</li>
+            <li><strong>射线车轮模式：</strong>先把轮胎前向和侧向投影到接触平面；目标纵向滑移由扭矩与 <i>Fz R μx</i> 的比值驱动，目标侧向滑移在低速符号响应和侧偏角间过渡，两者都随时间插值。合成滑移向量归一化，横向分量再做平方根形状调整，最后以 <i>Fz μx</i> 和 <i>Fz μy</i> 生成力。</li>
+            <li><strong>实体车轮模式：</strong>带碰撞的车轮刚体受到反向悬挂力。接触摩擦和驱动扭矩由刚体接触求解承担，不走前述合成轮胎力分支。<strong>这两种模式不能被描述成同一条轮胎力公式。</strong></li>
+          </ol></div>
+          <div class="model-entry" id="fgear"><p class="model-label">C / FGEAR VEHICLE PHYSICS</p><h3>弹簧预载，搭配可替换的轮胎曲线</h3><ol>
+            <li><strong>接触：</strong>检查过的车轮代码可用射线或形状检测，从命中几何得到悬挂行程；接触法线参与弹簧力方向计算。</li>
+            <li><strong>垂向力：</strong>可设置上下行程、预载、弹簧刚度，分别给压缩和回弹指定阻尼；当前运动方向决定所用阻尼系数。可选的悬挂限位约束帮助阻止车身过度穿透。</li>
+            <li><strong>滑移：</strong>纵向滑移始于 <i>RΩ − Vx</i>，侧偏角始于 <i>atan(Vy/(|Vx|+ε))</i>；为了处理低速数值问题，滑移率和角度受到截断。轮胎对象接收载荷、滑移、外倾角、胎压、半径和速度。</li>
+            <li><strong>轮胎选择：</strong>Simple 模型使用与载荷成比例的正弦—反正切曲线；Tire96、MF61 有随载荷变化的 Magic Formula 项和复合滑移修正；MF61 还包括胎压和力矩项。这些是模型族，并不证明预设参数与某个实测轮胎相符。</li>
+          </ol></div>
+          <div class="equation-strip"><span>拟合轮胎曲线的形状</span><strong>F(s) = D sin{ C atan[ B s − E(B s − atan(B s)) ] }</strong><p>这个示意 Magic Formula 可解释 FGear 的 Simple 曲线类型：<i>s</i> 是滑移率或侧偏角，<i>B</i> 控制初始斜率，<i>C</i> 控制形状，<i>D</i> 控制峰值，<i>E</i> 控制曲率。1996/MF6.1 族还加入许多与载荷、外倾、胎压、偏移和复合滑移有关的系数。这不是 Chaos 或 AVS 使用的精确公式。</p></div>
+          <div class="vehicle-lab" id="tire-lab"><div class="lab-header"><span>交互实验 03 / 轮胎曲线族</span><h3>纵向力怎样随滑移变化？</h3><p>切换示意轮胎响应，再移动滑移标记。曲线解释形状差异，不代表某条实测轮胎曲线，也不逐行复现插件代码。</p></div><div class="lab-controls lab-controls-two"><label>轮胎响应<select id="tire-model"><option value="grip">抓地力限制 / 参考 Chaos</option><option value="state">滑移状态 / 参考 AVS</option><option value="magic">Magic Formula / 参考 FGear</option></select></label><label>纵向滑移 <output id="slip-value">0.12</output><input id="slip-input" type="range" min="-0.5" max="0.5" step="0.01" value="0.12" /></label><button type="button" id="tire-reset">重置</button></div><canvas id="tire-plot" class="lab-plot" height="270" role="img" aria-label="三种示意轮胎力与滑移率曲线"></canvas><p class="lab-readout" id="tire-readout" aria-live="polite"></p><p class="lab-caveat">均为归一化示意曲线。抓地力和滑移状态曲线仅用于教学，并非从插件提取的数据；此处 Magic Formula 系数也并非实测拟合参数。</p></div>
+        </section>
+
+        <section class="paper-section" id="comparison" aria-labelledby="comparison-title">
+          <header class="section-heading"><span>06 / 对比</span><h2 id="comparison-title">三个模型真正不同的地方</h2></header>
+          <div class="table-wrap"><table class="paper-table vehicle-comparison"><thead><tr><th>问题</th><th>Chaos Vehicles</th><th>AVS 1.4.3</th><th>FGear（检查版本）</th></tr></thead><tbody>
+            <tr><td>接触表示</td><td>射线或球形扫描</td><td>射线；也有实体碰撞轮替代模式</td><td>射线或形状式车轮检测</td></tr>
+            <tr><td>垂向模型</td><td>弹簧 + 分方向阻尼；约束或直接施力；载荷混合、同轴耦合</td><td>显式弹簧阻尼与过度压缩支撑；实体车轮替代模式</td><td>弹簧、预载、非对称阻尼与可选防穿透约束</td></tr>
+            <tr><td>轮胎力</td><td>扭矩/半径 + 侧偏刚度或曲线，抓地力统一限制</td><td>目标滑移随时间插值；纵横向力归一化并调整形状；实体轮交给接触摩擦</td><td>可替换轮胎模型：Simple、1996、MF61，并考虑复合滑移</td></tr>
+            <tr><td>可用优势</td><td>参数较直接，适合建立抓地力预算基线</td><td>可选合成接触或实体碰撞，滑移响应有时间状态</td><td>轮胎模型可调范围广，高阶模型考虑外倾角和胎压</td></tr>
+            <tr><td>模型边界</td><td>未经数据调校时抓地力规律仍是风格化近似</td><td>射线与实体模式行为不同；自定义经验项需要验证</td><td>系数多、校准负担高；公式复杂也无法弥补不准确的输入</td></tr>
+          </tbody></table></div>
+          <div class="prose"><p><strong>本文没有引用三者在同等条件下的精度或 CPU 基准。</strong>公平对比应统一车身质量和惯量、轴距、半径、路面、输入、固定时间步及速度，然后记录轮胎力、法向载荷、绕圆加速度、制动距离、台阶响应和漏检次数。参数表更长，不等于外观或驾驶手感更好。</p></div>
+        </section>
+
+        <section class="paper-section" id="game-loop" aria-labelledby="game-loop-title">
+          <header class="section-heading"><span>07 / 游戏车辆制作</span><h2 id="game-loop-title">实际模拟顺序与调参步骤</h2></header>
+          <ol class="vehicle-steps">
+            <li><b>01 · 统一单位与车身状态</b><p>保证质量、距离、力、扭矩、时间、惯量单位一致；给质心和惯量张量合理的位置及大小；从固定物理时间步开始。</p></li>
+            <li><b>02 · 测量接触</b><p>每个轮子都判断是否接地，记录接触法线和位置、悬挂长度、命中处相对于路面的速度及表面性质。驶上移动平台时必须用相对速度。</p></li>
+            <li><b>03 · 计算悬挂</b><p>从静态下沉量确定行程和刚度，再根据 <i>2√(km)</i> 的目标比例确定阻尼。触底要有限位，离地时接触载荷归零；先调好独立车轮，再加入左右防倾杆耦合。</p></li>
+            <li><b>04 · 计算轮速与轮胎</b><p>把接触点速度转到转向后的轮胎坐标系，按低速规则计算滑移，选定轮胎模型求力并处理复合滑移，再按驱动、制动和接触反扭矩更新 <i>Ω</i>。</p></li>
+            <li><b>05 · 施力与积分</b><p>在接触点或指定悬挂位置施力，积分车身的平动和转动。若车轮旋转、接触或硬弹簧比渲染帧变化更快，就用物理子步；画面插值与物理求解分开。</p></li>
+            <li><b>06 · 先观测，再加辅助控制</b><p>绘制每轮压缩量、<i>Fz</i>、<i>κ</i>、<i>α</i>、<i>Fx</i>、<i>Fy</i>、角速度与控制系统介入。先把裸车调好，再加 ABS、防滑、镜头震动和视觉轮胎运动。</p></li>
+          </ol>
+          <div class="equation-strip"><span>计算工作分配</span><strong>CPU：接触检测 → 车轮和轮胎更新 → 刚体求解 &nbsp; | &nbsp; GPU：主要负责渲染</strong><p>本次检查的三套实现都在处理器侧模拟代码中计算核心力；GPU 绘制结果，也可能处理其他视觉效果。车辆模拟当然可以另做 GPU 求解器，但视觉质量好并不意味着车辆物理由 GPU 算。固定时间步的成本大致随车轮数、接触检测复杂度、约束迭代次数和子步数增加，而不只取决于轮胎系数数量。</p></div>
+        </section>
+
+        <section class="paper-section" id="evidence" aria-labelledby="evidence-title">
+          <header class="section-heading"><span>08 / 证据与局限</span><h2 id="evidence-title">源码能证明什么，不能证明什么？</h2></header>
+          <div class="table-wrap"><table class="paper-table"><thead><tr><th>测试</th><th>记录指标</th><th>什么现象说明有问题</th></tr></thead><tbody>
+            <tr><td>静态载荷和落地</td><td>单轮载荷约 <i>mg/4</i>；下沉、超调与稳定时间</td><td>单位错误、触底、持续振荡或负地面载荷</td></tr>
+            <tr><td>定半径绕圆和渐进转向</td><td>横向加速度、侧偏角、载荷转移</td><td>横向力无上限或低速时突然反向</td></tr>
+            <tr><td>加速和急刹</td><td><i>κ</i>、轮速、刹车距离、复合轮胎力</td><td>轮子不会空转/抱死，零载荷仍有牵引力</td></tr>
+            <tr><td>单轮碾过路沿</td><td>接触命中率、悬挂行程、侧倾</td><td>射线漏检、冲量过大、车身穿透</td></tr>
+            <tr><td>改变渲染帧率</td><td>不同帧率下重复同一操作</td><td>画面帧时变化导致物理结果变化</td></tr>
+          </tbody></table></div>
+          <div class="prose"><p>查阅源码可以确定特定算法，却<strong>不能</strong>提供对真实世界的标定误差、同一硬件上的运行时间、轮胎测试数据，或三者的受控对比。FGear 公式更多、物理解释更丰富，但参数未经拟合仍可能错误；AVS 或 Chaos 的简化方案经过细致调校，也可能更适合特定游戏。三者都简化了橡胶胎面分布式变形、温度、磨损等接触斑细节。尖锐几何可能使接触检测失效；物理子步和约束求解也会影响稳定性。</p></div>
+          <div class="paper-takeaway"><span>选型依据</span><p>先确定必须重现的现象，再选接触表示与轮胎模型；用相同路况、输入和遥测检验。物理准确度与操控手感应分别评价。</p></div>
+        </section>
+
+        <footer class="wm-reference vehicle-reference" id="sources"><span>来源、出处与图片说明</span>
+          <ol>
+            <li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/chaos-vehicles" target="_blank" rel="noreferrer">Epic Games：Chaos Vehicles 文档</a>。另检查本机 5.8 源码的 <i>SuspensionSystem.cpp</i>、<i>WheelSystem.cpp</i> 与 <i>ChaosWheeledVehicleMovementComponent.cpp</i>。</li>
+            <li><a href="https://sites.google.com/view/vehicle-system-documentation/home" target="_blank" rel="noreferrer">Advanced Vehicle System 文档</a>。另检查本机 1.4.3 版 <i>VehicleSystemBase.cpp</i> 和 <i>VehicleWheelBase.h</i>。</li>
+            <li>用户提供的 FGear Vehicle Physics 插件源码：<i>FGearWheel.cpp</i>、<i>FGearTireSimple.cpp</i>、<i>FGearTire96.cpp</i>、<i>FGearTireMF61.cpp</i> 和 <i>FGearWheelOptions.h</i>。数学解释为自行撰写的转述，本文不嵌入或转载专有源码。</li>
+            <li>Hans B. Pacejka，《<i>Tire and Vehicle Dynamics</i>》第三版，Butterworth-Heinemann，2012。用作滑移、Magic Formula 模型族和轮胎力术语的背景资料，不声称本文系数出自书中的实测数据。</li>
+          </ol>
+          <p>本页示意图和交互曲线均为原创。实验是教学模型，既不对三种实现跑分，也不逐行复现其代码。数学符号的正负取决于所选局部坐标轴与实现。</p>
+          <a href="/home/#articles">← 返回学习笔记</a>
+        </footer>
+      </article></main>
+      <aside class="next-sidebar next-article-toc wm-toc vehicle-toc" aria-label="文章目录">
+        <div class="next-sidebar-profile"><div class="next-avatar" aria-hidden="true">D</div><strong>DOTAFS</strong><a href="/home/">返回个人主页</a></div>
+        <p>目录</p><nav><a href="#overview">概览</a><a href="#question">1. 核心问题</a><a href="#geometry">2. 接触几何</a><a href="#spring">3. 弹簧与阻尼</a><a href="#tire">4. 轮胎力</a><a href="#implementations">5. 三种实现</a><a href="#comparison">6. 对比</a><a href="#game-loop">7. 游戏车辆制作</a><a href="#evidence">8. 证据与局限</a><a href="#sources">参考资料</a></nav>
+      </aside>
+    </div>
+    <footer class="next-footer"><p>© 2026 DOTAFS · 车辆动力学笔记</p><p>三种模型 · 共同的物理基础</p></footer>
+  </body>
+</html>

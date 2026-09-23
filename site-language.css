@@ -1,0 +1,48 @@
+/* Shared, compact language control for all site surfaces. */
+.next-site:not(.next-home) .next-header-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 112px;
+  padding: 4px 24px 8px;
+}
+.next-site:not(.next-home) .next-header-content .next-menu {
+  align-self: stretch;
+  min-height: 52px;
+  padding: 0;
+}
+.next-language-switch a:focus-visible {
+  outline: 2px solid var(--next-accent, #969792);
+  outline-offset: 2px;
+}
+.site-language-floating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: fixed;
+  top: clamp(1rem, 2.4vw, 2.3rem);
+  right: clamp(1rem, 2.4vw, 2.3rem);
+  z-index: 41;
+  min-height: 38px;
+  padding: 0 5px;
+  border: 1px solid rgba(130, 218, 255, .34);
+  background: rgba(14, 16, 49, .82);
+  color: #dce5e9;
+  font: 11px/1.2 "IBM Plex Mono", Consolas, monospace;
+}
+.site-language-floating a { display: inline-flex; min-width: 38px; min-height: 34px; align-items: center; justify-content: center; color: #b7c5ca; text-decoration: none; }
+.site-language-floating a:hover, .site-language-floating a.is-active { color: #fff; background: #2a304b; }
+body:has(.site-language-floating) .homepage-entry { top: calc(clamp(1rem, 2.4vw, 2.3rem) + 3.5rem); }
+.journal-header:has(.site-language-journal) { position: relative; min-height: 38px; padding-right: 106px; }
+.site-language-journal { position: absolute; top: 0; right: 16px; display: flex; align-items: center; gap: 4px; min-height: 34px; font: 11px/1.2 "IBM Plex Mono", Consolas, monospace; }
+.site-language-journal a { display: inline-flex; min-width: 36px; min-height: 34px; align-items: center; justify-content: center; color: inherit; text-decoration: none; }
+.site-language-journal a:hover, .site-language-journal a.is-active { text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 720px) {
+  .next-site:not(.next-home) .next-header-content { min-height: 0; padding: 0; }
+  .next-site:not(.next-home) .next-language-switch { align-self: stretch; justify-content: flex-end; padding: 0 8px; border-bottom: 1px solid var(--next-line); }
+  .next-site:not(.next-home) .next-header-content .next-menu { width: 100%; padding: 8px 4px; }
+}
+@media (max-width: 640px) {
+  body:has(.site-language-floating) .homepage-entry { top: auto; }
+}
