@@ -1,5 +1,35 @@
 # Third-party notices
 
+## Author-supplied Boston water recording
+
+The site author supplied the Boston water video used in
+`articles/reverse-engineering-reflections.html`.
+`articles/reverse-engineering-assets/boston-water-loop-hevc.mp4` preserves
+the source HEVC video stream without re-encoding and removes the audio.
+`articles/reverse-engineering-assets/boston-water-loop.mp4` is a silent H.264
+compatibility version for inline looping playback, preserving the source's 960 × 544
+resolution, full 6.6-second sequence, 30 fps, and BT.709 color metadata.
+It is encoded at CRF 16; no spatial downscaling or frame dropping is used.
+Browsers select the supported source; the page has no download links or
+player controls. Playback pauses offscreen and respects reduced-motion settings.
+`boston-water-still.png` is the first frame for reduced-motion/poster display.
+The recording is presented as the author's personal observation, not a
+rendering benchmark or third-party game footage.
+
+## Death Stranding effects-study screenshot
+
+`articles/reverse-engineering-assets/death-stranding-moss.jpg` is an unmodified
+screenshot supplied by the site author for the personal essay
+`articles/reverse-engineering-reflections.html` (2026-10-27). The author
+describes it as a screenshot from their reverse-engineering study of
+Death Stranding effects in an Unreal editor environment.
+
+The cover and home-page entry display only the moss area through an SVG
+viewport; the article also presents the complete original image. No scene
+details have been generated or repainted. Game imagery and software UI
+remain the property of their respective rightsholders; no open-content
+license or redistribution rights to underlying game assets are asserted.
+
 ## Hexo Theme Redefine wallpapers
 
 This site redistributes the following unmodified wallpaper assets from
