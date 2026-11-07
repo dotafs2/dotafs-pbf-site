@@ -151,7 +151,7 @@ to redistribute the underlying game assets is asserted.
 The article links to the previously selected video reference at
 https://www.bilibili.com/video/BV1yTQrBnEUa/ ; that video is not downloaded
 or redistributed by this site. The original local video was not found.
-The pipeline and strip-topology teaching diagrams are independently authored.
+The pipeline teaching diagram is independently authored.
 Public JSON and CSV contain research summaries and measurement values, with
 source-report SHA256 hashes; no game packages, models, executable code or
 shader bytecode are redistributed. Media details appear in
