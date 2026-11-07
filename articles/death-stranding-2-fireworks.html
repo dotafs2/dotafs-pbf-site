@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<!-- An implementation study, not a paper review: the three compared routes are
+     original runtime evidence, UE reconstruction, and UE optimization variants.
+     Measurements retain their different scopes; no paper metadata is invented. -->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="拆开《死亡搁浅 2》的花火：从场景与喷口骨骼，到 GPU 粒子更新、八顶点火星、运行时 Alpha 和实际 GPU 测量。附原游戏捕获图、1080p UE 重建录像与可追溯数据。" />
+  <meta name="theme-color" content="#1b1d1f" />
+  <meta property="og:title" content="《死亡搁浅 2》的花火，怎么撑得住这么大的场面？ · DOTAFS" />
+  <meta property="og:description" content="把花火拆开，看看粒子怎么动、怎么画，以及 GPU 时间到底花在哪里。附原画面、UE 重建录像与实验数据。" />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://dotafs.com/articles/ds2-fireworks-assets/original-capture-61699.png" />
+  <meta property="article:published_time" content="2026-11-07" />
+  <link rel="canonical" href="https://dotafs.com/articles/death-stranding-2-fireworks.html" />
+  <title>《死亡搁浅 2》的花火，怎么撑得住这么大的场面？ · DOTAFS</title>
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/next-theme.css" />
+  <link rel="stylesheet" href="/site-language.css" />
+  <link rel="stylesheet" href="/articles/death-stranding-2-fireworks.css" />
+  <script src="/site-language.js" defer></script>
+  <script src="/articles/death-stranding-2-fireworks.js" defer></script>
+</head>
+<body class="next-site fx-page">
+  <a class="fx-skip" href="#article">跳到正文</a>
+  <div class="next-headband" aria-hidden="true"></div>
+  <header class="next-header"><div class="next-header-inner">
+    <div class="next-brand-column"><a class="next-brand" href="/home/">DOTAFS</a><p>Personal learning notes</p></div>
+    <div class="next-header-content"><nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/">PBF Demo</a><a href="#sources">资料</a></nav></div>
+  </div></header>
+  <main class="fx-shell">
+    <aside class="fx-contents" aria-label="文章目录"><p>DS2 / EFFECT STUDY</p><nav>
+      <a href="#footage">先看原画面与复刻</a><a href="#scene">把场景和喷口找出来</a><a href="#simulation">粒子怎么动</a><a href="#geometry">一颗火星怎么画</a><a href="#alpha">白图为什么不对</a><a href="#gpu">原游戏与 UE 的 GPU 数据</a><a href="#optimization">大场景的开销</a><a href="#sources">来源与剩余问题</a>
+    </nav></aside>
+    <article class="fx-article" id="article">
+      <header>
+        <p class="fx-kicker">游戏效果解析 · DEATH STRANDING 2: ON THE BEACH</p>
+        <h1>《死亡搁浅 2》的花火，<br />怎么撑得住这么大的场面？</h1>
+        <p>旋转的喷口把火星甩出去，空中是密密麻麻的亮点，下面还有烟、建筑和水面倒影。当时我一直想知道：这么多东西一起动，性能到底怎么压得住？这次终于能把它拆开看了。</p>
+        <p class="fx-meta">DOTAFS · <time datetime="2026-11-07">2026 年 11 月 7 日</time> · Graphics Systems · 约 12 分钟<br />研究记录：2026.10.28–11.02；本文 UE 录像：2026.11.07</p>
+      </header>
+
+      <section id="footage">
+        <h2>先看我们拿到了什么</h2>
+        <p>上一篇<a href="/articles/reverse-engineering-reflections.html">随笔</a>里，我说过想把这些游戏效果单独写出来。这次先讲二代的花火。我们已经把捕获范围内的场景模型、材质和摆放关系带进 UE，也找到了旋转塔、骨骼挂点以及多种粒子的资源和计算路径。</p>
+        <figure>
+          <div class="fx-video-label"><span>原游戏 / CAPTURE 61699</span><span>1600 × 900 PNG</span></div>
+          <a href="/articles/ds2-fireworks-assets/original-capture-61699.png" target="_blank" rel="noopener"><img src="/articles/ds2-fireworks-assets/original-capture-61699.png" width="1600" height="900" alt="原游戏花火场景：左右旋转塔喷出密集金色火星，Sam 站在湿润街道上。" fetchpriority="high" /></a>
+          <figcaption>图 1。原游戏帧 61699 留存的捕获预览图，保持文件原尺寸和像素。看旋转塔的喷射方向、远近火星的密度，以及湿地面上的反射。它是静态捕获图。</figcaption>
+        </figure>
+        <p class="fx-status">原游戏的本地视频目前未找到。当时指定的<a href="https://www.bilibili.com/video/BV1yTQrBnEUa/" target="_blank" rel="noopener noreferrer">原游戏参考视频在这里</a>，重点可看约 17–25 秒。平台视频的清晰度由其片源和播放器决定；本文暂用上面的捕获图保留可放大核对的画面。</p>
+        <figure>
+          <div class="fx-video-label"><span>UE 重建 / 2026.11.07 新采集</span><span>1920 × 1080 · 30 FPS 文件 · 12 秒</span></div>
+          <video id="ue-fireworks-video" controls playsinline preload="metadata" poster="/articles/ds2-fireworks-assets/ue-frame-000.png" width="1920" height="1080" aria-label="UE 中重建的死亡搁浅二花火，固定原捕获相机，十二秒无声录像">
+            <source src="/articles/ds2-fireworks-assets/ue-fireworks-1080p.mp4" type="video/mp4" />
+            您的浏览器不支持视频。<a href="/articles/ds2-fireworks-assets/ue-fireworks-1080p.mp4">下载录像</a>。
+          </video>
+          <div class="fx-controls"><button type="button" data-frame-step="-1">前一帧</button><button type="button" data-frame-step="1">后一帧</button><label for="video-speed">速度 <select id="video-speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option></select></label><button type="button" id="video-reset">回到片头</button></div>
+          <p id="video-status" class="fx-note" role="status" aria-live="polite">可暂停检查火星轮廓。逐帧按钮按视频的 1/30 秒步长跳转。</p>
+          <figcaption>图 2。现有八顶点火星版本的 UE 场景，新采集的 360 帧。镜头采用原捕获的相机参数；粒子随机状态、动作相位、烟雾和光照仍有差异，不是逐像素同步的 A/B。以固定时间步逐帧读回制作，不代表实时 30 FPS；本片无音轨。</figcaption>
+          <div class="fx-links"><a href="/articles/ds2-fireworks-assets/ue-fireworks-1080p.mp4" download>下载 1080p 视频（约 80 MB）</a><a href="/articles/ds2-fireworks-assets/ue-frame-000.png" target="_blank" rel="noopener">第 0 帧 PNG</a><a href="/articles/ds2-fireworks-assets/ue-frame-180.png" target="_blank" rel="noopener">第 180 帧 PNG</a><a href="/articles/ds2-fireworks-assets/media-provenance.json">采集与编码记录</a></div>
+        </figure>
+        <p class="fx-note">怎样尽量保留画质：采集先存 PNG，网页视频从 PNG 一次编码，不缩放、不补帧、不额外锐化。浏览器兼容的 H.264 仍是有损压缩；检查单颗火星时，请打开 PNG 原图。</p>
+      </section>
+
+      <section id="scene">
+        <h2>第一步，先把场景和喷口找对</h2>
+        <p>花火看起来是一整面金色瀑布，拆资源时却要从摆放对象一路追到嵌套效果、发射器、材质和着色器。我们解析到的这一范围包含 48 个摆放根，其中 25 个带嵌套效果，合计 187 个系统、702 个发射器、71 种 shader。这些是资源图里的数量，不能当作同一帧的粒子数。</p>
+        <p>这里先走过一次弯路。最早选中的大塔有 43 根骨骼，后来把网格、骨骼和捕获画面对上，才确认目标场景的三座塔对应 35、12、35 根骨骼。喷口跟着骨骼挂点运动，出生位置和喷射方向也跟着变化。家族选错了，粒子参数再接近，整个旋转形状还是会偏。</p>
+        <div class="fx-flow" aria-label="花火研究数据流"><span>地图摆放</span><b>→</b><span>塔与骨骼挂点</span><b>→</b><span>粒子出生与更新</span><b>→</b><span>顶点展开</span><b>→</b><span>透明度、光照与合成</span></div>
+        <p>场景也足够大。后来的 UE 测试中加载了 41,939 个实例，组织为 2,449 个 HISM 组件，也就是 UE 用来管理层级实例的一类组件。它们描述的是我们的场景组织方式；原游戏的完整地图、流送和 LOD 系统没有随之完整移植。</p>
+      </section>
+
+      <section id="simulation">
+        <h2>第二步，看 GPU 每一步在算什么</h2>
+        <p>已确认的一部分火星使用计算着色器更新。位置、速度、剩余寿命和类型参数放在 GPU 缓冲区里，着色器按记录处理粒子。这样的数据组织适合并行执行，省去了把每颗火星当作独立场景对象逐个驱动的需要。</p>
+        <p>在捕获的一个更新分支里，我们恢复出了重力、阻力和位置积分。先修改速度，再用新速度推进位置，可以写成下面的形式。</p>
+        <div class="fx-equation">v′ = (v + Δv<sub>gravity</sub>) × (1 − drag(age))<br />p′ = p + v′ × Δt<p>p 是位置，v 是速度，age 是归一化年龄。这里的 Δv<sub>gravity</sub> 是该次 dispatch 输入的速度增量，不能再盲目乘一次 Δt。捕获时间步约为 0.017404 秒；这不证明原引擎始终使用固定时间步。</p></div>
+        <p>这次核对很直接：拿更新前后的原始缓冲区比较。类型 13 的 188 条匹配记录中，186 条速度结果达到 float32 位级一致；类型 16 是 2,643 条中的 2,630 条。类型 12 还有 curl 扰动，单靠上面的核心就对不齐，不能把它算成已经完整恢复。</p>
+        <p>对应到 UE，我们把正确大塔家族的 256 个源 GPU 喷口组织进 4 个 GPU 发射器池，按来源参数计算出生位置和形状，减少独立发射器的管理工作。这是<strong>复刻采用的组织方式</strong>，目前没有证据说原游戏也恰好用了这四个池，更没有单独测出这项合并省了多少毫秒。</p>
+      </section>
+
+      <section id="geometry">
+        <h2>第三步，一颗火星只需要多少几何？</h2>
+        <p>一条飞出去的亮线，可以由少量顶点展开。我们核对的地面火星分支采用八个顶点、六个三角形，形成三段结构。它根据视线和速度在屏幕平面的投影决定拉伸方向，再结合宽高比和枢轴位置生成轮廓。重建时曾用四顶点贴片近似，后来才把这段展开规则补回来。</p>
+        <figure><svg class="fx-topology" viewBox="0 0 680 190" role="img" aria-labelledby="strip-title strip-desc"><title id="strip-title">八顶点、六三角形的三段条带</title><desc id="strip-desc">四对顶点连接成三个四边形，每个四边形分成两个三角形。示意图不表示捕获顶点的实际比例。</desc><path d="M70 100 L210 60 L420 60 L600 90 L600 110 L420 130 L210 130 L70 120 Z M210 60 L210 130 M420 60 L420 130 M70 120 L210 60 M210 130 L420 60 M420 130 L600 90"/><g><circle cx="70" cy="100" r="4"/><circle cx="70" cy="120" r="4"/><circle cx="210" cy="60" r="4"/><circle cx="210" cy="130" r="4"/><circle cx="420" cy="60" r="4"/><circle cx="420" cy="130" r="4"/><circle cx="600" cy="90" r="4"/><circle cx="600" cy="110" r="4"/></g><text x="90" y="34">8 vertices · 6 triangles · 3 segments</text><text x="90" y="168">拓扑教学示意，非原始顶点比例</text></svg><figcaption>图 3。按已确认的顶点与三角形数量绘制的拓扑示意。实际火星的朝向、宽度和拉伸由着色器输入决定。</figcaption></figure>
+        <p>在三次选定绘制中，共 181 个粒子、1,448 个执行顶点，CPU 重建的最大位置误差约为 35 微米。再把捕获输入送进 UE，只画不透明白色轮廓，在原视点、6° 放大投影下，参考与重建只差一个边界像素，轮廓 IoU 为 99.94%。这回答的是<strong>这条 position 分支有没有对上</strong>，不包含颜色、光照、运动矢量和随机模拟。</p>
+        <details class="fx-detail"><summary>展开固定输入的轮廓验证图</summary><div class="fx-pair"><figure><a href="/articles/ds2-fireworks-assets/strip-reference.png" target="_blank" rel="noopener"><img src="/articles/ds2-fireworks-assets/strip-reference.png" alt="原 postVS 数据重建的白色轮廓参考图" loading="lazy" width="2032" height="722" /></a><figcaption>参考：原 postVS 输出重建。</figcaption></figure><figure><a href="/articles/ds2-fireworks-assets/strip-recovered.png" target="_blank" rel="noopener"><img src="/articles/ds2-fireworks-assets/strip-recovered.png" alt="UE 固定输入白色轮廓验证图" loading="lazy" width="2032" height="722" /></a><figcaption>UE：固定捕获输入，专用白材质。</figcaption></figure></div></details>
+        <p>远处火星还有屏幕宽度处理。检查过的部分类型把距离、寿命和随机量带入宽度公式，其中一条分支保留约 1.5 像素的最小贴片宽度，帮助细小火星维持可见。它主要控制视觉稳定性，不能直接算作降低 GPU 开销；透明粒子的成本还与覆盖多少像素、重叠多少层有关。</p>
+      </section>
+
+      <section id="alpha">
+        <h2>第四步，为什么搬过去以后亮成一片？</h2>
+        <p>比较意外的是，静态导出的某些透明度贴图是全白的，运行时真正绑定的对应层却带着柔和的 Alpha。只盯着资源文件，很容易漏掉这个差别。</p>
+        <div class="fx-pair fx-alpha"><figure><img src="/articles/ds2-fireworks-assets/static-alpha.png" alt="静态导出的 32×32 Alpha 通道，全白" width="32" height="32" loading="lazy" /><figcaption>静态导出 · Alpha 通道</figcaption></figure><figure><img src="/articles/ds2-fireworks-assets/runtime-alpha.png" alt="运行时第 12 层的 32×32 Alpha 通道，中心较亮、周围柔和衰减" width="32" height="32" loading="lazy" /><figcaption>运行时 layer 12 · Alpha 通道</figcaption></figure></div>
+        <p class="fx-note">图 4。两张图均为 32×32 源数据的 Alpha 通道可视化，按整数倍放大，没有平滑或生成细节。运行时层来自事件 86435 的资源 3464。</p>
+        <p>对类型 12、16、18，按报告中相同圆遮罩和采样方式积分，旧方案得到 0.34144，现场贴图得到 0.09374，相差约 3.64 倍。类型 13、17 的这项比值则为 1。这个发现解释了特定粒子为什么显得太实、太满；3.64 倍描述的是该项遮罩积分，不能直接当作整幅画面的亮度倍率。</p>
+        <p>寿命也会改变效果。已经核对的部分火星会随剩余寿命缩短，颜色按当前年龄更新；如果只在出生时取一次颜色，或者让长度一直保持最大值，粒子尾部就会残留得过久。这些细节叠起来，才决定画面是细碎的火星，还是一片厚重的发光物。</p>
+      </section>
+
+      <section id="gpu">
+        <h2>原游戏的 GPU 状态，我们实际测到了什么？</h2>
+        <p>抓帧帮助我们找到数据和 shader，实时测量则回答它们用了多少 GPU 时间。下面是原游戏进程中已识别管线的时间戳记录。采样时连接了 RenderDoc，没有运行视频编码器；这些标签沿用采集器的 generic 与 chiral 分类，不代表已经覆盖全部花火。</p>
+        <div class="fx-table-wrap" tabindex="0" role="region" aria-label="原游戏已识别管线 GPU 时间，可横向滚动"><table class="fx-table"><thead><tr><th>原游戏已识别部分</th><th>平均 GPU 时间 ↓</th><th>含义</th></tr></thead><tbody>
+          <tr><td>Generic 绘制</td><td class="fx-number">0.09944 ms</td><td>匹配到的通用效果绘制</td></tr><tr><td>Chiral 绘制</td><td class="fx-number">0.39762 ms</td><td>匹配到的 chiral 效果绘制</td></tr><tr><td>Generic 模拟</td><td class="fx-number">0.04048 ms</td><td>对应模拟 dispatch</td></tr><tr><td>Chiral 模拟</td><td class="fx-number">0.32172 ms</td><td>对应模拟 dispatch</td></tr><tr><td>已识别工作范围合计</td><td class="fx-number">0.85925 ms</td><td>1,251 个有效匹配样本；P95 0.87299 ms</td></tr>
+        </tbody></table></div>
+        <p>这组数值来自另一次向上的参考镜头。它包含已识别的烟、火和粒子管线，遗漏的管线与共享光照不在统计内；各类工作时间相加也不必然等于整帧关键路径。因此，不能写成“整场花火只要 0.86 ms”。</p>
+        <details class="fx-detail"><summary>一条实测样本中的 GPU 提交状态</summary><p>最后一个有效样本记录了 generic / chiral 绘制调用 109 / 7 次，模拟调用 2 / 5 次，间接调用 8 次，涉及队列 1 个，丢弃查询 0。它是单个样本的状态，不是整段采样的平均调用数。</p><p>间接绘制把绘制参数放进缓冲区，再由 GPU 执行。参数缓冲区既可由 CPU 生成，也可由 GPU 生成；仅看到 ExecuteIndirect，不能自动证明某套 GPU 剔除算法已经生效。尤其不能把命令数量或缓冲区容量当作活跃粒子数。参见 <a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/indirect-drawing" target="_blank" rel="noopener noreferrer">Direct3D 12 的定义</a>。</p></details>
+        <p>UE 的粒子测量用了另一种方法：在场景运行中按关、开、关、开的顺序切换选定系统，比较整帧 GPU 活跃时间。正确塔家族那轮实验的平均增量为 1.42792 ms，两次配对分别为 1.47374 和 1.38210 ms。它包括粒子开关连带的反射和共享光照变化。镜头、分辨率、数量及计时范围与上表不同，不能相除得出移植后的性能比例。</p>
+        <div class="fx-table-wrap" tabindex="0" role="region" aria-label="三种测量口径的区别"><table class="fx-table"><thead><tr><th>测量</th><th>结果</th><th>实际覆盖</th></tr></thead><tbody><tr><td>原游戏实时 GPU 时间戳</td><td class="fx-number">0.85925 ms</td><td>已识别管线；向上镜头</td></tr><tr><td>UE 正确塔家族 OFF/ON</td><td class="fx-number">+1.42792 ms</td><td>选定三套系统的整帧增量，含连带开销</td></tr><tr><td>本文新视频采集</td><td>固定步长 30 Hz</td><td>用于看效果；读回与编码不作为性能测量</td></tr></tbody></table></div>
+      </section>
+
+      <section id="optimization">
+        <h2>大场景的开销，还藏在花火后面</h2>
+        <p>把地图搭进 UE 以后，我们发现大量被遮住的实例仍然进入了深度和基础材质绘制。开启 GPU 实例 HZB 遮挡剔除后，GPU 先利用分层深度图判断实例是否被前方物体挡住，再减少后续提交的几何。这项修改发生在 UE 复刻场景中。</p>
+        <div class="fx-table-wrap" tabindex="0" role="region" aria-label="UE 实例遮挡剔除 ABAB 实验"><table class="fx-table"><thead><tr><th>同条件 ABAB · 2026.11.02</th><th>关闭剔除</th><th>开启剔除</th></tr></thead><tbody><tr><td>整帧 GPU 时间 ↓</td><td class="fx-number">12.9701 ms</td><td class="fx-number">8.1331 ms</td></tr><tr><td>主视图 PrePass + BasePass ↓</td><td class="fx-number">5.625 ms</td><td class="fx-number">1.320 ms</td></tr><tr><td>整帧耗时 ↓</td><td class="fx-number">15.3227 ms</td><td class="fx-number">15.3726 ms</td></tr><tr><td>实际吞吐 ↑</td><td class="fx-number">65.26 FPS</td><td class="fx-number">65.05 FPS</td></tr></tbody></table></div>
+        <p class="fx-note">UE 5.8.1 / D3D12 SM5 / RTX 5080。主视图 1284×722，反射 768×432；同轮保留相同几何、材质、阴影、反射及 10 个活跃效果。数值不是本文 1080p 录像的性能。</p>
+        <p>GPU 明显轻松了，帧率却没有涨。原因要继续往 CPU 和渲染任务看：主线程、编辑器界面，以及阴影和网格准备会影响整帧推进。拿 8.13 ms 的倒数宣称 123 FPS，会漏掉这些等待。</p>
+        <p>随后另一轮实验把主视图和阴影的网格收集任务从 4 份拆成 16 份，实际吞吐从 67.05 提升到 70.28 FPS，约 4.82%。这轮的播放方式和活跃效果数量与前一轮不同，单独记录。它说明了我们怎样找复刻场景的瓶颈，还不能反过来证明原游戏用了完全相同的调度。</p>
+        <p>现在可以解释的，是一部分具体做法：批量更新粒子，让少量几何承担火星的轮廓，再由挂点、寿命、透明度组织出密集的运动。至于一个大场景能否流畅，仍要把几何、烟雾、反射和 CPU 提交一起测。单看粒子数量，很难猜准最后的成本。</p>
+      </section>
+
+      <section id="sources">
+        <h2>这次知道了什么，还差什么</h2>
+        <p>这次最开心的地方，是原本只能隔着屏幕猜的东西，已经能对应到一份输入、一次计算和一个结果。我们找到了这段场景，找对了旋转塔，也能把某一类火星的顶点位置对到很小的误差。接下来要继续补的是原始随机流、风与力场、碰撞、上一帧位置和运动矢量，以及烟雾、光照和后处理。本文的 UE 画面仍是研究重建。</p>
+        <p>下列数据摘录来自本地研究报告，保留了数值、范围及报告哈希，便于追溯；不附原游戏包、二进制、shader 字节码或模型。</p>
+        <ol class="fx-source-list">
+          <li><a href="/articles/ds2-fireworks-assets/research-data.json">研究数据与来源索引（JSON）</a>：资源覆盖、积分验证、顶点误差、Alpha 与 GPU 实验。</li>
+          <li><a href="/articles/ds2-fireworks-assets/original-gpu-samples.csv">原游戏已识别管线采样（CSV）</a>：仅数值列，单位为毫秒；保留原测量范围。</li>
+          <li><a href="/articles/ds2-fireworks-assets/media-provenance.json">本文媒体采集与编码记录（JSON）</a>：新录制帧数、尺寸、时间步、编码与哈希。</li>
+          <li><a href="https://www.bilibili.com/video/BV1yTQrBnEUa/" target="_blank" rel="noopener noreferrer">当时指定的原游戏视频参考</a>；算法判断依据本地捕获与解析，不从视频观感推断具体实现。</li>
+          <li><a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/indirect-drawing" target="_blank" rel="noopener noreferrer">Microsoft：Indirect Drawing</a>，用于说明命令数、绘制参数及间接提交的含义。</li>
+        </ol>
+        <p class="fx-note">游戏画面与效果归各自权利人所有。本文对《DEATH STRANDING 2: ON THE BEACH》的有限截图和研究演示用于技术说明；不主张拥有底层游戏资产的再分发许可。Alpha 图为通道可视化，条带图为自绘示意，其余标明的 PNG 保留来源像素。详见 <a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
+      </section>
+      <footer><a href="/articles/reverse-engineering-reflections.html">← 系列开篇</a> · <a href="/home/#articles">返回文章目录</a></footer>
+    </article>
+  </main>
+  <footer class="next-footer"><p>© 2026 DOTAFS</p><p>界面结构基于 <a href="https://theme-next.js.org/" target="_blank" rel="noreferrer">NexT · Gemini</a></p></footer>
+</body>
+</html>

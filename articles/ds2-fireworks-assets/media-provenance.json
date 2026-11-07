@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "date": "2026-11-07",
+  "originalVideo": {
+    "localFileFound": false,
+    "referenceURL": "https://www.bilibili.com/video/BV1yTQrBnEUa/",
+    "referenceSegmentSeconds": [
+      17,
+      25
+    ]
+  },
+  "originalStill": {
+    "frame": 61699,
+    "dimensions": [
+      1600,
+      900
+    ],
+    "kind": "Original-game capture preview stored in research evidence, not replay output",
+    "sha256": "36d2b6f1667225d53465d49c8031307da3c7a2774e1af8223a27a68ad1f57f09"
+  },
+  "ue": {
+    "map": "/Game/DS2Fireworks/Maps/UEDPIE_0_DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2.DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2",
+    "captureDate": "2026-11-07",
+    "dimensions": [
+      1920,
+      1080
+    ],
+    "frames": 360,
+    "fps": 30,
+    "durationSeconds": 12,
+    "worldSpanSeconds": 11.966667290776968,
+    "uniqueFrames": 360,
+    "worldStepExceptions": [],
+    "method": "New UE PIE normal-viewport Draw+ReadPixels; fixed engine time step 1/30 s; temporal history retained; PNG masters. Extra draw/readback excluded from performance measurement.",
+    "audio": false,
+    "limits": [
+      "No original DS2 game video.",
+      "No live FPS claim.",
+      "No original RNG equivalence.",
+      "No audio recorded."
+    ],
+    "protectedSourceFilesUnchanged": {
+      "DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2.umap": true,
+      "DS1Scene.uproject": true
+    },
+    "rawCaptureReportSHA256": "3acb70e8704803d3ca9c5d2545da6b7155c2fde85514fef24c8b45008cb368e9"
+  },
+  "images": {
+    "original-capture-61699.png": {
+      "sha256": "36d2b6f1667225d53465d49c8031307da3c7a2774e1af8223a27a68ad1f57f09",
+      "dimensions": [
+        1600,
+        900
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "static-alpha.png": {
+      "sha256": "810a7e611c7893c873fa6755c3a2ada29997e8f49aa61516848d75755cd2b197",
+      "dimensions": [
+        32,
+        32
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "runtime-alpha.png": {
+      "sha256": "9f0e83b28660923a9912c0190c5cb566de17b095314a633e9e687721d655a64c",
+      "dimensions": [
+        32,
+        32
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "strip-reference.png": {
+      "sha256": "d6f888ff2d9b99b038b14e79227684936f4f33da4a75e01a1d5107920a864696",
+      "dimensions": [
+        2032,
+        722
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "strip-recovered.png": {
+      "sha256": "dffffd597974e605aa6b93a2fe8f6d6a8743265d8ef9521b1626cc171b27a9ae",
+      "dimensions": [
+        2032,
+        722
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "ue-frame-000.png": {
+      "sha256": "87769068787ad20cd36a4d87b9264e8835c75124c5bf3f619408012468d43883",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "ue-frame-180.png": {
+      "sha256": "823f91ac3e6bb45f0879dba2284fc7f0c60287cd3aa166590d1cdcd1856456ac",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "ue-frame-359.png": {
+      "sha256": "56aeced8254799064fccccb06241eb0a55a2ccb89c9c60e4c0c494687d4912d5",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    }
+  },
+  "videoEncoding": {
+    "codec": "H.264 / libx264",
+    "pixelFormat": "yuv420p",
+    "crf": 14,
+    "preset": "slow",
+    "fps": 30,
+    "resizing": false,
+    "interpolation": false,
+    "addedSharpening": false,
+    "audio": false,
+    "lossless": false,
+    "losslessReference": "Unchanged source PNG frames linked from article",
+    "bytes": 79853037,
+    "sha256": "a046fd67979baa4b9aa69319037e7b5ee51e669f677955af826a64bdf23474eb",
+    "decodedFramesVerified": 360,
+    "inputDecode": "Pillow loads PNG to RGB24; raw pixels piped to ffmpeg 7.1. No resize or compositing.",
+    "sourceFrameHashesVerified": 360,
+    "color": {
+      "matrix": "BT.709",
+      "primaries": "BT.709",
+      "transfer": "sRGB / IEC 61966-2-1",
+      "range": "limited (video)",
+      "sourceInterpretation": "8-bit SDR sRGB viewport PNG"
+    },
+    "colorMetadataVerifiedInBitstream": true,
+    "metadataPass": "Lossless stream copy to set explicit H.264 VUI color tags; no second image encoding."
+  }
+}

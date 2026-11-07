@@ -1,0 +1,502 @@
+{
+  "schema": 1,
+  "article": "death-stranding-2-fireworks",
+  "preparedDate": "2026-11-07",
+  "scope": "Public research summaries; no third-party source code, bytecode, models or game packages. Historical experiments were read, not rerun for this article. New video is separate fixed-step visual capture.",
+  "sources": {
+    "integrator": {
+      "report": "Evidence/big-fireworks-integrator-validation.json",
+      "sha256": "d7f1f23080ea89c824de2047877de77c5e18a6a0ee27d3369b5c303118f12c83"
+    },
+    "screenWidth": {
+      "report": "Evidence/source-screen-quad-rule-verified.json",
+      "sha256": "d1b79e1f5229d800bdb661b5f38142c6723e70ccbb467693d6c2c58d809c8e22"
+    },
+    "alpha": {
+      "report": "Evidence/source-runtime-atlas-opacity-mismatch.json",
+      "sha256": "ffeba630e12cff07423d26431d8de41568b5fbc914f0ac36dbfb5be19a84c079"
+    },
+    "geometryABAB": {
+      "report": "Evidence/GeometryOptimization20261102/verified.json",
+      "sha256": "22c4c83b69a27fa6f37a8292b15336bdc8b38d2e05240fe253b70c731364b3bf"
+    },
+    "groundStripAndTasks": {
+      "report": "Evidence/PerformanceFX20261102/verified.json",
+      "sha256": "bfc250465c592812044f1917f73fc1b2b8985fe6799e2791d674763236ab9239"
+    },
+    "originalGPU": {
+      "report": "Profiler/output/fireworks-reference-20261028-2347-renderdoc.json",
+      "sha256": "38dcaba38d2d71b011cd1320089139e90499cf1df47a1a1f8c17160e52d0f82a"
+    },
+    "ueParticleIncrement": {
+      "report": "Evidence/Performance/correct_tower_particle_gpu_scope_comparison.json",
+      "sha256": "c7afcdd03883301d5de07f095b8a467d9fba692704d4cd16a85a325decfe1ffd"
+    },
+    "mapScope": {
+      "report": "Evidence/particle-map-rebuild-current.json",
+      "sha256": "5b0fa32c08a058590d80558173bc64002d078c81a902d3deca2ca4aac21a1d44"
+    },
+    "towerFamily": {
+      "report": "Evidence/correct-tower-family-progress.json",
+      "sha256": "e59d07d1005208e4f307008800ce488393e69fd62eff1cea96a202d34244d3f9"
+    },
+    "poolAndIndirectLimits": {
+      "report": "Evidence/native-source8-indirect-argument-audit.json",
+      "sha256": "1a89ed613c4c6444d245e0e8dfe55a0a65865307fafa24b1d986e9a6e67981ed"
+    }
+  },
+  "mapCoverage": {
+    "placementRoots": 48,
+    "rootsWithNestedEffects": 25,
+    "systems": 187,
+    "emitters": 702,
+    "shaders": 71,
+    "scope": "Parsed static resource graph subset; not simultaneous particles or complete game map."
+  },
+  "sourceTowerBoneCounts": [
+    35,
+    12,
+    35
+  ],
+  "ueScene": {
+    "HISMComponents": 2449,
+    "loadedInstances": 41939,
+    "scope": "UE research scene; not visible geometry counts or proof of original HISM."
+  },
+  "integrator": {
+    "event": 86365,
+    "capturedStepSeconds": 0.017403999343514442,
+    "validation": [
+      {
+        "type": 12,
+        "matchedParticles": 4806,
+        "gravityPerDispatch": -0.4000000059604645,
+        "drag": 0.199951171875,
+        "dragPow": 1.0,
+        "dragLifeOffset": 0.0,
+        "velocityErrorMedian": 0.4158906936645508,
+        "velocityErrorP95": 1.2221684455871582,
+        "velocityFloat32BitwiseMatched": 16,
+        "wrongGravityTimesDtMedian": 0.5465441346168518,
+        "positionErrorMax": 0.0,
+        "nativeCurlEnabled": true
+      },
+      {
+        "type": 13,
+        "matchedParticles": 188,
+        "gravityPerDispatch": -0.25,
+        "drag": 0.04058837890625,
+        "dragPow": 1.0,
+        "dragLifeOffset": 0.0,
+        "velocityErrorMedian": 0.0,
+        "velocityErrorP95": 0.0,
+        "velocityFloat32BitwiseMatched": 186,
+        "wrongGravityTimesDtMedian": 0.24393072724342346,
+        "positionErrorMax": 0.0,
+        "nativeCurlEnabled": false
+      },
+      {
+        "type": 16,
+        "matchedParticles": 2643,
+        "gravityPerDispatch": -0.25,
+        "drag": 0.04058837890625,
+        "dragPow": 1.0,
+        "dragLifeOffset": 0.0,
+        "velocityErrorMedian": 0.0,
+        "velocityErrorP95": 0.0,
+        "velocityFloat32BitwiseMatched": 2630,
+        "wrongGravityTimesDtMedian": 0.24529790878295898,
+        "positionErrorMax": 0.0,
+        "nativeCurlEnabled": false
+      }
+    ],
+    "limits": [
+      "Type12 curl is excluded from this core comparison, so its residual is not evidence of a full fit.",
+      "Only one captured timestep; original engine scheduling and other simulation variants are not validated.",
+      "Actual captured SRV values and records are compared; nominal source properties alone are insufficient."
+    ]
+  },
+  "screenWidth": {
+    "rows": [
+      {
+        "type": 13,
+        "records": 199,
+        "pixelBase": 10.0,
+        "pixelRandomOffset": 5.0,
+        "worldHalfWidth": 0.0149993896484375,
+        "worldRandomHalfWidth": 0.00499725341796875,
+        "distance": [
+          40.0,
+          10.0,
+          0.2998046875,
+          1.0
+        ],
+        "sizePower": 1.0,
+        "sizeLifeOffset": 0.2998046875,
+        "minimumFullQuadPixels": 1.5,
+        "maxPixelError": 0.00012969970703125,
+        "meanPixelError": 1.4651679064161214e-05,
+        "specialSourceMixRecords": 0,
+        "projectedPixelsRange": [
+          1.7670795321464539,
+          2.754392623901367,
+          6.405726671218872
+        ]
+      },
+      {
+        "type": 17,
+        "records": 7,
+        "pixelBase": 6.0,
+        "pixelRandomOffset": 2.0,
+        "worldHalfWidth": 0.0149993896484375,
+        "worldRandomHalfWidth": 0.00499725341796875,
+        "distance": [
+          10.0,
+          30.0,
+          1.0,
+          0.0999755859375
+        ],
+        "sizePower": 1.0,
+        "sizeLifeOffset": 0.0,
+        "minimumFullQuadPixels": 1.5,
+        "maxPixelError": 5.745887756347656e-05,
+        "meanPixelError": 1.1461121695382254e-05,
+        "specialSourceMixRecords": 0,
+        "projectedPixelsRange": [
+          1.4999958872795105,
+          1.500001922249794,
+          2.8105419874191284
+        ]
+      }
+    ],
+    "limits": [
+      "Original cached life-valid records, not original draw-visible population.",
+      "This is quad geometry width before texture opacity/round mask/AA/Bloom.",
+      "Special per-particle modifier channels require separate native mapping; all206 validation records here have special mix disabled.",
+      "Native source seeds/correlation are not exact. No emitter/rate/brightness changes."
+    ]
+  },
+  "alpha": {
+    "event": 86435,
+    "resource": 3464,
+    "binding": "PS t14space8 Texture2DArray, layer=abs(actualVS TEXCOORD0.z)",
+    "rows": [
+      {
+        "type": 12,
+        "actualSHA": "9f0e83b28660923a9912c0190c5cb566de17b095314a633e9e687721d655a64c",
+        "actualAlphaMean": 0.11219362745098038,
+        "actualAlphaMax": 0.8509803921568627,
+        "oldAlphaMean": 1.0,
+        "oldAlphaMax": 1.0,
+        "oldCoveredFraction": 0.7699050903320312,
+        "sourceCoveredFraction": 0.3459644317626953,
+        "oldEnergyIntegral": 0.3414436893002465,
+        "sourceEnergyIntegral": 0.09374189861222118,
+        "oldToSourceEnergyRatio": 3.642380774819642
+      },
+      {
+        "type": 13,
+        "actualSHA": "f7b9da3b59df7c5a2d0ea2f7ce260c20fef37a0f550d150075a7f3c08b50a7de",
+        "actualAlphaMean": 1.0,
+        "actualAlphaMax": 1.0,
+        "oldAlphaMean": 1.0,
+        "oldAlphaMax": 1.0,
+        "oldCoveredFraction": 0.7699050903320312,
+        "sourceCoveredFraction": 0.7699050903320312,
+        "oldEnergyIntegral": 0.3414436893002465,
+        "sourceEnergyIntegral": 0.3414436893002465,
+        "oldToSourceEnergyRatio": 1.0
+      },
+      {
+        "type": 16,
+        "actualSHA": "9f0e83b28660923a9912c0190c5cb566de17b095314a633e9e687721d655a64c",
+        "actualAlphaMean": 0.11219362745098038,
+        "actualAlphaMax": 0.8509803921568627,
+        "oldAlphaMean": 1.0,
+        "oldAlphaMax": 1.0,
+        "oldCoveredFraction": 0.7699050903320312,
+        "sourceCoveredFraction": 0.3459644317626953,
+        "oldEnergyIntegral": 0.3414436893002465,
+        "sourceEnergyIntegral": 0.09374189861222118,
+        "oldToSourceEnergyRatio": 3.642380774819642
+      },
+      {
+        "type": 17,
+        "actualSHA": "f7b9da3b59df7c5a2d0ea2f7ce260c20fef37a0f550d150075a7f3c08b50a7de",
+        "actualAlphaMean": 1.0,
+        "actualAlphaMax": 1.0,
+        "oldAlphaMean": 1.0,
+        "oldAlphaMax": 1.0,
+        "oldCoveredFraction": 0.7699050903320312,
+        "sourceCoveredFraction": 0.7699050903320312,
+        "oldEnergyIntegral": 0.3414436893002465,
+        "sourceEnergyIntegral": 0.3414436893002465,
+        "oldToSourceEnergyRatio": 1.0
+      },
+      {
+        "type": 18,
+        "actualSHA": "9f0e83b28660923a9912c0190c5cb566de17b095314a633e9e687721d655a64c",
+        "actualAlphaMean": 0.11219362745098038,
+        "actualAlphaMax": 0.8509803921568627,
+        "oldAlphaMean": 1.0,
+        "oldAlphaMax": 1.0,
+        "oldCoveredFraction": 0.7699050903320312,
+        "sourceCoveredFraction": 0.3459644317626953,
+        "oldEnergyIntegral": 0.3414436893002465,
+        "sourceEnergyIntegral": 0.09374189861222118,
+        "oldToSourceEnergyRatio": 3.642380774819642
+      }
+    ],
+    "limits": [
+      "Coverageintegrals use bilinearclamp texelcentres and originalroundmask; originalsampler andPICO maydiffer.",
+      "This proves texturebindingmismatch; finalHDR scenecomposition stillneedsvisualvalidation.",
+      "No rate,size,sourcecolour orbrightnessreduction. Only originalactualatlasopacitycorrected."
+    ]
+  },
+  "groundStrip": {
+    "particles": 181,
+    "vertices": 1448,
+    "maxPositionErrorM": 3.525224064013402e-05,
+    "cpuLimits": [
+      "Current-position branch for shape4/flags0x800b in three captured draws only.",
+      "Reference positions were previously reconstructed from original postVS output; float matrix inversion limits numerical accuracy.",
+      "No motion-vector, other flags, original RNG/simulation, lighting or full-effect equivalence claim."
+    ],
+    "gpu": {
+      "status": "UE_gpu_current_position_silhouette_verified",
+      "sourceRecords": 181,
+      "sourceVertices": 1448,
+      "viewport": [
+        2032,
+        722
+      ],
+      "cameraEyeUnchanged": true,
+      "horizontalFovDegrees": 6,
+      "referenceForegroundPixels": 1660,
+      "recoveredForegroundPixels": 1661,
+      "differentPixels": 1,
+      "maskDifferencePixels": 1,
+      "intersectionOverUnion": 0.9993979530403372,
+      "limits": [
+        "Opaque white diagnostic silhouette; not textured color, lighting or motion vectors.",
+        "Only captured eye and zoomed projection; 181 records spawned, subset visible in zoomed frustum.",
+        "One boundary pixel differs; float reference inversion and raster rounding remain.",
+        "V2/V3 component material overrides were ignored by Niagara mesh renderer; those are not valid geometry comparisons. V4 uses dedicated mesh/material."
+      ]
+    }
+  },
+  "originalGPU": {
+    "scope": "Actual DS2 process GPU timestamps, known shader pipeline coverage only.",
+    "measurement_valid": true,
+    "matched_valid_samples": 1251,
+    "known_particle_work_ms": {
+      "mean": 0.8592548681055154,
+      "p95": 0.872992,
+      "min": 0.800128,
+      "max": 1.2492159999999999,
+      "last": 0.8601919999999998
+    },
+    "category_mean_ms": {
+      "generic_draw_ms": 0.09943773621103116,
+      "chiral_draw_ms": 0.3976232773780975,
+      "generic_sim_ms": 0.040476342126298956,
+      "chiral_sim_ms": 0.32171751239008795
+    },
+    "valid_sample_span_s": 21.956533
+  },
+  "originalLastSample": {
+    "generic_draw_calls": 109,
+    "chiral_draw_calls": 7,
+    "generic_sim_calls": 2,
+    "chiral_sim_calls": 5,
+    "indirect_calls": 8,
+    "queue_count": 1,
+    "dropped_queries": 0,
+    "particle_work_ms": 0.8601919999999998
+  },
+  "originalGPULimits": [
+    "Known pipelines only, including smoke/fire; not all particles or shared lighting.",
+    "Upward reference view differs from frame61699.",
+    "Category work-time sums do not establish full-frame critical-path cost."
+  ],
+  "ueParticleIncrement": {
+    "meanIncrementMs": 1.4279177983601876,
+    "pairDeltasMs": [
+      1.473736445109047,
+      1.3820991516113281
+    ],
+    "pairSpreadMs": 0.09163729349771899,
+    "scope": "Wholeeditor completedGPUactive-frame difference OFF/ON/OFF/ON; correctedlarge4GPU pools, small3GPU pools, correct18CPU smokeemitterrendering, reflection/sharedlighting consequences included; no encoder/screenshot/readback during25fresh1Hz samples."
+  },
+  "ueParticleLimits": [
+    "Different camera/coverage/resolution and simulation population; cannot treat values as same coverage or optimization ratio.",
+    "The earlier1.85985ms native result covered wrong tower family and is historical only.",
+    "Native wholeframe is about57-58ms in this editor context; incremental number is not total scene cost."
+  ],
+  "geometryABAB": {
+    "scope": "UE5.8.1 SM5 RTX5080 source-lod review, main1284x722 reflection768x432; original game not measured.",
+    "summary": {
+      "before": {
+        "gpuMs": 12.97006706794103,
+        "geometryMs": 5.625,
+        "prePassMs": 2.783333333333333,
+        "basePassMs": 2.841666666666667,
+        "wholeFrameMs": 15.322748537862344,
+        "throughputFPS": 65.26244280058575
+      },
+      "after": {
+        "gpuMs": 8.133092502752941,
+        "geometryMs": 1.32,
+        "prePassMs": 0.58,
+        "basePassMs": 0.74,
+        "wholeFrameMs": 15.372583618096884,
+        "throughputFPS": 65.05087400030675
+      },
+      "gpuReductionPercent": 37.2933658696643,
+      "geometryReductionPercent": 76.53333333333333,
+      "postCullTriangleReductionPercent": 78.57740093129313
+    },
+    "limits": [
+      "SceneDepth equivalence is RGB8 visualization for five sampled views, with Niagara disabled, dynamic Sam hidden, frame0 and AAoff; it is not float32 depth equality or complete temporal visual equivalence.",
+      "Performance keeps all10FX active; geometry assets, LOD, materials, shadow quality and reflection configuration stay the same across defaultABAB.",
+      "Native draw dumps are outside timed blocks. Counts are per pass and material segment across collected views, not unique world objects. CPU RHI primitive counters do not report actual post-indirect instance-multiplied triangle work.",
+      "Remaining approximately6ms CPU/UI work in the editor limits delivered frame rate; GPU time reduction is not an FPS increase or stable120FPS proof.",
+      "Motion runs are60seconds each, not an exhaustive traversal or a paired frame-exact original-game benchmark."
+    ],
+    "blocks": [
+      {
+        "name": "geometry_v7_default_off_A",
+        "samples": 120,
+        "gpuMeanMs": 12.98460829257965,
+        "frames": 7839,
+        "frameMeanMs": 15.307600089297104,
+        "throughputFPS": 65.32702671656469,
+        "prePassMs": 2.84,
+        "basePassMs": 2.8466666666666667
+      },
+      {
+        "name": "geometry_v7_default_on_A",
+        "samples": 120,
+        "gpuMeanMs": 8.129047481218974,
+        "frames": 7938,
+        "frameMeanMs": 15.11697258755354,
+        "throughputFPS": 66.15081122944838,
+        "prePassMs": 0.5766666666666667,
+        "basePassMs": 0.7366666666666667
+      },
+      {
+        "name": "geometry_v7_default_off_B",
+        "samples": 120,
+        "gpuMeanMs": 12.955525843302409,
+        "frames": 7823,
+        "frameMeanMs": 15.33792796880992,
+        "throughputFPS": 65.1978547580564,
+        "prePassMs": 2.7266666666666666,
+        "basePassMs": 2.836666666666667
+      },
+      {
+        "name": "geometry_v7_default_on_B",
+        "samples": 120,
+        "gpuMeanMs": 8.137137524286906,
+        "frames": 7689,
+        "frameMeanMs": 15.636472337104955,
+        "throughputFPS": 63.95304378386071,
+        "prePassMs": 0.5833333333333333,
+        "basePassMs": 0.7433333333333333
+      }
+    ]
+  },
+  "taskSplitABAB": {
+    "implementation": {
+      "mainMeshGatherTasks": 16,
+      "shadowMeshGatherTasks": 16,
+      "mainRenderArea": [
+        1284,
+        722
+      ],
+      "reflectionRenderArea": [
+        768,
+        432
+      ]
+    },
+    "performance": {
+      "blocks": [
+        {
+          "tag": "control_A",
+          "timing": {
+            "method": "Wall intervals between consecutive Slate post-tick callbacks during active runtime sampling; no engine CSV per-scope instrumentation.",
+            "frames": 4034,
+            "meanMs": 14.872150619732862,
+            "medianMs": 14.722900003107497,
+            "p95Ms": 17.23241500039876,
+            "p99Ms": 20.04249999925378,
+            "maxMs": 53.53140000079293,
+            "meanFPS": 67.23977086899367,
+            "framesOver120Budget": 4026
+          },
+          "gpu": 8.706018304866667
+        },
+        {
+          "tag": "split_A",
+          "timing": {
+            "method": "Wall intervals between consecutive Slate post-tick callbacks during active runtime sampling; no engine CSV per-scope instrumentation.",
+            "frames": 4203,
+            "meanMs": 14.274065619795172,
+            "medianMs": 14.110799995251,
+            "p95Ms": 16.721840002719546,
+            "p99Ms": 19.095239998714508,
+            "maxMs": 49.69770000025164,
+            "meanFPS": 70.05712504314168,
+            "framesOver120Budget": 4199
+          },
+          "gpu": 8.683962259147542
+        },
+        {
+          "tag": "control_B",
+          "timing": {
+            "method": "Wall intervals between consecutive Slate post-tick callbacks during active runtime sampling; no engine CSV per-scope instrumentation.",
+            "frames": 4010,
+            "meanMs": 14.957565461347322,
+            "medianMs": 14.777600001252722,
+            "p95Ms": 17.538054999749875,
+            "p99Ms": 19.745314996689554,
+            "maxMs": 57.71600000298349,
+            "meanFPS": 66.85579966767692,
+            "framesOver120Budget": 4005
+          },
+          "gpu": 8.682550032933333
+        },
+        {
+          "tag": "split_B",
+          "timing": {
+            "method": "Wall intervals between consecutive Slate post-tick callbacks during active runtime sampling; no engine CSV per-scope instrumentation.",
+            "frames": 4229,
+            "meanMs": 14.183877228658435,
+            "medianMs": 14.038200002687518,
+            "p95Ms": 16.52827999787405,
+            "p99Ms": 18.636687997495756,
+            "maxMs": 47.870800000964664,
+            "meanFPS": 70.50258429898888,
+            "framesOver120Budget": 4219
+          },
+          "gpu": 8.764859946533333
+        }
+      ],
+      "controlMeanMs": 14.914858040540093,
+      "splitMeanMs": 14.228971424226803,
+      "controlFPS": 67.04723553398222,
+      "splitFPS": 70.27914880040879,
+      "fpsGainPercent": 4.820352756809054,
+      "decision": "adopt16"
+    },
+    "limits": [
+      "Stable120FPS is not achieved: actual launcher P99 is18.64ms; 120FPS budget is8.33ms.",
+      "ABAB blocks are possessed PIE with27active visible Niagara components at each end audit. Fresh launcher has17at30s and90s. Do not mix these with earlier SIE10component tests.",
+      "Current-position geometry branch/flags0x800b only. Original RNG, force fields, curl/Brownian motion, collision, previous-position/motion vectors and global lighting are not fully matched.",
+      "Only system36573:22 changed; other ground-family systems remain incomplete.",
+      "UI reduction helps game-thread cost; render-thread shadow/mesh command preparation remains the main limiter.",
+      "Four prior maps, two prior plugin DLLs and nine prior scripts are unchanged; new assets/plugin/helper scripts are separate.",
+      "No original game/save modifications and no remote push."
+    ]
+  }
+}

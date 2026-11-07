@@ -125,3 +125,34 @@ Bartlomiej Wronski, Tomas Akenine-Möller, Pontus Ebelin, Aaron Lefohn, and
 NVIDIA. No open-content license is asserted for them. The surrounding article
 text, layout, tables, synthetic texture examples, and interactive teaching
 tools are independently authored.
+
+
+## Death Stranding 2 fireworks research note
+
+`articles/death-stranding-2-fireworks.html` includes limited game-imagery
+excerpts and a video of a local research reconstruction for technical commentary.
+DEATH STRANDING 2: ON THE BEACH imagery and underlying assets remain the
+property of their respective rightsholders, including KOJIMA PRODUCTIONS
+and Sony Interactive Entertainment. No open-content license or permission
+to redistribute the underlying game assets is asserted.
+
+- `articles/ds2-fireworks-assets/original-capture-61699.png`: the original-game
+  capture preview retained in the research evidence, unmodified, 1600×900.
+- `ue-fireworks-1080p.mp4` and `ue-frame-*.png` in that directory: the author's
+  local Unreal Engine research reconstruction, newly captured on 2026-11-07.
+  The video is a fixed-step visual demonstration, not a real-time benchmark.
+  PNGs are unchanged capture outputs; the browser video uses lossy H.264.
+- `static-alpha.png` and `runtime-alpha.png`: limited 32×32 texture excerpts
+  needed to explain the measured opacity mismatch; copied without alteration.
+  White RGB with alpha is displayed over black to visualize coverage.
+- `strip-reference.png` and `strip-recovered.png`: diagnostic silhouettes from
+  the 2026-11-02 fixed-input position comparison, preserved unmodified.
+
+The article links to the previously selected video reference at
+https://www.bilibili.com/video/BV1yTQrBnEUa/ ; that video is not downloaded
+or redistributed by this site. The original local video was not found.
+The pipeline and strip-topology teaching diagrams are independently authored.
+Public JSON and CSV contain research summaries and measurement values, with
+source-report SHA256 hashes; no game packages, models, executable code or
+shader bytecode are redistributed. Media details appear in
+`articles/ds2-fireworks-assets/media-provenance.json`.
