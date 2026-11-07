@@ -498,5 +498,64 @@
       "Four prior maps, two prior plugin DLLs and nine prior scripts are unchanged; new assets/plugin/helper scripts are separate.",
       "No original game/save modifications and no remote push."
     ]
+  },
+  "cp2077Reconstruction": {
+    "scope": "Original exported character/weapon assets and animations integrated with a custom UE behavior, input, collision and effects adapter. Not a complete REDengine port.",
+    "currentVideo": "cp2077-ue-combat-720p.mp4",
+    "videoChecks": {
+      "monotonicEngineFrames": true,
+      "fixedWorldSteps": true,
+      "fixedViewportSize": true,
+      "threeTapCombo": true,
+      "strongRelease": true,
+      "guardCycle": true,
+      "slowOnAndOff": true,
+      "globalTenth": true,
+      "rainUsesSlowWorldClock": true,
+      "slowSwing": true,
+      "bodyLookdown": true,
+      "audioObserved": true
+    },
+    "fullBattleProbe": {
+      "date": "2026-11-06",
+      "scope": "One ordinary-input match of the local combat adapter. Read-only boss state guides scripted aim, movement, guard and taps.",
+      "passed": true,
+      "checks": {
+        "ordinaryInputUsed": true,
+        "damageAttributedToSwordFrames": true,
+        "noResetDuringRun": true,
+        "orderedAppearances": true,
+        "emergencyCompleted": true,
+        "defeatRecorded": true,
+        "playerSurvived": true,
+        "defeatAnimationEntered": true
+      }
+    },
+    "armsAndBody": {
+      "status": "complete",
+      "originalExtractedSourceHashesMatch": true,
+      "UEVerified": true,
+      "UEVisualVerified": true
+    },
+    "rainContact": "Skeletal ellipsoid proxies and simplified ground collisions; locally adapted rain and wet-film rendering.",
+    "limits": [
+      "The 10-second clip is an excerpt, not the full battle probe.",
+      "Smoke, reflections, dense highlights and color remain work in progress.",
+      "No original-game-equivalent performance or complete behavior graph fidelity claimed."
+    ],
+    "sources": [
+      {
+        "file": "combat-full-battle-probe.json",
+        "sha256": "d2a4d7d4225b2346c8caaf61ec94fcfab3cd05bbb646acac749fcf78f6ef623a"
+      },
+      {
+        "file": "v_arms_body_source_audit.json",
+        "sha256": "86ce1a4cb60dded87f4fb4410fcd3d72702493db28e587e0a21673ef3964c35a"
+      },
+      {
+        "file": "dlss5-off-timeline.json",
+        "sha256": "a4af4dfb10f078f1eb8a94dfb11e23b44e48403011ffa6d3029780079f4118a1"
+      }
+    ]
   }
 }

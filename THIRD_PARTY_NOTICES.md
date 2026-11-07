@@ -156,3 +156,31 @@ Public JSON and CSV contain research summaries and measurement values, with
 source-report SHA256 hashes; no game packages, models, executable code or
 shader bytecode are redistributed. Media details appear in
 `articles/ds2-fireworks-assets/media-provenance.json`.
+
+
+### Rotating-tower replacement and Cyberpunk 2077 combat demo (2026-11-07)
+
+The article now uses `ue-fireworks-rotating-720p.mp4`, the existing 2026-11-03
+research recording with verified animation bindings for all three towers.
+It is copied byte-for-byte (1280×720, 240 frames, 8 seconds). The previous
+`ue-fireworks-1080p.mp4` is superseded and no longer embedded in the article:
+it used an earlier map without the corrected tower animation bindings.
+
+`cp2077-ue-combat-720p.mp4` is the existing 2026-11-07 `dlss5_off.mp4`
+research recording, copied byte-for-byte (1280×720, 300 frames, 10 seconds).
+It depicts Cyberpunk 2077 character, weapon and animation excerpts integrated
+into the local Unreal Engine / Death Stranding 2 research scene. Cyberpunk 2077
+imagery, characters, animation and source audio belong to CD PROJEKT RED and
+their respective rightsholders. This is a technical demonstration of a local
+adapter, not a complete REDengine port or an officially endorsed product.
+Audio is reconstructed from original-source cues using recorded combat events;
+it is not a live system-audio recording. Both clips use fixed-step capture,
+so neither is a realtime performance benchmark.
+
+`ue-fireworks-rotating-poster.png` and `cp2077-ue-combat-poster.png` are decoded
+frames from those videos. `ue-rotating-source-000.png`,
+`ue-rotating-source-120.png` and `cp2077-combat-source-090.png` are unchanged
+2032×722 viewport PNGs including black sidebars (active image 1284×722).
+The replacement publishes no source packages, model files, executable code,
+standalone audio assets or shader bytecode. Scope, checks and hashes are in
+`articles/ds2-fireworks-assets/media-provenance.json` and `research-data.json`.

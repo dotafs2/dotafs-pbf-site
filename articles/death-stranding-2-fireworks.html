@@ -5,7 +5,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="用四分钟看《死亡搁浅 2》花火的 UE 重建、关键算法与 GPU 数据，附 1080p 录像及后续雨滴、烟雾和《2077》移植计划。" />
+  <meta name="description" content="用四分钟看《死亡搁浅 2》花火的 UE 重建、关键算法与 GPU 数据，附扇叶转动录像及《2077》重锤、时停与雨水战斗演示。" />
   <meta name="theme-color" content="#1b1d1f" />
   <meta property="og:title" content="《死亡搁浅 2》的花火，怎么撑得住这么大的场面？ · DOTAFS" />
   <meta property="og:description" content="把花火拆开，看看粒子怎么动、怎么画，以及 GPU 时间到底花在哪里。附原画面、UE 重建录像与实验数据。" />
@@ -22,7 +22,7 @@
   <link rel="stylesheet" href="/site-language.css" />
   <link rel="stylesheet" href="/articles/death-stranding-2-fireworks.css" />
   <script src="/site-language.js" defer></script>
-  <script src="/articles/death-stranding-2-fireworks.js" defer></script>
+  <script src="/articles/death-stranding-2-fireworks.js?v=rotating240" defer></script>
 </head>
 <body class="next-site fx-page">
   <a class="fx-skip" href="#article">跳到正文</a>
@@ -33,7 +33,7 @@
   </div></header>
   <main class="fx-shell">
     <aside class="fx-contents" aria-label="文章目录"><p>DS2 / EFFECT STUDY</p><nav>
-      <a href="#footage">先看原画面与复刻</a><a href="#scene">把场景和喷口找出来</a><a href="#simulation">粒子怎么动</a><a href="#geometry">一颗火星怎么画</a><a href="#alpha">白图为什么不对</a><a href="#gpu">原游戏与 UE 的 GPU 数据</a><a href="#optimization">大场景的开销</a><a href="#next">接下来做《2077》</a><a href="#sources">数据与来源</a>
+      <a href="#footage">先看原画面与复刻</a><a href="#scene">把场景和喷口找出来</a><a href="#simulation">粒子怎么动</a><a href="#geometry">一颗火星怎么画</a><a href="#alpha">白图为什么不对</a><a href="#gpu">原游戏与 UE 的 GPU 数据</a><a href="#optimization">大场景的开销</a><a href="#next">《2077》当前进展</a><a href="#sources">数据与来源</a>
     </nav></aside>
     <article class="fx-article" id="article">
       <header>
@@ -51,18 +51,18 @@
           <figcaption>原游戏捕获图，保留原始像素。本地原视频未找到，可看<a href="https://www.bilibili.com/video/BV1yTQrBnEUa/" target="_blank" rel="noopener noreferrer">参考视频的 17–25 秒</a>。</figcaption>
         </figure>
         <figure>
-          <div class="fx-video-label"><span>UE 重建 / 2026.11.07</span><span>1920 × 1080 · 30 FPS 文件 · 12 秒</span></div>
-          <video id="ue-fireworks-video" controls playsinline preload="metadata" poster="/articles/ds2-fireworks-assets/ue-frame-000.png" width="1920" height="1080" aria-label="UE 中重建的死亡搁浅二花火，固定原捕获相机，十二秒无声录像">
-            <source src="/articles/ds2-fireworks-assets/ue-fireworks-1080p.mp4" type="video/mp4" />
-            您的浏览器不支持视频。<a href="/articles/ds2-fireworks-assets/ue-fireworks-1080p.mp4">下载录像</a>。
+          <div class="fx-video-label"><span>UE 重建 / 11.03 扇叶转动版</span><span>1280 × 720 · 30 FPS 文件 · 8 秒</span></div>
+          <video id="ue-fireworks-video" controls playsinline preload="metadata" poster="/articles/ds2-fireworks-assets/ue-fireworks-rotating-poster.png" width="1280" height="720" data-fps="30" data-frames="240" aria-label="UE 花火旋转塔扇叶转动，原捕获相机，八秒无声录像">
+            <source src="/articles/ds2-fireworks-assets/ue-fireworks-rotating-720p.mp4" type="video/mp4" />
+            您的浏览器不支持视频。<a href="/articles/ds2-fireworks-assets/ue-fireworks-rotating-720p.mp4">下载录像</a>。
           </video>
           <div class="fx-controls"><button type="button" data-frame-step="-1">前一帧</button><button type="button" data-frame-step="1">后一帧</button><label for="video-speed">速度 <select id="video-speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option></select></label><button type="button" id="video-reset">回到片头</button></div>
           <p id="video-status" class="fx-note" role="status" aria-live="polite">可慢放或逐帧查看火星。</p>
-          <figcaption>同相机参数，粒子与光照尚未完全对齐。固定步长采集的 360 帧无声演示，不代表实时帧率。</figcaption>
-          <div class="fx-links"><a href="/articles/ds2-fireworks-assets/ue-fireworks-1080p.mp4" download>下载 1080p 视频（约 80 MB）</a><a href="/articles/ds2-fireworks-assets/ue-frame-000.png" target="_blank" rel="noopener">第 0 帧 PNG</a><a href="/articles/ds2-fireworks-assets/ue-frame-180.png" target="_blank" rel="noopener">第 180 帧 PNG</a><a href="/articles/ds2-fireworks-assets/media-provenance.json">采集与编码记录</a></div>
+          <figcaption>原捕获相机；三座塔的扇叶随骨骼转动，路中央已加入重锤。240 帧固定步长演示，非实时帧率测试。</figcaption>
+          <div class="fx-links"><a href="/articles/ds2-fireworks-assets/ue-fireworks-rotating-720p.mp4" download>下载转动版视频（约 11 MB）</a><a href="/articles/ds2-fireworks-assets/ue-rotating-source-000.png" target="_blank" rel="noopener">第 0 帧 PNG</a><a href="/articles/ds2-fireworks-assets/ue-rotating-source-120.png" target="_blank" rel="noopener">第 120 帧 PNG</a><a href="/articles/ds2-fireworks-assets/media-provenance.json">采集与编码记录</a></div>
         </figure>
         <p>目前还缺烟雾等效果，之后会慢慢补齐。我对原版的雨、烟雾、地面反射和整体颜色也不太满意，想按自己的喜好重新调整。</p>
-        <p class="fx-note">PNG 逐帧采集后一次编码，不缩放、不补帧。H.264 有损，细节可看 PNG 原图。</p>
+        <p class="fx-note">沿用已验证的 720p 录像，无二次压缩或放大；PNG 保留原始视口像素（含两侧黑边）。</p>
       </section>
 
       <section id="scene">
@@ -91,17 +91,27 @@
         <details class="fx-detail"><summary>一条样本的 GPU 提交状态</summary><p>原游戏最后一个有效样本：generic/chiral 绘制 109/7 次，模拟 2/5 次，间接调用 8 次。这些调用数不等于活跃粒子数。</p></details>
         <h3 id="optimization">GPU 省下来了，帧率未必涨</h3>
         <p>UE 开启 HZB 遮挡剔除，用分层深度图排除被遮住的实例后，GPU 时间从 12.97 降到 8.13 ms，实际帧率仍约 65 FPS。另一轮把网格收集任务从 4 份拆成 16 份，才从 67.05 提到 70.28 FPS。瓶颈还在 CPU 和渲染任务调度。</p>
-        <p class="fx-note">剔除实验：UE 5.8.1、RTX 5080，主视图 1284×722、反射 768×432，10 个活跃效果；任务拆分是另一组配置。均非本文 1080p 录像的性能。</p>
+        <p class="fx-note">剔除实验：UE 5.8.1、RTX 5080，主视图 1284×722、反射 768×432，10 个活跃效果；任务拆分是另一组配置。均非本文两段录像的性能。</p>
       </section>
 
       <section id="next">
-        <h2>接下来做《2077》</h2>
-        <p>这段场景重建之后，我们打算继续反编译《赛博朋克 2077》，把选定场景和效果带进 UE，复刻雨滴等效果，再做自己的修改。</p>
+        <h2>《2077》的重锤，已经进来了</h2>
+        <p>我们已把重锤模型、阶段外观和战斗动画接进这片街道，加入 V 的手臂、武士刀连斩、格挡和 0.1 倍时停。行为、碰撞和特效由 UE 适配，尚未完整移植原版战斗。</p>
+        <figure>
+          <div class="fx-video-label"><span>《2077》× DS2 / UE 战斗预览 · 11.07</span><span>1280 × 720 · 30 FPS 文件 · 10 秒</span></div>
+          <video id="cp2077-combat-video" controls playsinline preload="metadata" poster="/articles/ds2-fireworks-assets/cp2077-ue-combat-poster.png" width="1280" height="720" aria-label="UE 中的重锤与武士刀战斗，包含雨水和零点一倍时停">
+            <source src="/articles/ds2-fireworks-assets/cp2077-ue-combat-720p.mp4" type="video/mp4" />
+            您的浏览器不支持视频。<a href="/articles/ds2-fireworks-assets/cp2077-ue-combat-720p.mp4">下载战斗演示</a>。
+          </video>
+          <figcaption>现有战斗片段，声音按事件从源音频重建。固定步长采集，不代表实时帧率。</figcaption>
+          <div class="fx-links"><a href="/articles/ds2-fireworks-assets/cp2077-ue-combat-720p.mp4" download>下载战斗视频（约 7 MB）</a><a href="/articles/ds2-fireworks-assets/cp2077-combat-source-090.png" target="_blank" rel="noopener">第 90 帧原始 PNG</a></div>
+        </figure>
+        <p>雨滴、装甲湿膜和地面反射也在同场景中调试。雨滴接触使用骨骼椭球和简化地面碰撞；碎亮点、烟雾和整体颜色还会继续改。</p>
       </section>
       <section id="sources">
         <h2>数据与来源</h2>
         <p class="fx-links"><a href="/articles/ds2-fireworks-assets/research-data.json">研究数据与验证范围</a><a href="/articles/ds2-fireworks-assets/original-gpu-samples.csv">GPU 采样 CSV</a><a href="/articles/ds2-fireworks-assets/media-provenance.json">采集记录</a></p>
-        <p class="fx-note">游戏画面归 KOJIMA PRODUCTIONS、Sony Interactive Entertainment 等权利人所有，用于技术说明。详见<a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
+        <p class="fx-note">游戏画面归 KOJIMA PRODUCTIONS、Sony Interactive Entertainment、CD PROJEKT RED 等权利人所有，用于技术说明。详见<a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
       </section>
       <footer><a href="/articles/reverse-engineering-reflections.html">← 系列开篇</a> · <a href="/home/#articles">返回文章目录</a></footer>
     </article>

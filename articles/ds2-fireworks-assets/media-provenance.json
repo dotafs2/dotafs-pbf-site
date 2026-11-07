@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "date": "2026-11-07",
   "originalVideo": {
     "localFileFound": false,
@@ -17,33 +17,6 @@
     ],
     "kind": "Original-game capture preview stored in research evidence, not replay output",
     "sha256": "36d2b6f1667225d53465d49c8031307da3c7a2774e1af8223a27a68ad1f57f09"
-  },
-  "ue": {
-    "map": "/Game/DS2Fireworks/Maps/UEDPIE_0_DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2.DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2",
-    "captureDate": "2026-11-07",
-    "dimensions": [
-      1920,
-      1080
-    ],
-    "frames": 360,
-    "fps": 30,
-    "durationSeconds": 12,
-    "worldSpanSeconds": 11.966667290776968,
-    "uniqueFrames": 360,
-    "worldStepExceptions": [],
-    "method": "New UE PIE normal-viewport Draw+ReadPixels; fixed engine time step 1/30 s; temporal history retained; PNG masters. Extra draw/readback excluded from performance measurement.",
-    "audio": false,
-    "limits": [
-      "No original DS2 game video.",
-      "No live FPS claim.",
-      "No original RNG equivalence.",
-      "No audio recorded."
-    ],
-    "protectedSourceFilesUnchanged": {
-      "DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2.umap": true,
-      "DS1Scene.uproject": true
-    },
-    "rawCaptureReportSHA256": "3acb70e8704803d3ca9c5d2545da6b7155c2fde85514fef24c8b45008cb368e9"
   },
   "images": {
     "original-capture-61699.png": {
@@ -109,33 +82,230 @@
         1080
       ],
       "processing": "Byte-for-byte copied. Alpha RGBA is displayed over black; no resampling of source files."
+    },
+    "ue-fireworks-rotating-poster.png": {
+      "sha256": "a91d333dd41e607a78746a570fc8472967b50faffb0e4428faa73db63cb5b2a8",
+      "dimensions": [
+        1280,
+        720
+      ],
+      "processing": "Decoded video frame for poster only."
+    },
+    "cp2077-ue-combat-poster.png": {
+      "sha256": "e934741b1082ca8aecab0551387b01bedde559011e257518c6b638c05fcf1b90",
+      "dimensions": [
+        1280,
+        720
+      ],
+      "processing": "Decoded video frame for poster only."
+    },
+    "ue-rotating-source-000.png": {
+      "sha256": "aae33a41f4ee19a891d6947ae46beda5d041d34115b044e2debb123cf9ed0a2f",
+      "dimensions": [
+        2032,
+        722
+      ],
+      "processing": "Unchanged source viewport PNG, including black sidebars; active image is 1284x722."
+    },
+    "ue-rotating-source-120.png": {
+      "sha256": "dc1b6dad0561b4b38872f26cc8070addc251e223d31b832edf5df9d125849533",
+      "dimensions": [
+        2032,
+        722
+      ],
+      "processing": "Unchanged source viewport PNG, including black sidebars; active image is 1284x722."
+    },
+    "cp2077-combat-source-090.png": {
+      "sha256": "d3eb77ca1c42cd0feb755afa22b289e2cad5269cb90249af6054f1232ebd481b",
+      "dimensions": [
+        2032,
+        722
+      ],
+      "processing": "Unchanged source viewport PNG, including black sidebars; active image is 1284x722."
     }
   },
-  "videoEncoding": {
-    "codec": "H.264 / libx264",
-    "pixelFormat": "yuv420p",
-    "crf": 14,
-    "preset": "slow",
-    "fps": 30,
-    "resizing": false,
-    "interpolation": false,
-    "addedSharpening": false,
-    "audio": false,
-    "lossless": false,
-    "losslessReference": "Unchanged source PNG frames linked from article",
-    "bytes": 79853037,
-    "sha256": "a046fd67979baa4b9aa69319037e7b5ee51e669f677955af826a64bdf23474eb",
-    "decodedFramesVerified": 360,
-    "inputDecode": "Pillow loads PNG to RGB24; raw pixels piped to ffmpeg 7.1. No resize or compositing.",
-    "sourceFrameHashesVerified": 360,
-    "color": {
-      "matrix": "BT.709",
-      "primaries": "BT.709",
-      "transfer": "sRGB / IEC 61966-2-1",
-      "range": "limited (video)",
-      "sourceInterpretation": "8-bit SDR sRGB viewport PNG"
+  "updated": "2026-11-07",
+  "supersededUECapture": {
+    "capture": {
+      "map": "/Game/DS2Fireworks/Maps/UEDPIE_0_DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2.DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2",
+      "captureDate": "2026-11-07",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "frames": 360,
+      "fps": 30,
+      "durationSeconds": 12,
+      "worldSpanSeconds": 11.966667290776968,
+      "uniqueFrames": 360,
+      "worldStepExceptions": [],
+      "method": "New UE PIE normal-viewport Draw+ReadPixels; fixed engine time step 1/30 s; temporal history retained; PNG masters. Extra draw/readback excluded from performance measurement.",
+      "audio": false,
+      "limits": [
+        "No original DS2 game video.",
+        "No live FPS claim.",
+        "No original RNG equivalence.",
+        "No audio recorded."
+      ],
+      "protectedSourceFilesUnchanged": {
+        "DS2_SourceModels_Capture61699_HomeGroundStripReview20261102V2.umap": true,
+        "DS1Scene.uproject": true
+      },
+      "rawCaptureReportSHA256": "3acb70e8704803d3ca9c5d2545da6b7155c2fde85514fef24c8b45008cb368e9"
     },
-    "colorMetadataVerifiedInBitstream": true,
-    "metadataPass": "Lossless stream copy to set explicit H.264 VUI color tags; no second image encoding."
+    "encoding": {
+      "codec": "H.264 / libx264",
+      "pixelFormat": "yuv420p",
+      "crf": 14,
+      "preset": "slow",
+      "fps": 30,
+      "resizing": false,
+      "interpolation": false,
+      "addedSharpening": false,
+      "audio": false,
+      "lossless": false,
+      "losslessReference": "Unchanged source PNG frames linked from article",
+      "bytes": 79853037,
+      "sha256": "a046fd67979baa4b9aa69319037e7b5ee51e669f677955af826a64bdf23474eb",
+      "decodedFramesVerified": 360,
+      "inputDecode": "Pillow loads PNG to RGB24; raw pixels piped to ffmpeg 7.1. No resize or compositing.",
+      "sourceFrameHashesVerified": 360,
+      "color": {
+        "matrix": "BT.709",
+        "primaries": "BT.709",
+        "transfer": "sRGB / IEC 61966-2-1",
+        "range": "limited (video)",
+        "sourceInterpretation": "8-bit SDR sRGB viewport PNG"
+      },
+      "colorMetadataVerifiedInBitstream": true,
+      "metadataPass": "Lossless stream copy to set explicit H.264 VUI color tags; no second image encoding."
+    },
+    "video": "ue-fireworks-1080p.mp4",
+    "reason": "Earlier map recording omitted the corrected tower animation bindings. Replaced in the article with the verified rotating-tower clip.",
+    "imageFiles": [
+      "ue-frame-000.png",
+      "ue-frame-180.png",
+      "ue-frame-359.png"
+    ]
+  },
+  "ue": {
+    "video": "ue-fireworks-rotating-720p.mp4",
+    "captureDate": "2026-11-03",
+    "dimensions": [
+      1280,
+      720
+    ],
+    "fps": 30,
+    "frames": 240,
+    "durationSeconds": 8,
+    "sha256": "02600143923489096617cd42a59d7cd8d5b3dc4ca25da49b91d760f98ce62967",
+    "bytes": 11004164,
+    "decodeVerifiedFrames": 240,
+    "distinctDecodedFrames": 240,
+    "processing": "Existing validated video copied byte-for-byte; no additional encoding or upscaling.",
+    "sourceViewport": [
+      2032,
+      722
+    ],
+    "originalEncodingCrop": [
+      374,
+      0,
+      1284,
+      722
+    ],
+    "originalEncodingScaleTo": [
+      1280,
+      720
+    ],
+    "originalEncoding": "H.264 baseline, CRF18, maxrate10M, faststart, no audio.",
+    "simulation": "Fixed 120 Hz, one frame recorded per four simulation steps; not a realtime benchmark.",
+    "cameraSourceFrame": 61699,
+    "cameraUnchanged": true,
+    "animatedTowerChangedBones": {
+      "DS2_CorrectTower_Capture0": 33,
+      "DS2_CorrectTower_Capture1": 10,
+      "DS2_CorrectTower_Capture2": 33
+    },
+    "motionRecheck": {
+      "DS2_CorrectTower_Capture0": {
+        "changedBones": 33,
+        "maxEndpointRotationDegrees": 110.09467124627109
+      },
+      "DS2_CorrectTower_Capture1": {
+        "changedBones": 10,
+        "maxEndpointRotationDegrees": 124.95754247902035
+      },
+      "DS2_CorrectTower_Capture2": {
+        "changedBones": 33,
+        "maxEndpointRotationDegrees": 110.08475096128694
+      }
+    },
+    "bindingRepair": "Map-local LevelSequence root-object overrides; shared sequences preserved.",
+    "sources": [
+      {
+        "file": "preview-validation.json",
+        "sha256": "218d67daff946340f4b166da0c1f450dc25c3b3e472ffef1f9f0f5936a31139e"
+      },
+      {
+        "file": "rain-quality-recording.json",
+        "sha256": "4f130095e53c37e1f16091f3e657a679c2b248a9ee549155c2e8f089b763ad60"
+      }
+    ]
+  },
+  "cp2077": {
+    "video": "cp2077-ue-combat-720p.mp4",
+    "captureDate": "2026-11-07",
+    "dimensions": [
+      1280,
+      720
+    ],
+    "fps": 30,
+    "frames": 300,
+    "durationSeconds": 10,
+    "sha256": "d426b3972688430dddb255566e89a603307ca62ad1d6b07d1591b191c488a260",
+    "bytes": 6941960,
+    "decodeVerifiedFrames": 300,
+    "distinctDecodedFrames": 300,
+    "processing": "Existing dlss5_off.mp4 copied byte-for-byte; no additional encoding or upscaling.",
+    "sourceViewport": [
+      2032,
+      722
+    ],
+    "originalEncodingCrop": {
+      "x": 374,
+      "y": 0,
+      "width": 1284,
+      "height": 722
+    },
+    "originalEncoding": "H.264 constrained baseline / level3.1 / yuv420p /1280x720/30fps, AAC192kbps/48kHz/stereo, faststart",
+    "audioScope": "Event-synchronized original-source audio reconstruction; not live engine/OS loopback audio capture.",
+    "liveLoopback": false,
+    "communityEnhancementEnabled": false,
+    "simulation": "Fixed 30 Hz presentation; selected segment changes world time to 0.1x. Not a realtime benchmark.",
+    "captureChecks": {
+      "monotonicEngineFrames": true,
+      "fixedWorldSteps": true,
+      "fixedViewportSize": true,
+      "threeTapCombo": true,
+      "strongRelease": true,
+      "guardCycle": true,
+      "slowOnAndOff": true,
+      "globalTenth": true,
+      "rainUsesSlowWorldClock": true,
+      "slowSwing": true,
+      "bodyLookdown": true,
+      "audioObserved": true
+    },
+    "slowWorldSecondsPerPresentationSecond": 0.100000009406358,
+    "sources": [
+      {
+        "file": "dlss5_off.provenance.json",
+        "sha256": "81f2b02f91d3d5aec3d22feffe7bf072ef97a421e0d887d0dfc6452c043ef1d9"
+      },
+      {
+        "file": "dlss5-off-timeline.json",
+        "sha256": "a4af4dfb10f078f1eb8a94dfb11e23b44e48403011ffa6d3029780079f4118a1"
+      }
+    ]
   }
 }
