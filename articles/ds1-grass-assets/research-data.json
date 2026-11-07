@@ -1,0 +1,168 @@
+{
+  "article": "death-stranding-1-grass.html",
+  "published": "2026-11-07",
+  "target": {
+    "game": "DEATH STRANDING",
+    "edition": "original PC 1.0.8, not Director’s Cut or DS2",
+    "frame": 35116,
+    "capture_date": "2026-10-24"
+  },
+  "source_reports": [
+    {
+      "handoff_relative_path": "docs/CURRENT_STATE.md",
+      "sha256": "c8f8a4ba7d75ea0a7e365c353251b20930c777ffb958aba3fad604358c373cb8",
+      "bytes": 6823
+    },
+    {
+      "handoff_relative_path": "docs/PLACEMENT_STAGE_20261026.md",
+      "sha256": "3a77b1669c2473359ab8a8a69e8a79be11fe97b0198dd3a6d45dd60583751463",
+      "bytes": 7965
+    },
+    {
+      "handoff_relative_path": "project/web/evidence.json",
+      "sha256": "a7718ac7f1196e04da132a684a03d17752696f0420f77458209222b82eb885dc",
+      "bytes": 2191
+    },
+    {
+      "handoff_relative_path": "project/web/evidence/moss-recovered.hlsl",
+      "sha256": "333e97a5b425bba017a59de86217c2d5bc6e2fbd283a5fd58404e441ed6a01a8",
+      "bytes": 2874
+    },
+    {
+      "handoff_relative_path": "project/web/app.js",
+      "sha256": "6d30cbd70617ce676c4caf57d449765e9c60ed9f96efd592dd31873d7a257d84",
+      "bytes": 8196
+    },
+    {
+      "handoff_relative_path": "project/web/renderer.js",
+      "sha256": "cb0ac2bbc3367a0630137cc9b1c59d38442d81453cd2d2ec411b843998744e73",
+      "bytes": 10540
+    },
+    {
+      "handoff_relative_path": "local-status/placement-stage-20261026/audit.json",
+      "sha256": "66e4f919141f740e9f0f051f8fea9ef641053830398a96e8513d22de07cc4393",
+      "bytes": 2768
+    }
+  ],
+  "original_selected_draws": [
+    {
+      "depth_event": 8179,
+      "material_event": 9165,
+      "index_count": 13956,
+      "triangles_per_instance": 4652,
+      "instance_count": 3,
+      "overlay": "Coverage of the large moss patch underfoot verified."
+    },
+    {
+      "depth_event": 8185,
+      "material_event": 9172,
+      "index_count": 8421,
+      "triangles_per_instance": 2807,
+      "instance_count": 1,
+      "overlay": "Empty material overlay; visible contribution not established."
+    }
+  ],
+  "original_submission_totals": {
+    "scope": "Only the four selected draw events, not the whole frame or all vegetation.",
+    "draw_calls_two_passes": 4,
+    "instances_per_pass": 4,
+    "triangles_per_pass": 16763,
+    "triangle_submissions_two_passes": 33526
+  },
+  "pipeline_state": {
+    "original_and_reconstruction": {
+      "topology": "triangle list",
+      "depth_prepass": {
+        "comparison": "GREATER",
+        "write_depth": true,
+        "alpha_test": "saturate(1-alpha) < 0.5"
+      },
+      "material_pass": {
+        "comparison": "EQUAL",
+        "write_depth": false
+      }
+    },
+    "original_selected_draws": "No hull/domain/geometry shader bound.",
+    "alpha_texture": {
+      "format": "BC4_UNORM",
+      "width": 256,
+      "height": 128,
+      "resource_id": 801690,
+      "uv": "flip Y",
+      "sampling": "SampleBias with global mip bias"
+    },
+    "geometry_shrink": "saturate((viewZ+8)*(-1/14))*0.1 along negative normalized normal; UV-conditioned for part of the mesh. Shading normal is separately adjusted. No triangle-count reduction."
+  },
+  "placement_analysis": {
+    "status": "Static interpretation of captured package bytecode, not matched to the four moss instances.",
+    "threads_per_group": [
+      64,
+      1,
+      1
+    ],
+    "input": "Already generated candidate positions, terrain normals and raw PointID bits.",
+    "algorithm": "xorshift32 with shifts 13,17,5; perturbs rotation, uniform scale and elevation; builds instance transforms and packed bounds.",
+    "output_bytes_per_instance": 64,
+    "not_in_this_stage": [
+      "mesh vertex/index generation",
+      "density sampling",
+      "candidate rejection",
+      "frustum/occlusion culling",
+      "LOD selection"
+    ]
+  },
+  "culling_evidence": {
+    "observed": "Frame shader reads Instances/Bounds/Lods/Setups/Matrices/Streaming/OcclusionTexture and writes FadeStates/CountersAndVisibleInstances with wave operations.",
+    "unresolved": "The four moss instances are not individually traced through this path. Web CPU hierarchy and A/B LOD controls are experiments, not recovered original HISM or an established LOD chain."
+  },
+  "webgl_recheck": {
+    "checked": "2026-11-07",
+    "settings": {
+      "camera": "capture",
+      "mesh": "all",
+      "display": "material",
+      "alphaCutoff": 0.5,
+      "exposure": 2,
+      "depthPrepass": true,
+      "shrink": true,
+      "lod": false
+    },
+    "individual": {
+      "modelInstances": 4,
+      "submittedInstances": 4,
+      "culledInstances": 0,
+      "geometryTriangles": 16763,
+      "triangleInvocations": 33526,
+      "drawCalls": 8,
+      "groups": 4,
+      "cullTests": 0,
+      "rejectedNodes": 0,
+      "lodSwitched": 0,
+      "webglError": 0,
+      "camera": "capture"
+    },
+    "instanced": {
+      "modelInstances": 4,
+      "submittedInstances": 4,
+      "culledInstances": 0,
+      "geometryTriangles": 16763,
+      "triangleInvocations": 33526,
+      "drawCalls": 4,
+      "groups": 2,
+      "cullTests": 0,
+      "rejectedNodes": 0,
+      "lodSwitched": 0,
+      "webglError": 0,
+      "camera": "capture"
+    }
+  },
+  "comparison_result": {
+    "draw_call_reduction_percent": 50,
+    "geometry_reduction_percent": 0,
+    "gpu_time_ms": null,
+    "fps": null,
+    "interpretation": "Fewer submissions with the same geometry, not a measured doubling of performance."
+  },
+  "visual_scope": "Original camera, selected original meshes and four transforms. Simplified lighting at exposure 2; no terrain, rocks or character. No full material or per-pixel visual equivalence claim.",
+  "redistribution": "Analyst summaries and media only. No raw game models, texture resources, bytecode or executable code."
+}

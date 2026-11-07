@@ -184,3 +184,27 @@ frames from those videos. `ue-rotating-source-000.png`,
 The replacement publishes no source packages, model files, executable code,
 standalone audio assets or shader bytecode. Scope, checks and hashes are in
 `articles/ds2-fireworks-assets/media-provenance.json` and `research-data.json`.
+
+## Death Stranding 1 grass / moss research note (2026-11-07)
+
+`articles/death-stranding-1-grass.html` contains an original-game frame and
+limited still images of the author's local WebGL research reconstruction.
+DEATH STRANDING imagery and underlying assets remain the property of their
+respective rightsholders, including KOJIMA PRODUCTIONS. These excerpts support
+technical commentary; no open-content license or endorsement is asserted.
+
+- `articles/ds1-grass-assets/original-frame-35116.png`: 1600×900 original-game
+  capture preview, copied byte-for-byte from the DS1 PC 1.0.8 research handoff.
+- `reconstruction-captured-camera.png`: direct lossless canvas export of the
+  reconstructed moss at the captured camera, 3200×1800. Only selected moss instances are drawn,
+  with simplified lighting and a display exposure multiplier of 2.
+- `cards-before-alpha.jpg` and `cards-after-alpha.jpg`: 850×450 browser screenshot
+  regions showing the same captured mesh and camera before/after alpha testing.
+  Diagnostic colors are not the original game's lighting.
+
+The two main PNGs preserve their source pixels. Diagnostic browser JPEGs are
+retained without resizing or recompression; no AI enhancement is used. No original grass
+video was found in this handoff. Published JSON files contain analyst summaries,
+browser counters and source-report hashes; no game models, textures, executable
+code or shader bytecode are redistributed. See the adjacent `research-data.json`
+and `media-provenance.json` for scope and provenance.

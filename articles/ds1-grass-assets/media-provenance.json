@@ -1,0 +1,76 @@
+{
+  "recorded": "2026-11-07",
+  "media": [
+    {
+      "file": "original-frame-35116.png",
+      "format": "PNG",
+      "width": 1600,
+      "height": 900,
+      "bytes": 2920047,
+      "sha256": "acb88da57be8412d40db8f728b0a0ed45a19ec6884bdd0a459d9a438f6536e3e",
+      "source": "project/web/assets/reference.png",
+      "method": "Byte-for-byte copy of original-game capture preview.",
+      "settings": {
+        "game_frame": 35116
+      }
+    },
+    {
+      "file": "reconstruction-captured-camera.png",
+      "format": "PNG",
+      "width": 3200,
+      "height": 1800,
+      "bytes": 3428203,
+      "sha256": "b6e3935ed0dc9bb26bd289e8a747deb573ae57b4abfe6c4304c176b0fb5e0a21",
+      "source": "Local WebGL research viewer",
+      "method": "Direct canvas.toBlob PNG export at native 3200x1800 drawing-buffer size, no resampling; copied byte-for-byte from browser download. Local export button added by a loopback-only HTML wrapper without modifying research renderer.",
+      "settings": {
+        "camera": "capture",
+        "mesh": "all",
+        "display": "material",
+        "alphaCutoff": 0.5,
+        "exposure": 2,
+        "depthPrepass": true,
+        "shrink": true,
+        "lod": false
+      }
+    },
+    {
+      "file": "cards-before-alpha.jpg",
+      "format": "JPEG",
+      "width": 850,
+      "height": 450,
+      "bytes": 40263,
+      "sha256": "8042da64af571c805d17ad01ed56c9ee5faab225d561676ddfe59622a88f6eb7",
+      "source": "Local WebGL research viewer",
+      "method": "Browser screenshot region, 850x450; same camera as after-alpha view. JPEG bytes retained unchanged.",
+      "settings": {
+        "mode": "single mesh A",
+        "display": "complete cards",
+        "camera": "default orbit",
+        "exposure": 2,
+        "shrink": true
+      }
+    },
+    {
+      "file": "cards-after-alpha.jpg",
+      "format": "JPEG",
+      "width": 850,
+      "height": 450,
+      "bytes": 82167,
+      "sha256": "59cc6c04e17c1e1f69c3a2ab3c026d2e195d77bb56ac9f1e61d045d028eeb69b",
+      "source": "Local WebGL research viewer",
+      "method": "Browser screenshot region, 850x450; same camera as before-alpha view. JPEG bytes retained unchanged.",
+      "settings": {
+        "mode": "single mesh A",
+        "display": "alpha silhouette",
+        "camera": "default orbit",
+        "alphaCutoff": 0.5,
+        "exposure": 2,
+        "shrink": true
+      }
+    }
+  ],
+  "handling": "Original and reconstructed PNGs preserve source pixels. Diagnostic JPEGs are lossy browser screenshot outputs; no resizing, recompression or AI enhancement.",
+  "video": "No original grass video found in this research handoff. This article publishes still images.",
+  "rights": "Game imagery and underlying assets remain with their respective rightsholders, including KOJIMA PRODUCTIONS. Limited excerpts for technical commentary."
+}

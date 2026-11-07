@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<!-- Short implementation study requested by the author: original/rebuilt views,
+     verified algorithms and scoped measurements, without a full paper-review template. -->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="《死亡搁浅 1》草地里的苔藓：原版与 WebGL 复刻效果，薄片 Alpha 裁切、距离收缩、深度预处理，以及 8 次到 4 次的实例批处理对照。" />
+  <meta name="theme-color" content="#1b1d1f" />
+  <meta property="og:title" content="《死亡搁浅 1》的草，原来是这样画出来的 · DOTAFS" />
+  <meta property="og:description" content="拆开脚下的苔藓，看薄片怎样变成枝叶，以及批处理究竟省下了什么。" />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://dotafs.com/articles/ds1-grass-assets/original-frame-35116.png" />
+  <meta property="article:published_time" content="2026-11-07" />
+  <link rel="canonical" href="https://dotafs.com/articles/death-stranding-1-grass.html" />
+  <title>《死亡搁浅 1》的草，原来是这样画出来的 · DOTAFS</title>
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/next-theme.css" />
+  <link rel="stylesheet" href="/site-language.css" />
+  <link rel="stylesheet" href="/articles/death-stranding-2-fireworks.css" />
+  <script src="/site-language.js" defer></script>
+</head>
+<body class="next-site fx-page">
+  <a class="fx-skip" href="#article">跳到正文</a>
+  <div class="next-headband" aria-hidden="true"></div>
+  <header class="next-header"><div class="next-header-inner">
+    <div class="next-brand-column"><a class="next-brand" href="/home/">DOTAFS</a><p>Personal learning notes</p></div>
+    <div class="next-header-content"><nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/">PBF Demo</a><a href="#sources">资料</a></nav></div>
+  </div></header>
+  <main class="fx-shell">
+    <aside class="fx-contents" aria-label="文章目录"><p>DS1 / GRASS STUDY</p><nav><a href="#views">原版与复刻</a><a href="#algorithm">枝叶是怎么画的</a><a href="#placement">怎样铺满地面</a><a href="#measurements">优化数据与 GPU 状态</a><a href="#sources">数据与来源</a></nav></aside>
+    <article class="fx-article" id="article">
+      <header>
+        <p class="fx-kicker">游戏效果解析 · DEATH STRANDING / PC 1.0.8</p>
+        <h1>《死亡搁浅 1》的草，<br />原来是这样画出来的</h1>
+        <p>这次拆的是脚下那层细密的苔藓。没想到，把一帧抓出来才看清：薄片负责撑起形状，贴图剪出枝叶，实例批处理把重复提交压下来。</p>
+        <p class="fx-meta">DOTAFS · <time datetime="2026-11-07">2026 年 11 月 7 日</time> · Graphics Systems · 约 3 分钟</p>
+      </header>
+
+      <section id="views">
+        <h2>先看原版与复刻</h2>
+        <figure>
+          <div class="fx-video-label"><span>原游戏 / FRAME 35116</span><span>1600 × 900 PNG</span></div>
+          <a href="/articles/ds1-grass-assets/original-frame-35116.png" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/original-frame-35116.png" width="1600" height="900" fetchpriority="high" alt="死亡搁浅一原游戏捕获画面：Sam 脚下及岩石之间覆盖着细密的绿色苔藓。" /></a>
+          <figcaption>原版 PC 1.0.8，2026 年 10 月 24 日捕获。点击看原图，保留原始像素。</figcaption>
+        </figure>
+        <figure>
+          <div class="fx-video-label"><span>我们的复刻 / WEBGL 研究版</span><span>3200 × 1800 PNG</span></div>
+          <a href="/articles/ds1-grass-assets/reconstruction-captured-camera.png" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/reconstruction-captured-camera.png" width="3200" height="1800" loading="lazy" alt="原相机下重建的四个苔藓实例，保留原始地被轮廓，背景中未加入人物、岩石和地形。" /></a>
+          <figcaption>原网格、原摆放、原相机；只重建选中的苔藓，未加入人物、岩石和地形。光照简化，显示倍率 2×，颜色尚未对齐原版。</figcaption>
+        </figure>
+        <p class="fx-note">这份交接资料没有草地视频，先展示静帧。上面两张均保留 PNG 原像素，复刻图直接导出渲染缓冲，无放大或有损压缩。</p>
+      </section>
+
+      <section id="algorithm">
+        <h2>枝叶细节，主要靠“剪”</h2>
+        <p>最先要弄清的是：这些细叶到底有多少几何？捕获的输入已经是三角薄片，选中的绘制没有几何着色器或曲面细分。真正把轮廓剪出来的是一张 <strong>256×128 的 BC4 遮罩</strong>：Alpha 严格大于 0.5 才保留。小叶片不必各自沿边缘建模，但薄片覆盖的像素仍有采样和裁切成本。</p>
+        <details class="fx-detail"><summary>看薄片裁切前后</summary>
+          <div class="fx-pair">
+            <figure><a href="/articles/ds1-grass-assets/cards-before-alpha.jpg" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/cards-before-alpha.jpg" width="850" height="450" loading="lazy" alt="捕获网格 A 关闭 Alpha 裁切后的完整三角薄片。" /></a><figcaption>完整薄片，4,652 个三角形。</figcaption></figure>
+            <figure><a href="/articles/ds1-grass-assets/cards-after-alpha.jpg" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/cards-after-alpha.jpg" width="850" height="450" loading="lazy" alt="同一网格和视角启用 Alpha 裁切后出现细密枝叶轮廓。" /></a><figcaption>同一网格裁切后，三角形数不变。</figcaption></figure>
+          </div>
+        </details>
+        <p>离相机更远时，顶点沿法线向内收拢，同时调整着色法线。当前执行版本的收缩量是 <code>clamp((−viewZ−8)/14, 0, 1) × 0.1</code>，部分顶点还受 UV 标记控制。它改变覆盖形状，<strong>不会直接减少三角形数</strong>。</p>
+        <p>薄片互相遮挡怎么办？原版先做 Alpha 深度预处理，再让材质阶段只通过深度相等的表面，减少被挡住区域的材质计算。代价是几何要提交两遍，收益取决于遮挡量和材质开销。</p>
+      </section>
+
+      <section id="placement">
+        <h2>铺满地面，靠实例与筛选</h2>
+        <p>选中的两套网格共用了 4 个实例。原生代码里还找到一个每组 64 线程的布置计算程序：对已有候选点，用 xorshift 随机数扰动旋转、尺度和高度，再输出实例矩阵与压缩包围盒。它负责摆放，不负责长出薄片；候选点的完整生成链还没追完。</p>
+        <p>帧内另有 GPU 筛选程序读取包围盒、LOD 和遮挡纹理，输出可见实例列表。大面积地被因此具备先筛选、再分组提交的机制，但这 4 个实例尚未逐一接上该链路，不能把网页实验当成原版整套剔除系统。</p>
+      </section>
+
+      <section id="measurements">
+        <h2>批处理省了多少？</h2>
+        <p>在复刻中切换逐实例提交和按网格批处理，保留相同模型、相机与两阶段绘制：</p>
+        <div class="fx-table-wrap" tabindex="0" role="region" aria-label="原版选定苔藓事件与 WebGL 复刻提交量对照，可横向滚动"><table class="fx-table"><thead><tr><th>提交量</th><th>原版选定事件</th><th>复刻：逐实例</th><th>复刻：批处理</th></tr></thead><tbody>
+          <tr><td>实例数</td><td class="fx-number">4</td><td class="fx-number">4</td><td class="fx-number">4</td></tr>
+          <tr><td>三角形 / 阶段</td><td class="fx-number">16,763</td><td class="fx-number">16,763</td><td class="fx-number">16,763</td></tr>
+          <tr><td>绘制调用 / 两阶段</td><td class="fx-number">4</td><td class="fx-number">8</td><td class="fx-number">4</td></tr>
+        </tbody></table></div>
+        <p><strong>绘制调用减少 50%，几何提交量不变。</strong>两阶段合计仍是 33,526 个三角形；省下的是重复提交。这里没有同条件的 GPU 毫秒或帧率对照，不能写成“快了一倍”。</p>
+        <details class="fx-detail"><summary>原版与复刻的 GPU 状态</summary><p>原版深度事件 8179、8185 对应材质事件 9165、9172。两者复用网格：深度阶段 <code>GREATER + 写深度</code>，材质阶段 <code>EQUAL + 不写深度</code>；WebGL 复刻保持相同设置。A 为 4,652 三角形 × 3 实例，B 为 2,807 × 1。B 的原版覆盖图为空，尚未确认可见贡献；表中统计的是提交量，不是整帧草地开销。11 月 7 日复查，两种提交方式均无 WebGL 错误。</p></details>
+      </section>
+
+      <section id="sources">
+        <h2>数据与来源</h2>
+        <p class="fx-links"><a href="/articles/ds1-grass-assets/research-data.json">捕获事件、算法依据与实测记录</a><a href="/articles/ds1-grass-assets/media-provenance.json">图片来源与校验值</a></p>
+        <p class="fx-note">依据本地 DS1 苔藓研究交接记录与本次浏览器复查。游戏画面及底层素材归 KOJIMA PRODUCTIONS 等相应权利人所有，仅作技术说明，见<a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
+      </section>
+      <footer><a href="/articles/death-stranding-2-fireworks.html">接着看：《死亡搁浅 2》的花火 →</a> · <a href="/home/#articles">返回文章目录</a></footer>
+    </article>
+  </main>
+  <footer class="next-footer"><p>© 2026 DOTAFS</p><p>界面结构基于 <a href="https://theme-next.js.org/" target="_blank" rel="noreferrer">NexT · Gemini</a></p></footer>
+</body>
+</html>
