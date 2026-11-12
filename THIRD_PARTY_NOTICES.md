@@ -224,3 +224,17 @@ material export values and historical audit conclusions, with source hashes
 in `technical-update-20261112.json`. It does not publish the supplied FBX/OBJ,
 standalone textures, shader graphs, source code, internal archive, or full ZIP.
 No new game capture or engine experiment was performed for this article update.
+
+
+### Additional moss scene screenshots (2026-11-12)
+
+`articles/ds1-grass-assets/ue-scene-character-scale.jpg` and
+`articles/ds1-grass-assets/ue-scene-rock-coverage.jpg` are author-supplied UE
+editor screenshots, reproduced byte-for-byte at 1920×1003 and 1920×996.
+They retain the editor UI and source JPEG compression, with no cropping,
+color adjustment or synthesis. They illustrate scene-scale coverage and
+rock/vegetation boundaries, not a controlled before/after experiment or a
+verified V2 material configuration. Game imagery and underlying asset rights
+remain with their respective owners, including KOJIMA PRODUCTIONS; these are
+limited excerpts for technical commentary. Source filenames, dimensions and
+SHA256 values are recorded in the adjacent `media-provenance.json`.

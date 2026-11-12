@@ -79,9 +79,31 @@
       "source": "Author-provided MossTechnicalNotes_20261111.zip / MossSingleClump_20261111/preview.png",
       "method": "Byte-for-byte screenshot copy, verified against supplied SHA256.json. No crop, resize, color correction or synthesis.",
       "scope": "V2 single-clump geometry/base-color/alpha preview; not full UE lighting. Controls shown are part of the still image."
+    },
+    {
+      "file": "ue-scene-character-scale.jpg",
+      "format": "JPEG",
+      "width": 1920,
+      "height": 1003,
+      "bytes": 983385,
+      "sha256": "1dca0a3a771325ef5a65d5fad8ea83fd364afa9846398afd709e4708808fe5f3",
+      "source": "Author-supplied image attachment: 62eb74e5d468723be9881dabb34ec50.jpg",
+      "method": "Byte-for-byte copy of supplied JPEG; no crop, resizing, recompression, color correction or synthesis. Editor UI retained.",
+      "scope": "UE editor scene view with character, sloped moss cover and exposed rocks. Capture date, exact material version and render settings not independently established; not a controlled A/B comparison."
+    },
+    {
+      "file": "ue-scene-rock-coverage.jpg",
+      "format": "JPEG",
+      "width": 1920,
+      "height": 996,
+      "bytes": 1007689,
+      "sha256": "94b0cc3160dc903e2b41e460776ab110e21c84f36022baf915d3d460293827bc",
+      "source": "Author-supplied image attachment: dc5ca706b040c5d3b3633a02c653771.jpg",
+      "method": "Byte-for-byte copy of supplied JPEG; no crop, resizing, recompression, color correction or synthesis. Editor UI retained.",
+      "scope": "UE editor low-angle view of dense moss cover and exposed rock boundaries. Capture date, exact material version and render settings not independently established; not a controlled A/B comparison."
     }
   ],
-  "handling": "Original and reconstructed PNGs preserve source pixels. Diagnostic JPEGs are lossy browser screenshot outputs; no resizing, recompression or AI enhancement.",
+  "handling": "PNG and JPEG sources are retained byte-for-byte. JPEG source compression is preserved; no resizing, recompression or AI enhancement.",
   "video": "No original grass video found in this research handoff. This article publishes still images.",
   "rights": "Game imagery and underlying assets remain with their respective rightsholders, including KOJIMA PRODUCTIONS. Limited excerpts for technical commentary.",
   "updated": "2026-11-12"

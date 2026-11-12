@@ -32,14 +32,14 @@
     <div class="next-header-content"><nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/pbf.html">PBF Demo</a><a href="#sources">资料</a></nav></div>
   </div></header>
   <main class="fx-shell">
-    <aside class="fx-contents" aria-label="文章目录"><p>DS1 / MOSS STUDY</p><nav><a href="#views">原版与复刻</a><a href="#algorithm">枝叶是怎么画的</a><a href="#placement">原版实例与筛选</a><a href="#v2">V2 法线与岩面刷草</a><a href="#alpha-filtering">侧视细线怎么消失</a><a href="#lighting">高光与阴影怎么查</a><a href="#measurements">优化数据与边界</a><a href="#sources">数据与来源</a></nav></aside>
+    <aside class="fx-contents" aria-label="文章目录"><p>DS1 / MOSS STUDY</p><nav><a href="#views">原版与复刻</a><a href="#ue-scene">UE 场景里的覆盖</a><a href="#algorithm">枝叶是怎么画的</a><a href="#placement">原版实例与筛选</a><a href="#v2">V2 法线与岩面刷草</a><a href="#alpha-filtering">侧视细线怎么消失</a><a href="#lighting">高光与阴影怎么查</a><a href="#measurements">优化数据与边界</a><a href="#sources">数据与来源</a></nav></aside>
     <article class="fx-article" id="article">
       <header>
         <p class="fx-kicker">游戏效果解析 · DEATH STRANDING / PC 1.0.8</p>
         <h1>《死亡搁浅 1》的草，<br />原来是这样画出来的</h1>
         <p>这次拆的是脚下那层细密的苔藓。没想到，把一帧抓出来才看清：薄片负责撑起形状，贴图剪出枝叶，实例批处理把重复提交压下来。</p>
         <p>后来把它搬到岩石上刷，问题又变了：中心贴住了，根部仍会悬空；叶片形状对了，受光却像散开的纸片。这次补上我们怎么处理这些问题，以及哪些差异最后查到了引擎里的采样和光照阶段。</p>
-        <p class="fx-meta">DOTAFS · 首发 <time datetime="2026-11-07">2026 年 11 月 7 日</time> · 更新 <time datetime="2026-11-12">2026 年 11 月 12 日</time> · Graphics Systems · 约 9 分钟</p>
+        <p class="fx-meta">DOTAFS · 首发 <time datetime="2026-11-07">2026 年 11 月 7 日</time> · 更新 <time datetime="2026-11-12">2026 年 11 月 12 日</time> · Graphics Systems · 约 10 分钟</p>
       </header>
 
       <section id="views">
@@ -55,6 +55,24 @@
           <figcaption>原网格、原摆放、原相机；只重建选中的苔藓，未加入人物、岩石和地形。光照简化，显示倍率 2×，颜色尚未对齐原版。</figcaption>
         </figure>
         <p class="fx-note">这两张图属于早期原网格 WebGL 研究，后文的 V2 是另一个经过改造的单簇版本。本次提供的资料没有新增草地视频。两张 PNG 保留原像素，复刻图直接导出渲染缓冲，无放大或有损压缩。</p>
+      </section>
+
+      <section id="ue-scene">
+        <h2>放回 UE 场景里，看苔藓怎样接上岩石</h2>
+        <p>单独看一簇草，容易只盯着叶片轮廓。把人物、岩石和成片植被放回同一个画面，才能看出它的尺度与覆盖关系。下面两张是补充的 UE 编辑器场景截图：先看人物旁的坡面，再换到贴近岩面的低视角。</p>
+        <figure>
+          <div class="fx-video-label"><span>UE 场景 / 人物与坡面</span><span>1920 × 1003 JPEG</span></div>
+          <a href="/articles/ds1-grass-assets/ue-scene-character-scale.jpg" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/ue-scene-character-scale.jpg" width="1920" height="1003" loading="lazy" alt="UE 编辑器场景截图：人物站在右侧岩石上，左侧斜坡覆盖疏密不一的苔藓，植被之间露出岩面。" /></a>
+          <figcaption>作者补充的场景图一。以右侧人物作视觉尺度参照，观察左侧坡面从稀疏叶簇到连续覆盖的变化。保留完整编辑器画面和原始 JPEG，点击可放大。</figcaption>
+        </figure>
+        <p>这张图把两层细节放在了一起：近处能分辨出独立叶簇，往坡面深处看，它们逐渐连成一层覆盖。叶片之间仍能看到下面的岩面，因此底层岩石的颜色和明暗也参与了最终观感。前文只保留四个实例的 WebGL 图用于拆解结构，这里的场景图则补上了它们与周围物体的关系。</p>
+        <figure>
+          <div class="fx-video-label"><span>UE 场景 / 低视角覆盖</span><span>1920 × 996 JPEG</span></div>
+          <a href="/articles/ds1-grass-assets/ue-scene-rock-coverage.jpg" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/ue-scene-rock-coverage.jpg" width="1920" height="996" loading="lazy" alt="UE 编辑器低视角场景截图：细密苔藓沿左侧起伏坡面延伸，在中部与右侧裸露岩石交接，背景是岩壁。" /></a>
+          <figcaption>作者补充的场景图二。沿左侧苔藓的外轮廓看向中部裸露岩石，观察覆盖层的厚度、起伏和边缘交接。原图未裁切、调色或重新压缩。</figcaption>
+        </figure>
+        <p>低视角更适合检查覆盖层有没有接住岩面的起伏：密集区域是否连贯，边缘是否突然翘起，裸露岩石与叶簇之间是否留有不自然的空隙。这些观察对应后文的根部支撑检查；而一簇内部明暗是否破碎，则要结合基础法线与光照去查。单簇做对之后，还需要在这种场景尺度下反复看。</p>
+        <p class="fx-note">两张图展示不同视角的场景效果，不是同机位的修改前后对照。截图未附对应的材质版本与渲染参数，不能据此确认全部植被都使用后文的 V2 配置，或把画面差异归因于某一个修复。</p>
       </section>
 
       <section id="algorithm">
@@ -78,7 +96,7 @@
 
       <section id="v2">
         <h2>搬到岩石上，先处理一簇草的受光</h2>
-        <p>为了反复刷涂，我们用提取资源制作了 <strong>V2 单簇：LOD0 只有 16 个单三角薄片</strong>，重新排布根部、朝向和倾角。它和上面动辄数千个三角形的原版植被块不是同一个对象，也不能拿二者面数直接算优化比例。</p>
+        <p><a href="#ue-scene">前面的场景图</a>展示了成片覆盖需要检查的问题。为了反复刷涂，我们用提取资源制作了 <strong>V2 单簇：LOD0 只有 16 个单三角薄片</strong>，重新排布根部、朝向和倾角。它和上面动辄数千个三角形的原版植被块不是同一个对象，也不能拿二者面数直接算优化比例。</p>
         <figure>
           <a href="/articles/ds1-grass-assets/v2-single-clump.png" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/v2-single-clump.png" width="1905" height="946" loading="lazy" alt="11 月 11 日交接包中的 V2 单簇预览截图：亮草 B、LOD0，16 个三角薄片由 Alpha 剪出叶片轮廓。" /></a>
           <figcaption>11 月 11 日交接包内的预览截图，原样保留，点击可放大。这是几何、底色与裁切检查，不是 UE 完整光照，也不是原游戏未经修改的模型。图中控件属于截图。</figcaption>
@@ -147,7 +165,7 @@
         <h2>数据与来源</h2>
         <p class="fx-links"><a href="/articles/ds1-grass-assets/research-data.json">早期捕获事件与提交量记录</a><a href="/articles/ds1-grass-assets/technical-update-20261112.json">11 月补记：证据、当前参数与未完成项</a><a href="/articles/ds1-grass-assets/media-provenance.json">图片来源与校验值</a></p>
         <p class="fx-note">本次补记依据作者提供的《苔藓技术全记录》11 月 11 日离线包、单簇导出清单与随附诊断结论，核对了文件及校验值；没有在本次文章更新中重新运行 UE 或原始 RDC。原版证据、V2 实现、历史试验分别标注，根部零出界、完整光照对齐和常数反射率性能对比仍未完成。</p>
-        <p class="fx-note">游戏画面及底层素材归 KOJIMA PRODUCTIONS 等相应权利人所有，仅作技术说明。新增内容只选用一张单簇预览截图和整理后的结论，不公开模型、完整贴图、工程与内部存档。见<a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
+        <p class="fx-note">游戏画面及底层素材归 KOJIMA PRODUCTIONS 等相应权利人所有，仅作技术说明。新增内容选用一张单簇预览、两张作者补充的 UE 场景截图和整理后的结论，不公开模型、完整贴图、工程与内部存档。见<a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
       </section>
       <footer><a href="/articles/death-stranding-2-fireworks.html">接着看：《死亡搁浅 2》的花火 →</a> · <a href="/home/#articles">返回文章目录</a></footer>
     </article>
