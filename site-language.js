@@ -3,6 +3,7 @@
 
   const key = "dotafs-language";
   const path = window.location.pathname;
+  const isDemo = path === "/pbf.html";
   const routes = {
     "/home/": { zh: "/home/", en: "/home/en/" },
     "/home/index.html": { zh: "/home/", en: "/home/en/" },
@@ -57,16 +58,16 @@
     switcher.setAttribute("aria-label", pageLanguage === "zh" ? "语言切换" : "Language selector");
     for (const link of switcher.querySelectorAll("a")) {
       const lang = link.lang.toLowerCase().startsWith("zh") ? "zh" : "en";
-      const destination = counterpart ? counterpart[lang] : path !== "/" && lang === pageLanguage
+      const destination = counterpart ? counterpart[lang] : !isDemo && lang === pageLanguage
         ? `${path}${window.location.search}${window.location.hash}`
         : lang === "zh" ? "/home/" : "/home/en/";
-      const active = counterpart ? lang === pageLanguage : path === "/" ? lang === choice : lang === pageLanguage;
+      const active = counterpart ? lang === pageLanguage : isDemo ? lang === choice : lang === pageLanguage;
       link.href = destination;
       link.dataset.lang = lang;
       link.classList.toggle("is-active", active);
       if (active && counterpart) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
-      if (!counterpart && lang !== pageLanguage && path !== "/") {
+      if (!counterpart && lang !== pageLanguage && !isDemo) {
         const explanation = pageLanguage === "zh" ? "本页暂无英文版，前往英文文章目录" : "No translation yet; open the Chinese article index";
         link.title = explanation;
         link.setAttribute("aria-label", explanation);
@@ -76,7 +77,7 @@
       });
     }
 
-    if (path === "/") {
+    if (isDemo) {
       const entry = document.querySelector(".homepage-entry");
       if (entry) {
         entry.href = choice === "zh" ? "/home/" : "/home/en/";

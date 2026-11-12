@@ -1,35 +1,26 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta
-      name="description"
-      content="DOTAFS 的交互式 WebGPU PBF 流体与天气主页。"
-    />
-    <meta name="theme-color" content="#111a4c" />
-    <meta property="og:title" content="DOTAFS — Interactive GPU Fluids" />
-    <meta
-      property="og:description"
-      content="Interactive WebGPU PBF fluid, weather, and particle artwork."
-    />
-    <meta property="og:image" content="/og.png" />
-    <title>DOTAFS — Interactive GPU Fluids</title>
-    <script type="module" crossorigin src="/assets/index-AZuTbc6H.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Ccpgi7f3.css">
-    <link rel="stylesheet" href="/portal.css">
-    <link rel="stylesheet" href="/site-language.css" />
-    <script src="/site-language.js" defer></script>
+    <meta name="description" content="DOTAFS — personal learning notes, research, and portfolios." />
+    <meta name="theme-color" content="#1b1d1f" />
+    <title>DOTAFS — Personal Homepage</title>
+    <link rel="canonical" href="https://dotafs.com/home/en/" />
+    <script>
+      (() => {
+        let language;
+        try { language = localStorage.getItem("dotafs-language"); } catch (_) {}
+        const destination = language === "zh" ? "/home/" : "/home/en/";
+        location.replace(destination + location.search + location.hash);
+      })();
+    </script>
+    <noscript><meta http-equiv="refresh" content="0;url=/home/en/" /></noscript>
   </head>
   <body>
-    <div id="root"></div>
-    <a class="homepage-entry" href="/home/en/" aria-label="Open the DOTAFS personal homepage">
-      <span class="homepage-entry-dot" aria-hidden="true"></span>
-      <b>Personal homepage</b>
-      <i aria-hidden="true">→</i>
-    </a>
+    <p><a href="/home/en/">DOTAFS — Personal homepage</a> · <a href="/home/">中文主页</a></p>
   </body>
 </html>

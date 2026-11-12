@@ -1756,6 +1756,39 @@
 
 /* Home modules: readable sheets against the darker canvas, with a soft
    interaction state rather than a thick outline around every article. */
+.next-home .next-site-directory {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 24px;
+  width: min(1160px, calc(100% - 40px));
+  margin: 0 auto 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--next-line);
+  font-size: 14px;
+}
+
+.next-home .next-site-directory span {
+  color: var(--next-muted);
+}
+
+.next-home .next-site-directory a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .next-home .next-site-directory {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+}
+
 .next-home .next-page-layout {
   gap: 16px;
 }
