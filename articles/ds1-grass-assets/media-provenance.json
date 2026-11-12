@@ -68,9 +68,21 @@
         "exposure": 2,
         "shrink": true
       }
+    },
+    {
+      "file": "v2-single-clump.png",
+      "format": "PNG",
+      "width": 1905,
+      "height": 946,
+      "bytes": 70650,
+      "sha256": "6aabb5b0a7fd3f39f630d6012fe949dd0b4ae5d39351b3d8cadafb9684313025",
+      "source": "Author-provided MossTechnicalNotes_20261111.zip / MossSingleClump_20261111/preview.png",
+      "method": "Byte-for-byte screenshot copy, verified against supplied SHA256.json. No crop, resize, color correction or synthesis.",
+      "scope": "V2 single-clump geometry/base-color/alpha preview; not full UE lighting. Controls shown are part of the still image."
     }
   ],
   "handling": "Original and reconstructed PNGs preserve source pixels. Diagnostic JPEGs are lossy browser screenshot outputs; no resizing, recompression or AI enhancement.",
   "video": "No original grass video found in this research handoff. This article publishes still images.",
-  "rights": "Game imagery and underlying assets remain with their respective rightsholders, including KOJIMA PRODUCTIONS. Limited excerpts for technical commentary."
+  "rights": "Game imagery and underlying assets remain with their respective rightsholders, including KOJIMA PRODUCTIONS. Limited excerpts for technical commentary.",
+  "updated": "2026-11-12"
 }

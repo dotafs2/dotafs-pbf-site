@@ -1,0 +1,110 @@
+{
+  "article": "death-stranding-1-grass.html",
+  "updated": "2026-11-12",
+  "source_date": "2026-11-11",
+  "verification": "Editorial review of author-supplied notes, current asset export and historical audit conclusions; no new UE/RenderDoc experiment performed for this update.",
+  "archive": {
+    "name": "MossTechnicalNotes_20261111.zip",
+    "sha256": "f63cb018f35ae60c5680d6b4907e23928b2bd6963c00075e537361e059882869"
+  },
+  "sources": [
+    {
+      "id": "technical-notes",
+      "archive_entry": "MossTechnicalNotes/DS1SceneUE5/moss-tech-notes/index.html",
+      "sha256": "21c01ebb8e1475143acd8564f276217e0172a681488ca7a9175aa022d69c9c32",
+      "bytes": 416944
+    },
+    {
+      "id": "current-asset-readme",
+      "archive_entry": "MossTechnicalNotes/SceneResearch-Handoff/MossSingleClump_20261111/README.txt",
+      "sha256": "45702a36c907e6fa8938d8f6151633ec0225802d4f8f626f6cefa406882c9b36",
+      "bytes": 3130
+    },
+    {
+      "id": "current-material-export",
+      "archive_entry": "MossTechnicalNotes/SceneResearch-Handoff/MossSingleClump_20261111/manifest.json",
+      "sha256": "12753af31cd868e321af89264cdbb53d959116d7664c15a0f353468dd4e1f417",
+      "bytes": 1022
+    },
+    {
+      "id": "alpha-sampling-review",
+      "archive_entry": "MossTechnicalNotes/DS1SceneUE5/Evidence/Rock8299Aki40Port/MossGrazingReview/修正与验证.txt",
+      "sha256": "99054b715c55253159ce0b1b270b11a7b48e13d8db250632171d675b924cb867",
+      "bytes": 2989
+    },
+    {
+      "id": "original-deferred-lighting",
+      "archive_entry": "MossTechnicalNotes/DS1SceneUE5/Evidence/MossDeferredLightingAudit20261106/结论.txt",
+      "sha256": "0bf334be525a3ed5e2cb25e0e1e62328b294f66c926c6883a26fb3847f8ba9c2",
+      "bytes": 3199
+    },
+    {
+      "id": "lighting-stage-review",
+      "archive_entry": "MossTechnicalNotes/DS1SceneUE5/Evidence/MossShaderStageAudit20261108/诊断结论.txt",
+      "sha256": "b2495f3b6b2850966633e8bc6f90bc1c5496a0c4be870c061c1f0cdfc76819d0",
+      "bytes": 5354
+    },
+    {
+      "id": "sampler-build-verification",
+      "archive_entry": "MossTechnicalNotes/DS1SceneUE5/Evidence/MossEngineBuild20261108/编译安装与验收结论.txt",
+      "sha256": "3fbec05f6b01818e4f8255373b18bea6cc61f0ab4197ef6c218e5f7b6b381fae",
+      "bytes": 2786
+    }
+  ],
+  "current_v2": {
+    "scope": "Project-authored clump derived from extracted source resources, not the unmodified original vegetation block.",
+    "lod_triangles": [
+      16,
+      12,
+      8,
+      6,
+      4,
+      2
+    ],
+    "base_vertex_normal": [
+      0,
+      0,
+      1
+    ],
+    "alignment": "One clump orientation per rock hit normal; texture adds pixel normal variation.",
+    "shading": "Default Lit, two-sided Masked; SSS disabled",
+    "roughness": 0.9,
+    "normal_intensity": 0.85,
+    "alpha_clip": 0.5,
+    "alpha_mip_coverage_compensation": false,
+    "source_dimensions_cm": [
+      3.82561,
+      4.03399,
+      1.2726
+    ],
+    "brush_uniform_scale": 7.74520922,
+    "root_support": {
+      "points": 16,
+      "max_float_cm": 3,
+      "max_burial_cm": 6,
+      "max_shift_cm": 3,
+      "limit": "Root samples only; no guarantee against tip intersections or overhang."
+    },
+    "instancing": "HISM grouped by receiver rock component and mesh; screen-size LOD; A/B UV selection via instance custom data."
+  },
+  "original_lighting": {
+    "frame": 35116,
+    "evidence": "Moss GBuffer consumers traced to sun and environment passes; original sun Schlick-like Fresnel confirmed.",
+    "visible_sample_event": 9165,
+    "sun_pass_event": 11069,
+    "transmission_scope": "Zero weight for verified moss samples in this sun path, not a whole-game SSS claim."
+  },
+  "historical_tests": {
+    "alpha": "Four variants; dynamic scene time continued, so full-image differences are not isolated errors.",
+    "ao_calibration": "Specific UE4 branch/path: radius subtracts 70, full-resolution intensity adds .15, bias multiplies by 5. Historical settings, not universal conversion or current production defaults.",
+    "contact_shadow": "GPU constants, not only Python property reads, were checked. Experimental self-skip shader was reverted.",
+    "sampler": "Engine-module rebuild; fixed-camera BaseColor 1x -> 8x -> 1x with AA off and zero mip bias. First/last ROI difference zero. This ROI was rock, not a whole-scene moss quality metric."
+  },
+  "not_established": [
+    "Complete original placement/generation pipeline",
+    "Pixel-identical original lighting",
+    "Root checks guaranteeing zero overhang",
+    "Constant specular versus texture quality/performance result",
+    "V2 total GPU cost including screen-space lighting stages"
+  ]
+}

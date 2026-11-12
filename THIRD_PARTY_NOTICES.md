@@ -208,3 +208,19 @@ video was found in this handoff. Published JSON files contain analyst summaries,
 browser counters and source-report hashes; no game models, textures, executable
 code or shader bytecode are redistributed. See the adjacent `research-data.json`
 and `media-provenance.json` for scope and provenance.
+
+### Moss technical-note update (2026-11-12)
+
+`articles/ds1-grass-assets/v2-single-clump.png` is a limited still excerpt from
+the author's supplied `MossTechnicalNotes_20261111.zip`, specifically the V2
+single-clump viewer's `preview.png`. It is copied byte-for-byte (1905×946),
+with its SHA256 checked against the supplied manifest. The image shows a
+project-modified clump derived from DEATH STRANDING resources; it is not an
+unmodified original-game asset or a full Unreal lighting reference. The
+existing game-imagery rights statement above applies to this excerpt.
+
+The update publishes an editorial summary of the author's technical notes,
+material export values and historical audit conclusions, with source hashes
+in `technical-update-20261112.json`. It does not publish the supplied FBX/OBJ,
+standalone textures, shader graphs, source code, internal archive, or full ZIP.
+No new game capture or engine experiment was performed for this article update.

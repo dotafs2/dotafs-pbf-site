@@ -5,13 +5,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="《死亡搁浅 1》草地里的苔藓：原版与 WebGL 复刻效果，薄片 Alpha 裁切、距离收缩、深度预处理，以及 8 次到 4 次的实例批处理对照。" />
+  <meta name="description" content="从《死亡搁浅 1》原版苔藓到 V2 岩面刷草：薄片裁切、统一基础法线、根部支撑、反射率与透光证据，以及采样和阴影的排查记录。" />
   <meta name="theme-color" content="#1b1d1f" />
   <meta property="og:title" content="《死亡搁浅 1》的草，原来是这样画出来的 · DOTAFS" />
-  <meta property="og:description" content="拆开脚下的苔藓，看薄片怎样变成枝叶，以及批处理究竟省下了什么。" />
+  <meta property="og:description" content="薄片怎样变成枝叶？补记 V2 岩面刷草、法线与根部检查，以及侧视细线、反射和阴影的排查。" />
   <meta property="og:type" content="article" />
   <meta property="og:image" content="https://dotafs.com/articles/ds1-grass-assets/original-frame-35116.png" />
   <meta property="article:published_time" content="2026-11-07" />
+  <meta property="article:modified_time" content="2026-11-12" />
   <link rel="canonical" href="https://dotafs.com/articles/death-stranding-1-grass.html" />
   <title>《死亡搁浅 1》的草，原来是这样画出来的 · DOTAFS</title>
   <link rel="icon" href="data:," />
@@ -31,13 +32,14 @@
     <div class="next-header-content"><nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/pbf.html">PBF Demo</a><a href="#sources">资料</a></nav></div>
   </div></header>
   <main class="fx-shell">
-    <aside class="fx-contents" aria-label="文章目录"><p>DS1 / GRASS STUDY</p><nav><a href="#views">原版与复刻</a><a href="#algorithm">枝叶是怎么画的</a><a href="#placement">怎样铺满地面</a><a href="#measurements">优化数据与 GPU 状态</a><a href="#sources">数据与来源</a></nav></aside>
+    <aside class="fx-contents" aria-label="文章目录"><p>DS1 / MOSS STUDY</p><nav><a href="#views">原版与复刻</a><a href="#algorithm">枝叶是怎么画的</a><a href="#placement">原版实例与筛选</a><a href="#v2">V2 法线与岩面刷草</a><a href="#alpha-filtering">侧视细线怎么消失</a><a href="#lighting">高光与阴影怎么查</a><a href="#measurements">优化数据与边界</a><a href="#sources">数据与来源</a></nav></aside>
     <article class="fx-article" id="article">
       <header>
         <p class="fx-kicker">游戏效果解析 · DEATH STRANDING / PC 1.0.8</p>
         <h1>《死亡搁浅 1》的草，<br />原来是这样画出来的</h1>
         <p>这次拆的是脚下那层细密的苔藓。没想到，把一帧抓出来才看清：薄片负责撑起形状，贴图剪出枝叶，实例批处理把重复提交压下来。</p>
-        <p class="fx-meta">DOTAFS · <time datetime="2026-11-07">2026 年 11 月 7 日</time> · Graphics Systems · 约 3 分钟</p>
+        <p>后来把它搬到岩石上刷，问题又变了：中心贴住了，根部仍会悬空；叶片形状对了，受光却像散开的纸片。这次补上我们怎么处理这些问题，以及哪些差异最后查到了引擎里的采样和光照阶段。</p>
+        <p class="fx-meta">DOTAFS · 首发 <time datetime="2026-11-07">2026 年 11 月 7 日</time> · 更新 <time datetime="2026-11-12">2026 年 11 月 12 日</time> · Graphics Systems · 约 9 分钟</p>
       </header>
 
       <section id="views">
@@ -52,7 +54,7 @@
           <a href="/articles/ds1-grass-assets/reconstruction-captured-camera.png" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/reconstruction-captured-camera.png" width="3200" height="1800" loading="lazy" alt="原相机下重建的四个苔藓实例，保留原始地被轮廓，背景中未加入人物、岩石和地形。" /></a>
           <figcaption>原网格、原摆放、原相机；只重建选中的苔藓，未加入人物、岩石和地形。光照简化，显示倍率 2×，颜色尚未对齐原版。</figcaption>
         </figure>
-        <p class="fx-note">这份交接资料没有草地视频，先展示静帧。上面两张均保留 PNG 原像素，复刻图直接导出渲染缓冲，无放大或有损压缩。</p>
+        <p class="fx-note">这两张图属于早期原网格 WebGL 研究，后文的 V2 是另一个经过改造的单簇版本。本次提供的资料没有新增草地视频。两张 PNG 保留原像素，复刻图直接导出渲染缓冲，无放大或有损压缩。</p>
       </section>
 
       <section id="algorithm">
@@ -74,6 +76,60 @@
         <p>帧内另有 GPU 筛选程序读取包围盒、LOD 和遮挡纹理，输出可见实例列表。大面积地被因此具备先筛选、再分组提交的机制，但这 4 个实例尚未逐一接上该链路，不能把网页实验当成原版整套剔除系统。</p>
       </section>
 
+      <section id="v2">
+        <h2>搬到岩石上，先处理一簇草的受光</h2>
+        <p>为了反复刷涂，我们用提取资源制作了 <strong>V2 单簇：LOD0 只有 16 个单三角薄片</strong>，重新排布根部、朝向和倾角。它和上面动辄数千个三角形的原版植被块不是同一个对象，也不能拿二者面数直接算优化比例。</p>
+        <figure>
+          <a href="/articles/ds1-grass-assets/v2-single-clump.png" target="_blank" rel="noopener"><img src="/articles/ds1-grass-assets/v2-single-clump.png" width="1905" height="946" loading="lazy" alt="11 月 11 日交接包中的 V2 单簇预览截图：亮草 B、LOD0，16 个三角薄片由 Alpha 剪出叶片轮廓。" /></a>
+          <figcaption>11 月 11 日交接包内的预览截图，原样保留，点击可放大。这是几何、底色与裁切检查，不是 UE 完整光照，也不是原游戏未经修改的模型。图中控件属于截图。</figcaption>
+        </figure>
+        <p>V2 把共享模型的<strong>基础顶点法线统一为局部 +Z</strong>。刷到石头上时，再把整簇的局部 Z 对齐落点岩面。不同草片的基础受光方向因此一致，减少一簇内部忽明忽暗的割裂感；材质仍通过法线贴图补充像素级变化。</p>
+        <div class="fx-flow" aria-label="V2 基础法线的处理流程"><span>模型内：基础法线统一 +Z</span><b aria-hidden="true">→</b><span>摆放时：整簇对齐岩面</span><b aria-hidden="true">→</b><span>着色时：叠加法线贴图</span></div>
+        <p>这里要区分草片的<strong>几何朝向</strong>和<strong>受光方向</strong>。修改顶点法线不会把薄片转过去，也不会让它弯曲贴地。当前方案是一簇一个对齐方向，没有给每个顶点重新查询脚下的岩面。它是让覆盖层受光更连续的制作取舍，不能据此推断原版也把所有法线统一朝上。</p>
+        <h3>中心贴住，不代表十六个根部都贴住</h3>
+        <p>笔刷先在切平面的圆盘内按面积均匀生成候选点，再沿刷子法线投射到选定岩石。检查间距和朝向后，还要检查 <strong>16 个草片的根部中点</strong>，逐个收紧整簇允许移动的区间：区间为空就放弃落点，否则选最接近零的合法位移，再检查范围和重叠。</p>
+        <p>当前允许根部沿实例上方向悬空最多 3 cm、埋入最多 6 cm，整簇最多移动 ±3 cm。这些是该笔刷的容差，不是原版参数。它改善了窄边和凹凸岩面上的出界，但只检查根部采样点，叶尖仍可能穿插。</p>
+        <details class="fx-detail"><summary>模型、UV 与实例组织的当前状态</summary>
+          <p>截至 11 月 11 日，六档 LOD 分别为 16、12、8、6、4、2 个三角形，按屏占比选择。同一岩石组件、同一草网格归入一个 HISM，重复刷涂追加实例；不再使用旧的 CPU 距离分池方案，也不是每档 LOD 一个组件。</p>
+          <p>亮暗两种草共用模型与材质，用一个实例自定义浮点数选择 UV1 或 UV2；底色、Alpha、法线和反射率共用这个选择。UV3 留作工具数据。HISM 能共享资源并组织剔除，但不能保证所有 LOD、所有渲染阶段合起来只有一次绘制。</p>
+          <p>原资产约 3.83 × 4.03 × 1.27 cm，当前独立笔刷使用约 7.745 倍统一缩放，放置后约 29.63 × 31.25 × 9.86 cm。历史场景实例可能不同。UE 常规植被笔刷本来就有射线落点、法线对齐、坡度和间距检查；我们增加的是针对这 16 个根部的支撑规则。</p>
+        </details>
+      </section>
+
+      <section id="alpha-filtering">
+        <h2>侧着看残留的细线，查到了 Alpha 的 Mip</h2>
+        <p>一个容易漏掉的差别是遮罩放在哪个通道。参考材质用独立遮罩的 R 通道，移植后把同样的像素放进底色 A 通道。在当时的引擎配置里，A 通道触发了 <strong>Mip 覆盖率补偿</strong>：贴图变小后，部分本该被过滤变淡的 Alpha 又被抬高，细碎残片更容易留下。</p>
+        <p>11 月 5 日做了四组对照：原配置、只关覆盖补偿、只改裁剪阈值、两项一起改。最终为苔藓使用专用贴图，关闭覆盖补偿，并把阈值从 0.3333 改到 0.5，两项合用进一步减少了斜视残片。测试时场景时间仍在推进，不能把全图差值当作严格隔离后的误差。</p>
+        <p>所以，当前的侧视消失来自<strong>投影面积缩小、纹理过滤和 Alpha 裁剪共同作用</strong>。0.5 是透明度阈值，不是观察角度；双面显示也不会给薄片增加厚度。V2 没有额外的按视角淡出分支，更不能拿统一朝上的受光法线去判断每片草的几何侧视程度。</p>
+      </section>
+
+      <section id="lighting">
+        <h2>亮边和黑块，不能只凭截图猜原因</h2>
+        <p>当前 V2 使用双面 Masked、Default Lit，SSS 关闭，粗糙度固定 0.9，法线强度为 0.85。它仍保留反射率贴图：反射率管基础反射强弱，粗糙度管高光的分散程度，法线管朝向。三角薄片只有三个顶点，单靠顶点色很难表达贴图里许多小叶子各自的反射差异。</p>
+        <p><strong>原版太阳高光中已经追到了 Fresnel（菲涅尔）计算。</strong>11 月 6 日的离线回放报告把苔藓材质输出追到太阳光照阶段；可见苔藓样本在这条太阳路径中的透光分支权重为零。这个结论只覆盖已验证的帧、样本与路径，不能推广成“整个游戏没有 SSS”。当前移植把提取的反射率交给 UE 计算高光，也不等于完整复刻了原版光照。</p>
+        <details class="fx-detail"><summary>反射率怎么进入高光？</summary>
+          <p>当前材质把反射率 R 作为线性数据读取，再手动解码为 F0，换算成 UE Specular。F0 表示基础反射率；下面的公式是本次移植使用的输入换算，不是完整的原版 BRDF。</p>
+          <div class="fx-equation">F0 = R × (R × (0.305306 × R + 0.682171) + 0.012523)<br />Specular = saturate(F0 / 0.08)</div>
+          <p>原版太阳 shader 则确认了 <code>p = (1 − VoH)⁵</code>，以及 <code>F = F0 × (1 − p) + saturate(50 × F0.g) × p</code>。VoH 是视线方向与半程方向的点积。这条反射不需要另外添加自发光亮边；截图中的白边也可能同时受底色、光照和环境反射影响。</p>
+          <p>笔记中的有效叶片区域统计给出平均 F0 约 0.026，换算常数 Specular 约 0.33 可作为对照起点。但当前仍使用贴图，常数替代的正式画质和 GPU 耗时对比尚未完成。</p>
+        </details>
+        <p>黑块也需要分开查。11 月 9 日的开关对照中，关闭接触阴影后黑斑大幅减少，关闭 AO 后却基本还在，说明当时主要是密集叶片间的接触遮挡过强。直接抬高底色或加自发光会连正常受光一起改变。接触阴影的范围和强度属于灯光侧，当前材质没有只减弱苔藓自身接触阴影的专用输入。</p>
+        <details class="fx-detail"><summary>为什么 UE4 / UE5 面板数字相同，结果仍不一样？</summary>
+          <p>11 月 8 日的分阶段诊断确认，本项目使用的 UE4 分支会在参数进入 shader 前做额外处理。比如面板 Radius=70，减去 70 后有效半径变成零，对应抽样区域的 AO 全为 1。下面只是该分支、该路径的历史校准，不能作为所有 UE 版本的通用换算。</p>
+          <div class="fx-table-wrap" tabindex="0" role="region" aria-label="特定 UE4 分支与 UE5 的历史 AO 参数对照"><table class="fx-table"><thead><tr><th>AO 参数</th><th>该 UE4 路径的处理</th><th>UE5 对照值</th><th>UE4 校准输入</th></tr></thead><tbody>
+            <tr><td>Radius</td><td>max(Radius − 70, 0)</td><td>70</td><td>140</td></tr>
+            <tr><td>Intensity</td><td>满分辨率时 +0.15</td><td>0.85</td><td>0.70</td></tr>
+            <tr><td>Bias</td><td>shader 内 ×5</td><td>3</td><td>0.6</td></tr>
+          </tbody></table></div>
+          <p>接触阴影还遇到过另一种情况：脚本读出的参数变了，渲染侧的 SceneProxy 没有更新，GPU 仍在用旧常量。重建渲染状态并重新截帧后，才确认参数真正生效。试改的接触阴影算法后来撤回，主要改善不能归功于那段试验代码。</p>
+          <p>那轮主光、天光和阴影校准仍是临时预览，整体色调和局部质感没有完全对齐。它与 11 月 11 日资产导出的材质参数不是同一份状态。</p>
+        </details>
+        <details class="fx-detail"><summary>另一个独立问题：8× 各向异性过滤没有真正生效</summary>
+          <p>记录还定位到纹理采样器缓存键遗漏了实际各向异性值，导致设置从 1× 改为 8× 后仍可能复用旧采样器。修复后编译安装 Engine 模块，在固定镜头、BaseColor、关闭 AA、Mip 偏移为零的条件下做 1×→8×→1× 对照；固定岩石区域第一次和最后一次像素差为零，确认切换可逆。</p>
+          <p>这是采样器缓存修复，和前面的 Alpha 覆盖率补偿是两个问题。该证据不能换算成苔藓整体画质提升百分比，也没有给出 8× 的净性能收益。</p>
+        </details>
+      </section>
+
       <section id="measurements">
         <h2>批处理省了多少？</h2>
         <p>在复刻中切换逐实例提交和按网格批处理，保留相同模型、相机与两阶段绘制：</p>
@@ -83,13 +139,15 @@
           <tr><td>绘制调用 / 两阶段</td><td class="fx-number">4</td><td class="fx-number">8</td><td class="fx-number">4</td></tr>
         </tbody></table></div>
         <p><strong>绘制调用减少 50%，几何提交量不变。</strong>两阶段合计仍是 33,526 个三角形；省下的是重复提交。这里没有同条件的 GPU 毫秒或帧率对照，不能写成“快了一倍”。</p>
+        <p>这张表仍是早期 WebGL 重建的提交量对照，不能当作 V2 笔刷的性能测试。V2 的 HISM、六档 LOD 和材质整理都需要各自固定条件的 A/B。按材质匹配到的 GPU 事件也不会自动包含整屏 AO、接触阴影和阴影投影的全部开销。</p>
         <details class="fx-detail"><summary>原版与复刻的 GPU 状态</summary><p>原版深度事件 8179、8185 对应材质事件 9165、9172。两者复用网格：深度阶段 <code>GREATER + 写深度</code>，材质阶段 <code>EQUAL + 不写深度</code>；WebGL 复刻保持相同设置。A 为 4,652 三角形 × 3 实例，B 为 2,807 × 1。B 的原版覆盖图为空，尚未确认可见贡献；表中统计的是提交量，不是整帧草地开销。11 月 7 日复查，两种提交方式均无 WebGL 错误。</p></details>
       </section>
 
       <section id="sources">
         <h2>数据与来源</h2>
-        <p class="fx-links"><a href="/articles/ds1-grass-assets/research-data.json">捕获事件、算法依据与实测记录</a><a href="/articles/ds1-grass-assets/media-provenance.json">图片来源与校验值</a></p>
-        <p class="fx-note">依据本地 DS1 苔藓研究交接记录与本次浏览器复查。游戏画面及底层素材归 KOJIMA PRODUCTIONS 等相应权利人所有，仅作技术说明，见<a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
+        <p class="fx-links"><a href="/articles/ds1-grass-assets/research-data.json">早期捕获事件与提交量记录</a><a href="/articles/ds1-grass-assets/technical-update-20261112.json">11 月补记：证据、当前参数与未完成项</a><a href="/articles/ds1-grass-assets/media-provenance.json">图片来源与校验值</a></p>
+        <p class="fx-note">本次补记依据作者提供的《苔藓技术全记录》11 月 11 日离线包、单簇导出清单与随附诊断结论，核对了文件及校验值；没有在本次文章更新中重新运行 UE 或原始 RDC。原版证据、V2 实现、历史试验分别标注，根部零出界、完整光照对齐和常数反射率性能对比仍未完成。</p>
+        <p class="fx-note">游戏画面及底层素材归 KOJIMA PRODUCTIONS 等相应权利人所有，仅作技术说明。新增内容只选用一张单簇预览截图和整理后的结论，不公开模型、完整贴图、工程与内部存档。见<a href="/THIRD_PARTY_NOTICES.md">素材声明</a>。</p>
       </section>
       <footer><a href="/articles/death-stranding-2-fireworks.html">接着看：《死亡搁浅 2》的花火 →</a> · <a href="/home/#articles">返回文章目录</a></footer>
     </article>
