@@ -1,0 +1,50 @@
+/* Compact Markdown paper notes using the existing DOTAFS article shell. */
+.ai-note-page { line-height: 1.8; }
+.ai-note-page .next-page-layout { max-width: 1080px; }
+.ai-note { padding: 32px 40px 36px; overflow-wrap: anywhere; }
+.note-header { padding-bottom: 24px; border-bottom: 1px solid var(--next-line); margin-bottom: 26px; }
+.note-meta { color: var(--next-muted); font: 11px/1.8 "IBM Plex Mono", "Noto Sans SC", sans-serif; }
+.ai-note-page .next-main h1 { margin: 12px 0 8px; font-size: 34px; line-height: 1.35; font-weight: 500; }
+.note-subtitle { color: var(--next-muted); font-size: 14px; margin: 0 0 18px; }
+.note-paper { font-size: 12px; color: var(--next-muted); }
+.note-paper summary { cursor: pointer; width: fit-content; padding: 4px 0; }
+.note-paper summary:focus-visible { outline: 2px solid var(--next-accent); outline-offset: 3px; }
+.note-paper p { margin: 10px 0; }
+.ai-note-page .next-main h2 { margin: 42px 0 18px; font-size: 24px; line-height: 1.45; font-weight: 500; }
+.ai-note-page .next-main h3 { margin: 28px 0 12px; font-size: 18px; line-height: 1.5; font-weight: 500; }
+.note-prose { font-size: 16px; }
+.note-prose p { margin: 16px 0; }
+.note-prose li { margin: 8px 0; }
+.note-prose :where(ul, ol) { padding-left: 1.5em; }
+.ai-note-page .note-prose a,
+.ai-note-page .note-paper a,
+.ai-note-page .note-end a { color: var(--next-accent); text-decoration: underline; text-underline-offset: 3px; }
+.note-prose blockquote { border-left: 2px solid var(--next-line-strong); margin: 24px 0; padding: 2px 18px; }
+.note-prose code { font-family: "IBM Plex Mono", "Noto Sans SC", monospace; font-size: .88em; }
+.note-prose :not(pre) > code { padding: 2px 4px; background: var(--next-card); }
+.note-prose pre { margin: 24px 0; padding: 18px; background: var(--next-menu); border: 1px solid var(--next-line); overflow-x: auto; line-height: 1.85; }
+.note-prose pre code { white-space: pre; }
+.note-table { max-width: 100%; overflow-x: auto; margin: 24px 0; }
+.note-table table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.8; }
+.note-table th { text-align: left; font-weight: 500; color: var(--next-heading); background: var(--next-card); }
+.note-table th, .note-table td { padding: 11px 13px; border: 1px solid var(--next-line); min-width: 90px; vertical-align: top; }
+.note-table th:first-child, .note-table td:first-child { min-width: 72px; }
+.note-equation { max-width: 100%; overflow-x: auto; margin: 24px 0; padding: 8px 2px; }
+.note-equation .katex-display { margin: 0; padding: 8px 0; }
+.note-prose .katex { position: relative; font-size: 1.08em; }
+.note-table:focus-visible, .note-equation:focus-visible { outline: 1px solid var(--next-accent); outline-offset: 3px; }
+.note-end { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; margin-top: 34px; padding-top: 20px; border-top: 1px solid var(--next-line); font-size: 13px; }
+.note-toc { position: sticky; top: 16px; padding: 22px 20px; font-size: 12px; line-height: 1.75; }
+.note-toc > p { margin: 0 0 15px; color: var(--next-muted); }
+.note-toc nav { display: grid; gap: 12px; }
+.note-toc a:hover { color: var(--next-accent); }
+.note-toc hr { border: 0; border-top: 1px solid var(--next-line); margin: 22px 0; }
+@media (max-width: 720px) {
+  .ai-note { padding: 24px 18px; }
+  .ai-note-page .next-main h1 { font-size: 28px; }
+  .ai-note-page .next-main h2 { font-size: 22px; margin-top: 34px; }
+  .note-prose { font-size: 15px; }
+  .note-table table { min-width: 540px; font-size: 13px; }
+  .note-prose pre { padding: 14px; }
+  .note-meta { font-size: 10px; }
+}

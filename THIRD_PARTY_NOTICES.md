@@ -238,3 +238,14 @@ verified V2 material configuration. Game imagery and underlying asset rights
 remain with their respective owners, including KOJIMA PRODUCTIONS; these are
 limited excerpts for technical commentary. Source filenames, dimensions and
 SHA256 values are recorded in the adjacent `media-provenance.json`.
+
+## KaTeX 0.16.21
+
+`assets/vendor/katex-0.16.21/` contains unmodified KaTeX styles and fonts for
+the LaMP and A-MEM notes. Math is rendered into HTML and MathML at authoring
+time. KaTeX is MIT-licensed; the license is included in that directory.
+Source: https://github.com/KaTeX/KaTeX/tree/v0.16.21
+
+The two notes link to the original papers and reproduce selected reported
+metrics with attribution. Their email and debugging examples are original
+fictional teaching examples. No paper figures or private records are included.
