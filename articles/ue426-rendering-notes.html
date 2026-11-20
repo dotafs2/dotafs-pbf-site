@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UE 4.26：Shader 变体、PSO 与自定义 VF · DOTAFS</title>
+<meta name="description" content="从 shader 编译组合到 D3D12 提交，整理 VF 的数据接口、Usage 过滤、材质实例与运行时兜底。"><meta name="theme-color" content="#1b1d1f">
+<meta property="og:title" content="UE 4.26：Shader 变体、PSO 与自定义 VF · DOTAFS"><meta property="og:description" content="从 shader 编译组合到 D3D12 提交，整理 VF 的数据接口、Usage 过滤、材质实例与运行时兜底。"><meta property="og:type" content="article"><meta property="article:published_time" content="2026-11-20">
+<link rel="canonical" href="https://dotafs.com/articles/ue426-rendering-notes.html"><link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/next-theme.css"><link rel="stylesheet" href="/site-language.css"><link rel="stylesheet" href="/articles/ai-paper-notes.css">
+<script src="/site-language.js" defer></script>
+<style>
+.note-mobile-contents { display:none; font-size:14px; margin-top:18px; }
+.note-mobile-contents summary { cursor:pointer; padding:8px 0; }
+.note-mobile-contents nav { display:grid; gap:10px; margin:12px 0; }
+.note-mobile-contents :focus-visible { outline:2px solid var(--next-accent); outline-offset:3px; }
+@media(max-width:1000px) { .note-mobile-contents { display:block; } }
+</style></head>
+<body class="next-site next-article ai-note-page">
+<a class="skip-link" href="#content">跳到正文</a><div class="next-headband" aria-hidden="true"></div>
+<header class="next-header"><div class="next-header-inner"><div class="next-brand-column"><a class="next-brand" href="/home/">DOTAFS</a><p>Personal learning notes</p></div><nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/pbf.html">PBF Demo</a><a href="#references">参考资料</a></nav></div></header>
+<div class="next-page-layout">
+<main id="content" class="next-main"><article class="ai-note">
+<header class="note-header"><p class="note-meta">技术笔记 · <time datetime="2026-11-20">2026-11-20</time> · 约 18 分钟</p><h1>UE 4.26 Rendering Notes</h1><p class="note-subtitle">Shader permutation · PSO · Draw call · Vertex Factory</p><details class="note-mobile-contents"><summary>目录</summary><nav aria-label="手机文章目录"><a href="#section-1">1. Shader permutation</a>
+<a href="#section-2">2. Static Switch 和动态分支</a>
+<a href="#section-3">3. PSO、draw call、CommandList</a>
+<a href="#section-4">4. Component 怎么到 D3D12</a>
+<a href="#section-5">5. Vertex Factory</a>
+<a href="#section-6">6. 骨骼动画到 GPU</a>
+<a href="#section-7">7. 自定义 VF 为什么要加 Usage</a>
+<a href="#section-8">8. 母材质、MI 和缓存</a>
+<a href="#section-9">9. Global Shader 和运行时兜底</a>
+<a href="#section-10">10. 怎么检查实际效果</a>
+<a href="#references">参考资料</a></nav></details></header>
+<div class="note-prose"><p>加一个自定义 Vertex Factory，为什么材质突然多编了一堆 shader？因为 VF 不只是换个 vertex buffer，它也是 MeshMaterial shader 的编译维度。VF 注册进去以后，还要限制哪些材质、平台和 pass 可以用它。</p>
+<p>这里先顺一遍 shader permutation、PSO、draw call 的关系，再接到自定义 VF 的 Usage 过滤。按 UE 4.26 的常规 mesh rendering 路径讨论，D3D12 用来对照底层对象。</p>
+<h2 id="section-1">1. Shader permutation</h2>
+<p>同一份 shader 源码，给不同的编译期开关，得到不同的编译结果，这些结果就是 permutation。比如 <code>USE_NORMAL_MAP=0</code> 和 <code>1</code>，预处理以后已经是两份不同的程序。</p>
+<p>UE 里不只有材质图上的 Static Switch 会产生区别：</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>哪一层不同</th>
+<th>会改变什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Static Switch、Static Component Mask</td>
+<td>材质生成的 HLSL</td>
+</tr>
+<tr>
+<td>Blend Mode、Shading Model、Two Sided</td>
+<td>编译条件、渲染状态，以及能进入哪些 pass</td>
+</tr>
+<tr>
+<td>Vertex Factory</td>
+<td>顶点数据的读取和处理方式</td>
+</tr>
+<tr>
+<td>Mesh pass</td>
+<td>BasePass、DepthOnly、ShadowDepth 等对应的 shader 类型</td>
+</tr>
+<tr>
+<td>shader 自己的 permutation domain</td>
+<td>灯光、lightmap policy 等编译期组合</td>
+</tr>
+<tr>
+<td>Shader Platform、Feature Level</td>
+<td>可用功能、编译目标和输出格式</td>
+</tr>
+</tbody></table>
+</div>
+<p>这些维度里，有些是在选 shader，有些是在选状态，也有些只是在排除不支持的组合，不能把每一项都当作独立开关直接相乘。</p>
+<p>做一个简化计数：某个材质实际用了两套静态参数，两种 VF，三个 pass，两个 shader platform，并且这些组合都允许编译，那么有 <code>2 × 2 × 3 × 2 = 24</code> 个配置组合。每个 pass 可能还包含多个 shader stage；24 不是最后的 shader 二进制数量。</p>
+<p>再加一个两值的静态参数，只有两种配置都实际使用，才可能把这部分翻倍。并不是加一个 Static Switch 节点，工程就必然编满全部组合。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/parameter-expressions?application_version=4.27">Static Parameter 文档</a></p>
+<p>统计时，我会把它拆成两层看：</p>
+<pre><code class="language-text">实际使用的材质静态配置 / ShaderMap key
+  × 目标平台和质量配置
+  × 允许的 VF
+  × 允许的 shader 类型及其 permutation
+</code></pre>
+<p>这里的乘法只是估算结构。实际会经过过滤，也会复用已有缓存。Quality Switch、手机光照支持等编译期开关要算进去；阴影分辨率这类运行时设置，不能一概再乘一遍。</p>
+<h2 id="section-2">2. Static Switch 和动态分支</h2>
+<p>Static Switch 在编译时选分支，没选中的代码可以被删掉。动态 <code>if</code> 在运行时决定走哪条路，编译结果里仍然要支持这些路径。</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>做法</th>
+<th>编译侧</th>
+<th>运行侧</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>静态变体</td>
+<td>可能多套编译结果和 PSO</td>
+<td>每套可以针对固定条件优化</td>
+</tr>
+<tr>
+<td>动态分支</td>
+<td>可以减少编译组合</td>
+<td>需要考虑分支一致性、寄存器和实际执行成本</td>
+</tr>
+<tr>
+<td>逐实例数据＋共享 shader</td>
+<td>可以让多个实例共用程序</td>
+<td>仍须满足 instancing 的网格、绑定和状态条件</td>
+</tr>
+</tbody></table>
+</div>
+<p>动态分支不是一定慢。同一个 wave 内都走同一条路时，和各线程走不同路径的情况不一样；编译器也可能把短分支变成条件选择。动态分支能跳过不需要的计算，保留的多条路径又可能影响寄存器分配。最后要看生成代码和 GPU 时间，不能直接写成“动态一定多执行两边”或“寄存器一定等于最重分支”。<a href="https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-optimize">HLSL 优化说明</a></p>
+<h3>同一个 shader，就能合成一个 draw 吗</h3>
+<p>还不够。以常规 indexed instancing 为例，需要相容的网格与索引、PSO、shader 资源绑定，以及能逐实例读取的差异数据。只把 Static Switch 换成动态 bool，如果每个 MI 还绑定不同的材质 uniform buffer，也不一定能合批。</p>
+<p>例如把颜色、形变权重放到实例 buffer 或受支持的 primitive data 路径里，shader 用实例或 primitive ID 去取，才有机会让这些差异不再拆开 draw。具体能不能合，取决于那条 VF 和渲染路径。</p>
+<p>100 把椅子和 50 张桌子可以共享一个 PSO。但椅子、桌子不是同一套网格，在相同 LOD、section、pass 和绑定条件下，可以分别 instancing 成两次 draw，不会仅凭 shader 相同就自动变成一次。ISM/HISM 本身也会因 section、LOD、pass 等拆开，不能按“一个 Component 等于一个 DC”计算。</p>
+<p>如果瓶颈在 CPU 提交，可以看减少 draw 和状态切换是否有用；如果瓶颈在像素计算，就要比较动态路径的 GPU 开销。只给出“五个物体”这个数量，判断不了哪种更快。</p>
+<h2 id="section-3">3. PSO、draw call、CommandList</h2>
+<p>PSO，Pipeline State Object，保存的是管线配置。它不是一个渲染物体，也不保存“这次画哪张桌子”。</p>
+<p>以 D3D12 graphics PSO 为例：</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>在 PSO 里</th>
+<th>画的时候另外绑定或设置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>VS、PS 等 shader 字节码</td>
+<td>实际使用的 vertex/index buffer</td>
+</tr>
+<tr>
+<td>Input Layout</td>
+<td>texture、SRV、CBV 等资源绑定</td>
+</tr>
+<tr>
+<td>Blend、Rasterizer、DepthStencil state</td>
+<td>viewport、scissor、stencil reference</td>
+</tr>
+<tr>
+<td>RT/Depth 格式、采样数</td>
+<td>实际的 render target 资源</td>
+</tr>
+<tr>
+<td>Primitive Topology Type、Root Signature</td>
+<td>具体 topology、draw 参数和 root 参数值</td>
+</tr>
+</tbody></table>
+</div>
+<p>这里 Input Layout 是顶点格式，不是顶点数据本身；Root Signature 是参数布局，也不是这一帧的参数值。因此，换网格 buffer 或变换矩阵，不必然换 PSO。Compute PSO 则主要由 CS 和 Root Signature 等描述组成。<a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/managing-graphics-pipeline-state-in-direct3d-12">D3D12 pipeline state</a></p>
+<p>draw call 是一次 <code>Draw*</code> 调用。<code>Dispatch</code> 是 compute 的派发，通常单独统计，不把它混作 mesh draw call。</p>
+<p>CommandList 记录这些命令：</p>
+<pre><code class="language-cpp">// 顺序示意，省略完整初始化和资源状态处理。
+list-&gt;SetPipelineState(PSO_A);
+// 绑定 root signature、资源、vertex/index buffer。
+list-&gt;DrawIndexedInstanced(...);   // draw 1
+// 换资源或参数，仍可以使用 PSO_A。
+list-&gt;DrawIndexedInstanced(...);   // draw 2
+list-&gt;SetPipelineState(PSO_B);
+list-&gt;DrawIndexedInstanced(...);   // draw 3
+list-&gt;Close();
+
+queue-&gt;ExecuteCommandLists(...);
+</code></pre>
+<p>一个 list 可以录很多 draw，queue 再接收 list 提交。录制、提交和 GPU 完成是三个时间点；<code>ExecuteCommandLists</code> 返回，不代表 GPU 已经画完。资源和 command allocator 什么时候能复用，要用 fence 等同步机制管理。<a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/recording-command-lists-and-bundles">Command list 的录制与执行</a></p>
+<h3>PSO 和首次卡顿</h3>
+<p>shader 编译结果通常由 UE 在编辑器或 cook 阶段准备；驱动创建 PSO 时，还要处理具体硬件上的管线组合。如果在用到时才创建，这部分工作可能造成 hitch。</p>
+<p>UE4 的 PSO cache 可以记录使用过的组合，再安排提前创建。但它需要覆盖实际会用到的状态，不能理解成“有缓存就保证不卡”。4.26 的这套流程也不要和新版本的自动 PSO precaching 混在一起。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/gathering-pso-data?application_version=4.27">UE4 PSO 数据采集</a></p>
+<p>同一个 shader 可以进入多个 PSO，一个 graphics PSO 又包含多个 shader stage。因此 shader 变体数和 PSO 数没有固定的大小关系。</p>
+<h2 id="section-4">4. Component 怎么到 D3D12</h2>
+<p>先看数据经过哪些对象：</p>
+<pre><code class="language-text">UPrimitiveComponent                 游戏线程上的组件
+  → FPrimitiveSceneProxy            提供渲染线程使用的表示
+  → FMeshBatch                      VF、材质、索引范围、实例数
+  → FMeshPassProcessor              为当前 pass 选 shader 和状态
+  → FMeshDrawCommand                保存绑定、管线和 draw 参数
+  → 排序 / 尝试合并
+  → FRHICommandList                 UE 的 RHI 命令
+  → D3D12 command context/list      翻译为 D3D12 调用
+  → CommandQueue → GPU
+</code></pre>
+<p>SceneProxy 的作用是把渲染线程需要的数据和游戏线程上的 UObject 分开。Component 改变以后，通过渲染命令更新数据，或者重建 Proxy，而不是让渲染线程随时去读一个可能被修改的 Component。</p>
+<p>Proxy 提供 MeshBatch；pass processor 再决定这个 batch 能不能进当前 pass，用哪个 shader、绑定什么资源。静态路径可以缓存 MeshBatch，满足条件时也可以缓存 MeshDrawCommand；动态路径会按帧或视图生成需要的描述，不是每个物体的全部工作都能永久缓存。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/mesh-drawing-pipeline?application_version=4.27">Mesh Drawing Pipeline</a></p>
+<p>一张网格有两个材质 section，假设它们都进入 Depth、Base、Shadow 三个绘制阶段，暂不合批，可以先按 <code>2 × 3 = 6</code> 次绘制估算。实际是否走完整 depth pass、阴影有多少个视图、哪些 section 可见，都会改变数量。</p>
+<p>UE 可以把相容的 draw 排在一起，用状态缓存避免重复绑定；满足更严格条件时，再做 dynamic instancing。少调用 <code>SetPipelineState</code> 和少一次 draw 是两种优化，不能只看其中一个数量。</p>
+<h2 id="section-5">5. Vertex Factory</h2>
+<p>VF 是材质 shader 读取网格数据的一套接口。C++ 侧准备 vertex stream、声明格式、绑定 buffer 和参数；shader 侧实现怎么读顶点，以及怎样得到材质计算需要的位置、切线和插值数据。</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>部分</th>
+<th>负责什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>FVertexFactory</code> 派生类</td>
+<td>顶点声明、stream 和 VF 类型相关信息</td>
+</tr>
+<tr>
+<td><code>FVertexFactoryShaderParameters</code> 派生类</td>
+<td>为 shader 收集、绑定 VF 参数</td>
+</tr>
+<tr>
+<td>VF 的 <code>.ush</code></td>
+<td>定义输入、中间结果，以及位置和材质参数接口</td>
+</tr>
+<tr>
+<td>VF type 注册信息</td>
+<td>把 shader 路径、能力和编译规则接入引擎</td>
+</tr>
+</tbody></table>
+</div>
+<p>可以把 <code>.ush</code> 看作编译时选定的接口实现。不同 VF 接到同一个 pass 的材质逻辑上，会形成不同的编译组合。它不是 GPU 运行到一半再去调用一个 C++ 虚函数。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/shader-development?application_version=4.27">Vertex Factory 接口</a></p>
+<p>常见的区别在数据来源：LocalVF 处理常规静态网格数据，GPUSkinVF 加入骨骼索引和权重，instanced mesh 的路径还要读取逐实例数据。</p>
+<h3>CS 先写位置，VF 再读</h3>
+<p>假设 compute shader 把形变结果写进一个共享 buffer，顶点端可以根据 <code>instance offset + vertex ID</code> 找到对应位置，再进入后续材质与 pass 的计算。</p>
+<pre><code class="language-text">模拟状态
+  → CS 写 position / tangent buffer
+  → 资源访问转换与必要同步
+  → VF 读取结果
+  → 材质 WPO、pass shader
+  → 光栅化、PS、RT
+</code></pre>
+<p>这时要核对的不只是 position：normal、tangent、上一帧位置、实例偏移、LOD 的索引范围也要对应。不然 BasePass 能画出来，Velocity 或 Shadow 仍可能不对。</p>
+<p>但“用了 CS buffer”不代表一定要写新 VF。LocalVF 本身有 manual fetch 等路径；如果输出能满足现有 VF 的格式和绑定约定，可以先看能不能复用。只有寻址、输入结构或参数接口确实不相容时，再加自己的 VF。</p>
+<h2 id="section-6">6. 骨骼动画到 GPU</h2>
+<p>VS 不需要知道角色当前在 walk 还是 run。动画系统先计算 pose，再把骨骼变换转换成蒙皮需要的数据。GPU 读取的是 bone index、weight 和矩阵。</p>
+<pre><code class="language-text">动画更新：状态、混合权重
+  → pose 求值：局部骨骼变换、组件空间变换
+  → 按配置合入物理结果
+  → 生成 RefToLocal 蒙皮矩阵
+  → 通过渲染数据更新上传
+  → GPUSkin VS 或 Skin Cache CS
+</code></pre>
+<p>动画更新、并行求值、物理混合和最终提交有各自的任务依赖，不适合简单写成“每帧全在同一个 CPU 函数里算完”。不过，对 GPU 接口来说，结果仍然是一套当前可用的骨骼数据。</p>
+<p>按 UE 常见的行向量记法，可以把位置蒙皮简写成：</p>
+<pre><code class="language-text">RefToLocal[b] = InverseBind[b] × CurrentComponentSpace[b]
+p_component  = Σ weight[b] × (p_bind × RefToLocal[b])
+p_world      = p_component × LocalToWorld
+</code></pre>
+<p><code>InverseBind</code> 把绑定姿态下的顶点退回对应骨骼空间，当前骨骼变换再把它带到现在的位置。换成列向量约定时乘法顺序要对应调整；切线、法线和各种蒙皮路径还需要各自的处理。</p>
+<p>切动画状态，通常只是更新上传的数据，不会因为 walk 变成 run 就新编一份 shader。是否启用 Skin Cache、权重格式、cloth 等渲染路径变化，则是另一回事。</p>
+<p>Skin Cache 的思路和前面相近：用 CS 先得到变形后的顶点数据，再供后续绘制读取，减少某些重复计算。它也有 buffer、派发和带宽成本，不能只因为改成 CS 就断言角色更快。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-rendering-paths-in-unreal-engine">路径机制对照：现行 Skeletal Mesh Rendering Paths 文档</a></p>
+<h2 id="section-7">7. 自定义 VF 为什么要加 Usage</h2>
+<p>材质的 ShaderMap 要收集它需要的 shader。对 MeshMaterial shader，VF 是其中一维。如果自定义 VF 对大量材质都返回允许编译，这些材质就可能多出该 VF 对应的 BasePass、Depth、Shadow 等组合。</p>
+<p>Usage 在这里提供一个明确条件：材质是否准备给这条 VF 用。编译前的过滤大致是：</p>
+<pre><code class="language-text">材质是否允许这个 Usage
+  &amp;&amp; VF 是否支持目标平台和材质
+  &amp;&amp; pass shader 是否接受这个组合
+  &amp;&amp; 这个 shader permutation 的其他条件
+</code></pre>
+<p>这几层都允许，组合才有机会编译。VF 的 <code>ShouldCompilePermutation</code> 只管其中一部分，并不是它返回 true 就保证所有 pass 都编。</p>
+<h3>把开关传到编译参数</h3>
+<p>如果要在 4.26 加一个新的 <code>bUsedWithMyFeature</code>，它属于引擎改动，不是给插件类随便加个 bool 就能接入现成的材质 Usage。</p>
+<pre><code class="language-text">UMaterial：保存 Usage
+  → Material / MaterialResource：暴露有效值
+  → FMaterialShaderParameters：保存编译时快照
+  → 自定义 VF::ShouldCompilePermutation：读取并过滤
+</code></pre>
+<p>可以沿已有 Usage 的实现去找：</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>位置或符号</th>
+<th>要检查的内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Material.h</code>、<code>MaterialInterface.h</code></td>
+<td>属性、访问接口、默认值与继承</td>
+</tr>
+<tr>
+<td><code>Material.cpp</code>、材质资源实现</td>
+<td>资源拿到的值是否与资产一致</td>
+</tr>
+<tr>
+<td><code>FMaterialShaderParameters</code></td>
+<td>编译参数里能不能读到这位</td>
+</tr>
+<tr>
+<td>ShaderMap/DDC key 与失效路径</td>
+<td>新规则会不会继续命中旧的编译集</td>
+</tr>
+<tr>
+<td>材质编辑与保存路径</td>
+<td>切换开关后能否正确更新并保存</td>
+</tr>
+</tbody></table>
+</div>
+<p>下面只表示过滤逻辑。成员 <code>bIsUsedWithMyFeature</code> 来自上述引擎改动；<code>SupportsMyVFPlatform</code>、<code>SupportsMyVFMaterial</code> 是项目自己的检查函数，不是可以直接复制的完整引擎补丁。</p>
+<pre><code class="language-cpp">static bool ShouldCompilePermutation(
+    const FVertexFactoryShaderPermutationParameters&amp; Parameters)
+{
+#if MY_ENGINE_HAS_CUSTOM_USAGE
+    const auto&amp; Material = Parameters.MaterialParameters;
+    const bool bAllowedMaterial = Material.bIsUsedWithMyFeature
+        || Material.bIsSpecialEngineMaterial;
+
+    return bAllowedMaterial
+        &amp;&amp; SupportsMyVFPlatform(Parameters.Platform)
+        &amp;&amp; SupportsMyVFMaterial(Material);
+#else
+    return false;
+#endif
+}
+</code></pre>
+<p>平台条件按实际功能来定：是否只支持某个 RHI、feature level，是否需要 compute 和 manual fetch。继承 LocalVF 时也要检查哪些基类规则应该保留，不能盲目追加一个基类判断，又把自己的合法材质全挡掉。</p>
+<p><code>bIsSpecialEngineMaterial</code> 是给引擎的特殊材质留通路，其中包括 fallback 和调试用材质。它们仍然受平台与实际能力约束，也不等于整个工程只有一份 DefaultMaterial 编译开销。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/shader-development?application_version=4.27">Special Engine Materials</a></p>
+<p><code>ModifyCompilationEnvironment</code> 给当前组合设置 define；permutation domain 则定义还要枚举哪些配置。固定 define 不会凭空多出一个枚举维度，但现有 pass、lightmap 等维度仍然在，不能因此说“每个平台只剩一个 shader”。</p>
+<h2 id="section-8">8. 母材质、MI 和缓存</h2>
+<p>先把三种变化分开：</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>变化</th>
+<th>常见影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MI 改颜色、roughness 等普通参数</td>
+<td>更新参数，可以复用对应的编译结果</td>
+</tr>
+<tr>
+<td>MI 改 Static Switch 或编译相关的 Base Property</td>
+<td>可能需要不同的静态配置和 ShaderMap</td>
+</tr>
+<tr>
+<td>多个 MI 使用同一套有效静态配置</td>
+<td>有机会复用相同结果，不是按 MI 资产数量各编整套</td>
+</tr>
+</tbody></table>
+</div>
+<p>因此，估算编译量要数有效配置，不能直接拿 MI 数量乘所有 VF 和 pass。配置改变以后，也不是所有 shader 无条件从零重编，DDC 和 shader 代码缓存可能复用已有结果。</p>
+<p>原生的材质 Usage 主要设在母材质。若还要让 MI 单独覆盖自定义 Usage，需要自己扩展覆盖结构、有效值继承、比较、序列化、静态资源选择与缓存 key。只在编辑器面板加一个勾选框是不够的。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/material-properties?application_version=4.27">Material Usage Flags</a></p>
+<p>MI 覆盖如果改变了需要的编译集，就必须让对应缓存标识反映这个变化；否则资产上显示开了，资源却可能还拿到不包含该 VF 的旧结果。MID 运行时改参数，也不能让 cooked 包里凭空长出之前没有编译的 shader。</p>
+<p>我会先把 Usage 放在合适的母材质上，确认实际需要的配置数量，再决定有没有必要给 MI 增加覆盖能力。不是“越多地方能勾越方便”，因为每个入口都要把资源和缓存一起接完整。</p>
+<p>如果插件必须兼容改过和没改过的引擎，可以用一个明确的构建能力宏，把新接口引用隔开。Build.cs 搜索头文件字符串能做临时检测，但注释、旧声明或不完整补丁也可能误判；检测到名字不等于整条链已经可用。</p>
+<h2 id="section-9">9. Global Shader 和运行时兜底</h2>
+<p>“CS 算位置＋VF 绘制”包含两套编译规则。</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>跟什么关联</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>FGlobalShader</code></td>
+<td>shader type、平台、自己的 permutation 与功能条件；不逐材质生成</td>
+</tr>
+<tr>
+<td><code>FMaterialShader</code></td>
+<td>需要材质，但不需要 VF 的 shader</td>
+</tr>
+<tr>
+<td><code>FMeshMaterialShader</code></td>
+<td>需要材质与 VF，例如常见 mesh pass 的 shader</td>
+</tr>
+</tbody></table>
+</div>
+<p>插件的计算 shader 如果注册为 Global Shader，材质 Usage 不会顺便帮它过滤。它要用自己的 <code>ShouldCompilePermutation</code> 限制平台和功能；如果还有 N 种自身配置，允许的平台上仍然可能有 N 份。Global/Material/MeshMaterial 是关联方式，VS/PS/CS 是 shader stage，两组概念不是同一层。</p>
+<h3>没编出 VF shader，运行时怎么办</h3>
+<p>编译时删掉的组合，不能在 cooked 游戏里靠一次勾选立即补回来。Proxy 创建或更新时，就要决定是否进入自定义路径。</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>条件</th>
+<th>处理方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>平台、材质、shader 和资源都满足</td>
+<td>走自定义 VF</td>
+</tr>
+<tr>
+<td>材质没有 Usage，但普通网格路径仍有完整数据</td>
+<td>退回普通 VF，输出明确的槽位诊断</td>
+</tr>
+<tr>
+<td>要保留自定义几何，但当前材质不能用</td>
+<td>在该 VF 的 fallback shader 和资源都齐全时，使用合适的默认材质</td>
+</tr>
+<tr>
+<td>平台不支持，或本就没有可用的普通网格数据</td>
+<td>提供另一条完整路径，或明确跳过绘制</td>
+</tr>
+</tbody></table>
+</div>
+<p>不能只换成 DefaultMaterial 就认为解决了所有问题；缺的是 VF 本身、buffer 或平台能力时，换材质没用。CS 写 UAV、绘制读 SRV 之间的访问状态和同步，也要走正确的 RHI 路径。</p>
+<p>如果接入引擎的标准 Usage 检查，还要留意编辑器里的自动设置行为。在相应设置和路径允许时，编辑器可能自动补 Usage 并要求保存。想严格控制哪些材质进入编译集，就要把这个行为纳入设计，而不是一边过滤、一边又自动全部打开。</p>
+<h2 id="section-10">10. 怎么检查实际效果</h2>
+<p>这份笔记没有对应的 4.26 工程测量数据。改完之后，需要分别检查编译量、运行正确性和渲染开销，不能拿其中一个替代另外两个。</p>
+<p>先准备几组材质：不开自定义 Usage、开启、普通参数不同的 MI、静态配置不同的 MI，再加一个 fallback 情况。在相同平台、质量和 cook 条件下比较。</p>
+<div class="note-table" role="region" aria-label="对照表" tabindex="0"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>记录什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>编译过滤</td>
+<td>哪些材质出现了自定义 VF 的 shader，哪些没有</td>
+</tr>
+<tr>
+<td>缓存</td>
+<td>重新启动、重新 cook 后，Usage 和编译结果是否一致；区分首次编译与缓存命中</td>
+</tr>
+<tr>
+<td>pass 正确性</td>
+<td>BasePass、Depth、Shadow、Velocity 各自是否使用了正确数据</td>
+</tr>
+<tr>
+<td>draw 合并</td>
+<td>相同网格与状态是否合并，分开的 draw 差在哪项绑定</td>
+</tr>
+<tr>
+<td>CPU/GPU</td>
+<td>render/RHI 提交时间、GPU pass 时间、首次使用和热缓存情况</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>缺 Usage、平台不支持、部分材质槽未配置时，是否按预期处理</td>
+</tr>
+</tbody></table>
+</div>
+<p>shader 编译日志和 debug dump 可以按材质、VF、shader type 找到对应结果；UE4 的 <code>r.DumpShaderDebugInfo</code> 适合在小样例上临时打开。RenderDoc/PIX 看实际 draw、PSO 和资源，<code>stat RHI</code>、GPU profiler、Insights 分别帮助核对计数和耗时。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/debugging-the-shader-compile-process?application_version=4.27">Shader Compile 调试</a></p>
+<p>对照代码时，可以从这些地方开始找，路径相对 <code>Engine/</code>：</p>
+<pre><code class="language-text">Source/Runtime/Engine/Classes/Materials/Material.h
+Source/Runtime/Engine/Public/MaterialShared.h
+Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp
+Source/Runtime/Engine/Private/LocalVertexFactory.cpp
+Source/Runtime/Engine/Private/GPUSkinVertexFactory.cpp
+Source/Runtime/Engine/Private/GPUSkinCache.cpp
+Shaders/Private/LocalVertexFactory.ush
+Shaders/Private/GpuSkinVertexFactory.ush
+</code></pre>
+<p>先确认数据怎样到 VF，再确认哪些组合被编译，最后看哪些 draw 真正合上了。这样编译量变多、shader 缺失和 draw 太多，能落到各自对应的位置去查。</p>
+<h2 id="references">参考资料</h2>
+<p>本文由原始渲染笔记重新整理。公开文档以 UE 4.27 页面为主；Skeletal Mesh Rendering Paths 使用现行页面，只对照 GPUSkin 与 Skin Cache 的基本关系。4.26 的具体结构、宏签名和调用位置仍以对应引擎分支为准。代码块中的省略号和项目函数表示实现思路，不是一份已编译验证的引擎补丁。</p>
+<ul>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/mesh-drawing-pipeline?application_version=4.27">Epic · Mesh Drawing Pipeline</a></li>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/shader-development?application_version=4.27">Epic · Shader Development</a></li>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/material-properties?application_version=4.27">Epic · Material Properties / Usage Flags</a></li>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/parameter-expressions?application_version=4.27">Epic · Parameter Expressions</a></li>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-rendering-paths-in-unreal-engine">Epic · Skeletal Mesh Rendering Paths（现行文档）</a></li>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/gathering-pso-data?application_version=4.27">Epic · Gathering PSO Data</a></li>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/debugging-the-shader-compile-process?application_version=4.27">Epic · Debugging the Shader Compile Process</a></li>
+<li><a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/managing-graphics-pipeline-state-in-direct3d-12">Microsoft · Managing Graphics Pipeline State in D3D12</a></li>
+<li><a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/recording-command-lists-and-bundles">Microsoft · Recording Command Lists and Bundles</a></li>
+<li><a href="https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-optimize">Microsoft · Optimizing HLSL Shaders</a></li>
+</ul>
+</div>
+<footer class="note-end"><a href="/home/#articles">← 文章目录</a><a href="ue426-rendering-notes.md" download>Markdown 原稿</a></footer>
+</article></main>
+<aside class="next-sidebar note-toc" aria-label="文章目录"><p>本文目录</p><nav><a href="#section-1">1. Shader permutation</a>
+<a href="#section-2">2. Static Switch 和动态分支</a>
+<a href="#section-3">3. PSO、draw call、CommandList</a>
+<a href="#section-4">4. Component 怎么到 D3D12</a>
+<a href="#section-5">5. Vertex Factory</a>
+<a href="#section-6">6. 骨骼动画到 GPU</a>
+<a href="#section-7">7. 自定义 VF 为什么要加 Usage</a>
+<a href="#section-8">8. 母材质、MI 和缓存</a>
+<a href="#section-9">9. Global Shader 和运行时兜底</a>
+<a href="#section-10">10. 怎么检查实际效果</a>
+<a href="#references">参考资料</a></nav><hr><a href="/home/#articles">全部文章</a></aside>
+</div>
+<footer class="next-footer"><p>© 2026 DOTAFS</p><p>界面结构基于 <a href="https://theme-next.js.org/">NexT · Gemini</a></p></footer>
+</body></html>
