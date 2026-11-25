@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GTA头发如何制作 · DOTAFS</title>
+<meta name="description" content="从 GTA VI 披发样本看 GPU 逐点和逐束约束、发丝插值与窄带展开，附单步模拟耗时。"><meta name="theme-color" content="#1b1d1c">
+<meta property="og:title" content="GTA头发如何制作 · DOTAFS"><meta property="og:description" content="从 GTA VI 披发样本看 GPU 逐点和逐束约束、发丝插值与窄带展开，附单步模拟耗时。"><meta property="og:type" content="article"><meta property="article:published_time" content="2026-11-25">
+<link rel="canonical" href="https://dotafs.com/articles/hairlab.html"><link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/next-palette.css">
+<script src="/site-language.js" defer></script>
+<style>
+:root {
+  color-scheme: dark;
+  --rail-width: clamp(205px, 16vw, 266px);
+  --inset: clamp(22px, 2.6vw, 52px);
+  --mono: "IBM Plex Mono", "PingFang SC", monospace;
+}
+.ai-note-page {
+  --next-menu: #171918;
+  --next-body: #1b1d1c;
+  --next-content: #222423;
+  --next-card: rgb(232 232 228 / 5%);
+  --next-line: rgb(232 232 228 / 14%);
+  --next-muted: #acada8;
+  --next-accent: #a7b5ab;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--next-body); color: var(--next-text); font: 1rem/1.75 "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+a { color: var(--next-accent); text-underline-offset: .2em; }
+a:hover { color: var(--next-heading); }
+:focus-visible { outline: 2px solid var(--next-accent); outline-offset: 2px; }
+.skip-link { position: absolute; z-index: 2; top: 6px; left: 8px; transform: translateY(-160%); padding: 6px 14px; background: var(--next-card); }
+.skip-link:focus { transform: none; }
+.next-headband { height: 1px; background: var(--next-accent); }
+.next-header { background: var(--next-menu); border-bottom: 1px solid var(--next-line); }
+.next-header-inner, .next-page-layout { display: grid; grid-template-columns: var(--rail-width) minmax(0, 1fr); }
+.next-header-inner { min-height: 54px; }
+.next-brand-column { display: flex; align-items: center; padding-inline: 24px; border-right: 1px solid var(--next-line); }
+.next-brand { color: var(--next-heading); font-size: 1.2rem; font-weight: 400; letter-spacing: .08em; }
+.next-header a, .note-toc a, .note-mobile-contents a { text-decoration: none; }
+.next-header-content { display: flex; align-items: center; justify-content: space-between; padding-inline: var(--inset); gap: 12px; }
+.next-menu, .next-language-switch { display: flex; align-items: center; flex-wrap: wrap; }
+.next-menu { gap: clamp(10px, 2vw, 30px); }
+.next-header .next-menu a, .next-language-switch a { padding-block: 10px; color: var(--next-muted); font-size: .875rem; }
+.next-language-switch { order: 1; gap: 8px; color: var(--next-line); }
+.next-header a:is(.is-active,:hover) { color: var(--next-heading); }
+.next-header .next-language-switch .is-active { box-shadow: inset 0 -1px var(--next-accent); }
+.next-page-layout { grid-template-areas: "toc article"; }
+.next-main { background: var(--next-content); grid-area: article; min-width: 0; }
+.ai-note { padding: 24px var(--inset) 44px; overflow-wrap: anywhere; }
+.note-header { padding-bottom: 15px; margin-bottom: 17px; border-bottom: 1px solid var(--next-line); }
+.note-meta, .note-subtitle { margin: 0; color: var(--next-muted); }
+.note-meta { font: .78rem/1.6 var(--mono); }
+h1, h3, th { color: var(--next-heading); }
+h1 { font-weight: 500; margin: 7px 0 3px; font-size: clamp(1.65rem, 2.1vw, 2.2rem); line-height: 1.3; letter-spacing: -.025em; }
+.note-subtitle { font-size: .92rem; }
+.note-prose p { max-width: 72em; margin: 10px 0; }
+.note-prose h2 { color: var(--next-heading); font-weight: 500; font-size: 1.42rem; line-height: 1.45; margin: 29px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--next-line); scroll-margin-top: 16px; }
+.note-prose h3 { margin: 22px 0 6px; font-size: 1.08rem; }
+.note-prose ul, .note-prose ol { margin: 8px 0 14px; padding-left: 1.6em; }
+.note-prose li { margin: 4px 0; }
+code, pre { font-family: var(--mono); }
+:not(pre) > code { font-size: .87em; color: var(--next-text); background: var(--next-card); padding: .08em .32em; border-radius: 3px; }
+pre { max-width: 100%; overflow: auto; background: var(--next-menu); border: 1px solid var(--next-line); border-radius: 3px; padding: 13px 17px; margin: 13px 0 18px; font-size: .86rem; line-height: 1.65; }
+.note-table { overflow-x: auto; margin: 12px 0 17px; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: .92rem; line-height: 1.6; }
+th, td { padding: 7px 12px; text-align: left; vertical-align: top; border: 1px solid var(--next-line); }
+th { background: var(--next-card); font-weight: 500; }
+.note-toc { grid-area: toc; position: sticky; top: 0; align-self: start; height: 100vh; height: 100dvh; overflow-y: auto; padding: 25px 13px; background: var(--next-menu); border-right: 1px solid var(--next-line); }
+.note-toc > p { font-weight: 600; margin: 0 10px 13px; color: var(--next-heading); }
+.note-toc nav a { display: grid; grid-template-columns: 1.6em 1fr; gap: 5px; align-items: baseline; padding: 6px 9px; line-height: 1.5; border-left: 2px solid transparent; }
+.note-toc a, .note-mobile-contents a { font-size: .875rem; color: var(--next-muted); }
+.note-toc nav a span:first-child { font: .78rem/1.5 var(--mono); }
+.note-toc a:hover, .note-toc a[aria-current] { color: var(--next-heading); background: var(--next-card); }
+.note-toc nav a[aria-current] { border-left-color: var(--next-accent); }
+.note-toc hr { border: 0; border-top: 1px solid var(--next-line); margin: 16px 9px 12px; }
+.note-toc > a { margin-inline: 11px; }
+.note-end, .next-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--next-line); font-size: .84rem; }
+.note-end { margin-top: 30px; padding-top: 16px; }
+.next-footer { color: var(--next-muted); padding: 14px var(--inset); }
+.next-footer p { margin: 0; }
+.note-mobile-contents { display: none; }
+@media (max-width: 799px) {
+  :root { --inset: clamp(16px, 3.4vw, 26px); }
+  .next-header-inner, .next-page-layout { display: block; }
+  .next-header-inner { position: relative; }
+  .next-brand-column { height: 42px; padding-inline: var(--inset); border: 0; }
+  .next-language-switch { position: absolute; top: 0; right: var(--inset); }
+  .next-header-content, .next-menu { padding-inline: var(--inset); }
+  .next-header-content .next-menu { padding: 0; }
+  .next-menu { gap: 15px; }
+  .next-header .next-menu a { padding: 3px 0 9px; }
+  .note-toc { display: none; }
+  .ai-note { padding-top: 19px; }
+  .note-mobile-contents { display: block; width: fit-content; margin-top: 10px; font-size: .9rem; }
+  .note-mobile-contents summary { cursor: pointer; color: var(--next-accent); }
+  .note-mobile-contents nav { display: grid; padding: 6px 0; }
+  .note-mobile-contents a { padding: 4px 0; }
+  .note-prose h2 { font-size: 1.28rem; }
+}
+</style><link rel="stylesheet" href="hairlab.css"><script src="hairlab.js" defer></script></head>
+<body class="next-site next-article ai-note-page">
+<a class="skip-link" href="#content">跳到正文</a><div class="next-headband" aria-hidden="true"></div>
+<header class="next-header"><div class="next-header-inner"><div class="next-brand-column"><a class="next-brand" href="/home/">DOTAFS</a></div><nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/pbf.html">PBF Demo</a><a href="#lab">页内实验</a></nav></div></header>
+<div class="next-page-layout">
+<main id="content" class="next-main"><article class="ai-note">
+<header class="note-header"><p class="note-meta">图形学笔记 · <time datetime="2026-11-25">2026-11-25</time></p><h1>GTA头发如何制作</h1><details class="note-mobile-contents"><summary>目录</summary><nav aria-label="文章章节"><a href="#lab">披发 Demo</a>
+<a href="#motion">GPU 怎么算头发运动</a>
+<a href="#strands">GPU 怎么画出细丝</a>
+<a href="#timing">模拟一步花多久</a></nav></details></header>
+<div class="note-prose"><section class="hair-lab" id="lab" aria-label="HairLab 页内实验">
+  <div class="lab-console"><span class="lab-prompt">披发实验</span><a id="start-lab" href="../assets/hairlab/index.html?motion=2">运行披发 Demo</a><button type="button" id="stop-lab" hidden>关闭 Demo</button></div>
+  <div id="lab-poster"><img loading="lazy" src="../assets/hairlab-figures/guide-comparison.webp" width="1324" height="440" alt="附件里的发丝对照，疏密不同的引导线与最终渲染的披发并排展示。"></div>
+  <div id="lab-view"></div>
+  <p class="lab-caption">切换「游戏原始引导丝」和「动态模拟」，对照 192 根引导丝和插值后的披发。</p>
+</section>
+<p>这份 GTA VI 披发样本里，一根引导丝从发根到发梢有 35 个点，整头一共 192 根。转头时，先解这 6,720 个点怎么动，再在引导丝之间插出可见的细丝。</p>
+<h2 id="motion">GPU 怎么算头发运动</h2>
+<p>我们回放这束头发时，GPU 的计算分成两步。先逐点处理速度和碰撞，再沿每根引导丝修正相邻两点的距离。</p>
+<p>取相邻两点的位置 <math><mrow><msub><mi>p</mi><mrow><mi>i</mi><mo>−</mo><mn>1</mn></mrow></msub><mo separator="true">,</mo><msub><mi>p</mi><mi>i</mi></msub></mrow></math>，记它们静止时相距 <math><msub><mi>L</mi><mi>i</mi></msub></math>。段长约束和需要消掉的拉伸量可以写成</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><mi>d</mi><mo>=</mo><msub><mi>p</mi><mi>i</mi></msub><mo>−</mo><msub><mi>p</mi><mrow><mi>i</mi><mo>−</mo><mn>1</mn></mrow></msub><mo separator="true">,</mo><mspace width="2em"></mspace><mi>C</mi><mo form="prefix" stretchy="false">(</mo><mi>d</mi><mo form="postfix" stretchy="false">)</mo><mo>=</mo><mo form="prefix" stretchy="false">‖</mo><mi>d</mi><mo form="postfix" stretchy="false">‖</mo><mo>−</mo><msub><mi>L</mi><mi>i</mi></msub><mi>.</mi></mrow></math></div>
+<p>如果这段原长 10 mm，转头后两点相距 12 mm，就沿着 <math><mi>d</mi></math> 的方向收回 2 mm。修正只沿这段的方向做，发束仍然可以弯。</p>
+<p>本页 Demo 把引导丝放在 CPU 上，用带阻尼的 Verlet 积分预测位置。<math><msub><mi>a</mi><mi>n</mi></msub></math> 是当前加速度，<math><mrow><mi>h</mi><mo>=</mo><mn>1</mn><mi>/</mi><mn>90</mn></mrow></math> 秒。每一步先算下式，再做五轮段长和碰撞修正。</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msubsup><mi>p</mi><mrow><mi>n</mi><mo>+</mo><mn>1</mn></mrow><mo lspace="0em" rspace="0em" class="tml-med-pad">∗</mo></msubsup><mo>=</mo><msub><mi>p</mi><mi>n</mi></msub><mo>+</mo><mn>0.965</mn><mspace width="0.1667em"></mspace><mo form="prefix" stretchy="false">(</mo><msub><mi>p</mi><mi>n</mi></msub><mo>−</mo><msub><mi>p</mi><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></msub><mo form="postfix" stretchy="false">)</mo><mo>+</mo><msub><mi>a</mi><mi>n</mi></msub><msup><mi>h</mi><mn>2</mn></msup><mi>.</mi></mrow></math></div>
+<p>侧风拉满时，两点可以分别从耳朵两边绕过去，连线却从耳朵里面穿过去。所以头部碰撞还要检查整段发丝。把引导点转回头部坐标，在头模的皮肤三角形上求交。设交点为 <math><mi>s</mi></math>，朝外的单位法向为 <math><mi>n</mi></math>。当 <math><mrow><mo form="prefix" stretchy="false">(</mo><mi>p</mi><mo>−</mo><mi>s</mi><mo form="postfix" stretchy="false">)</mo><mo>⋅</mo><mi>n</mi><mo>&lt;</mo><mn>0</mn></mrow></math>，点已经到了皮肤内侧，要把它推回去。</p>
+<h2 id="strands">GPU 怎么画出细丝</h2>
+<p>每根可见发丝存两项重心权重，第三项用 <math><mrow><mn>1</mn><mo>−</mo><msub><mi>w</mi><mn>1</mn></msub><mo>−</mo><msub><mi>w</mi><mn>2</mn></msub></mrow></math> 补出来。取三根引导丝上相同编号的点 <math><mrow><msub><mi>g</mi><mrow><mn>1</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo separator="true">,</mo><msub><mi>g</mi><mrow><mn>2</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo separator="true">,</mo><msub><mi>g</mi><mrow><mn>3</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub></mrow></math>，Demo 在顶点着色器里算出细丝上的第 <math><mi>k</mi></math> 个点</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msub><mi>q</mi><mi>k</mi></msub><mo>=</mo><msub><mi>w</mi><mn>1</mn></msub><msub><mi>g</mi><mrow><mn>1</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo>+</mo><msub><mi>w</mi><mn>2</mn></msub><msub><mi>g</mi><mrow><mn>2</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo>+</mo><mo form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><msub><mi>w</mi><mn>1</mn></msub><mo>−</mo><msub><mi>w</mi><mn>2</mn></msub><mo form="postfix" stretchy="false">)</mo><msub><mi>g</mi><mrow><mn>3</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mi>.</mi></mrow></math></div>
+<p>从根到梢都用同一组权重。比如第一根占一半，只把它的第 17 个点往右挪 8 mm，细丝在这里就跟着挪 4 mm。换一组权重，就得到另一根细丝。头顶另外铺一层贴着头皮的短发，沿发缝两侧各自的走向排。转头时这层跟着头皮走，侧风能吹开外面的长发，发根处还留着一条细缝。</p>
+<p>中心线还没有宽度。我们在顶点着色器里用相邻点求切线，再沿横向把中心线展开。记单位横向量为 <math><msub><mi>b</mi><mi>k</mi></msub></math>，半宽为 <math><msub><mi>r</mi><mi>k</mi></msub></math>，左右两个顶点就是</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msubsup><mi>v</mi><mi>k</mi><mo lspace="0em" rspace="0em" class="tml-sml-pad">−</mo></msubsup><mo>=</mo><msub><mi>q</mi><mi>k</mi></msub><mo>−</mo><msub><mi>r</mi><mi>k</mi></msub><msub><mi>b</mi><mi>k</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><msubsup><mi>v</mi><mi>k</mi><mo lspace="0em" rspace="0em" class="tml-sml-pad">+</mo></msubsup><mo>=</mo><msub><mi>q</mi><mi>k</mi></msub><mo>+</mo><msub><mi>r</mi><mi>k</mi></msub><msub><mi>b</mi><mi>k</mi></msub><mi>.</mi></mrow></math></div>
+<p>把相邻两对顶点连成两个三角形，就是一段可以光栅化的发丝。这个 Demo 默认画 32,768 根，参与物理求解的还是那 192 根。</p>
+<h2 id="timing">模拟一步花多久</h2>
+<p>我们单独测了 GPU 物理求解器。单人披发，192 根引导丝，连续跑 32 步，用总耗时除以 32。测了 12 组，每步耗时的中位数是 <strong>0.04 毫秒出头</strong>。</p>
+</div><footer class="note-end"><a href="/home/#articles">文章目录</a><a href="hairlab.md" download>Markdown 原稿</a></footer></article></main>
+<aside class="note-toc" aria-label="文章目录"><p>本文目录</p><nav><a href="#lab"><span>·</span><span>披发 Demo</span></a>
+<a href="#motion"><span>1.</span><span>GPU 怎么算头发运动</span></a>
+<a href="#strands"><span>2.</span><span>GPU 怎么画出细丝</span></a>
+<a href="#timing"><span>3.</span><span>模拟一步花多久</span></a></nav><hr><a href="/home/#articles">全部文章</a></aside></div>
+<footer class="next-footer"><p>© 2026 DOTAFS</p><p>界面结构基于 <a href="https://theme-next.js.org/">NexT · Gemini</a></p></footer>
+<script>
+const tocLinks = [...document.querySelectorAll('.note-toc nav a')];
+const headings = tocLinks.map(link => document.getElementById(link.hash.slice(1)));
+let activeIndex = -1;
+function markSection() {
+  let index = 0;
+  for (let i = 1; i < headings.length; i++) {
+    if (headings[i].getBoundingClientRect().top > 72) break;
+    index = i;
+  }
+  if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) index = headings.length - 1;
+  if (index === activeIndex) return;
+  tocLinks[activeIndex]?.removeAttribute('aria-current');
+  tocLinks[index].setAttribute('aria-current', 'location');
+  activeIndex = index;
+}
+window.addEventListener('scroll', markSection, { passive: true });
+window.addEventListener('resize', markSection);
+window.addEventListener('load', markSection);
+markSection();
+document.querySelector('.note-mobile-contents nav').addEventListener('click', event => {
+  if (event.target.closest('a')) event.currentTarget.closest('details').open = false;
+});
+</script>
+</body></html>

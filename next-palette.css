@@ -1,0 +1,16 @@
+.next-site {
+  /* NexT's dark Pisces layering: the canvas, reading sheet and header are
+     distinct. Warm type and one restrained copper accent keep long reads calm. */
+  --next-body: #282828;
+  --next-content: #333;
+  --next-card: rgb(240 237 231 / 5%);
+  --next-menu: #222;
+  --next-text: #d6d3cd;
+  --next-heading: #f0ede7;
+  --next-muted: #aba7a0;
+  --next-line: rgb(240 237 231 / 13%);
+  --next-line-strong: rgb(240 237 231 / 24%);
+  --next-accent: #d0a187;
+  --next-brand: #222;
+  --next-brand-text: #f0ede7;
+}

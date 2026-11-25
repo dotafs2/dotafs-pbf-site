@@ -1,0 +1,30 @@
+.hair-lab { margin: 21px 0 28px; background: var(--next-menu); border: 1px solid var(--next-line); }
+.hair-lab [hidden] { display: none; }
+#lab-poster img { display: block; width: 100%; height: auto; }
+#lab-view iframe { display: block; width: 100%; height: min(82vh, 880px); min-height: 230px; border: 0; }
+.lab-console { display: flex; align-items: center; justify-content: space-between; gap: 8px 18px; flex-wrap: wrap; padding: 11px 16px 6px; }
+.lab-prompt, .evidence figcaption { color: var(--next-muted); font-size: .85rem; }
+#start-lab, #stop-lab { color: var(--next-heading); font: inherit; font-size: .9rem; line-height: 1.5; padding: 6px 13px; border: 1px solid var(--next-line); border-radius: 2px; background: var(--next-card); cursor: pointer; text-decoration: none; }
+#start-lab { border-color: var(--next-accent); }
+#stop-lab { background: transparent; }
+.note-prose .lab-caption { margin: 0; padding: 4px 16px 12px; color: var(--next-muted); font-size: .84rem; }
+.evidence { margin: 14px 0; }
+.evidence img { display: block; max-width: 100%; height: auto; }
+.evidence img[src*="scattering-comparison"] { width: min(580px, 100%); }
+.evidence figcaption { margin-top: 5px; }
+@media (max-width:799px) {
+  .lab-console { padding: 9px 10px 5px; }
+  #start-lab, #stop-lab { padding: 6px 9px; }
+  .note-prose .lab-caption { padding: 4px 10px 10px; }
+}
+
+.hair-equation {
+  margin: 12px 0 16px;
+  padding: 12px clamp(10px, 2vw, 22px);
+  overflow-x: auto;
+  color: var(--next-heading);
+  background: var(--next-card);
+  border-left: 2px solid var(--next-accent);
+}
+.hair-equation math { display: block math; width: max-content; font-size: 1.12rem; }
+.note-prose math { font-family: math; }

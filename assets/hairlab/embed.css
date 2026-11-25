@@ -1,0 +1,12 @@
+/* The scene keeps its own lighting. Only the controls match the reading page. */
+.embedded body { background: #171918; color: #d6d3cd; }
+.embedded header { display: none; }
+.embedded #stage { height: clamp(245px, 44vw, 475px); min-height: 0; border-radius: 0; }
+.embedded section, .embedded .sim, .embedded .bar, .embedded .panel,
+.embedded .tools, .embedded .clock, .embedded .metrics { background: #202221; border-color: #434542; border-radius: 0; }
+.embedded button, .embedded select, .embedded .styles { color: #d6d3cd; background: #252725; border-color: #4d504d; border-radius: 2px; }
+.embedded input { accent-color: #a7b5ab; }
+.embedded .styles label:has(:checked), .embedded button[aria-pressed=true] { color: #171918; background: #b6c0b8; }
+.embedded output, .embedded .sim #shake { color: #dddcd5; }
+.embedded #stage, .embedded .viewport { border-color: #434542; }
+.embedded .note, .embedded .hint { color: #acada8; }

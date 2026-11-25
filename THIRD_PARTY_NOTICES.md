@@ -249,3 +249,12 @@ Source: https://github.com/KaTeX/KaTeX/tree/v0.16.21
 The two notes link to the original papers and reproduce selected reported
 metrics with attribution. Their email and debugging examples are original
 fictional teaching examples. No paper figures or private records are included.
+
+## HairLab teaching demo
+
+The loose-hair demo in `assets/hairlab/` and its guide comparison image are
+adapted from the supplied HairLab Mac Lite research project (2026-11-25).
+Hair and character materials are attributed to their respective owners.
+See the [head model provenance](https://negentropy.studio/protagonists/lucia/)
+and [groom format reader](https://github.com/holdmysocks/SixNG/blob/master/crates/sixng-core/src/groom.rs).
+The bundled Three.js code is covered by its [MIT license](assets/hairlab/three-LICENSE.txt).

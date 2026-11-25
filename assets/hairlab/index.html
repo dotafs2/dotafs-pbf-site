@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>披发动力学 · HairLab</title><link rel="icon" href="data:,">
+<style>
+*{box-sizing:border-box}[hidden]{display:none!important}html{color-scheme:dark}body{margin:0;background:#171a20;color:#edf0f6;font:16px/1.55 "Inter","Microsoft YaHei",sans-serif}
+main{max-width:1440px;margin:auto;padding:30px clamp(16px,4vw,64px) 24px}
+header,.bar,.panel{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+header{margin-bottom:19px}h1{font-size:clamp(1.6rem,3.6vw,2.7rem);margin:0;letter-spacing:-.04em}h1 small{font-size:.56em;font-weight:400;line-height:1.3;color:#b1bac9}
+button,.file,select{font:inherit;cursor:pointer;border:1px solid #505a6d;border-radius:5px;background:#232a35;color:#eef1fa;padding:7px 13px}
+.file{background:#e6af8b;color:#211c19;border-color:transparent;font-weight:600}.file:focus-within,button:focus-visible,select:focus-visible{outline:3px solid #94caff}
+.file input{position:absolute;width:1px;height:1px;opacity:0}button:disabled{opacity:.4;cursor:default}
+section{background:#101318;border:1px solid #343c49;border-radius:10px;overflow:hidden}
+#stage{position:relative;height:clamp(360px,65vh,820px);background:radial-gradient(ellipse at 48% 44%,#303945,#11151c 74%)}
+#reference{position:absolute;right:14px;top:14px;margin:0;width:clamp(110px,20%,210px);aspect-ratio:16/15;overflow:hidden;border:1px solid #77818a;border-radius:5px;pointer-events:none;background:#26252a}
+#reference img{position:absolute;left:0;top:0;width:225%;max-width:none;transform:translate(-29.17%,-37.8%)}
+#reference figcaption{position:absolute;left:0;bottom:0;background:#121419dc;padding:2px 7px;font-size:.74rem}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+#empty{position:absolute;inset:0;display:grid;place-content:center;text-align:center;color:#aab7c7;pointer-events:none;padding:20px}
+#empty[hidden],aside[hidden]{display:none}#empty strong{font-size:1.35rem;color:#f0f1f4}#empty p{max-width:35em;margin:5px 0}
+.bar,.panel{padding:12px 18px}.bar{border-bottom:1px solid #343c49}.panel{border-top:1px solid #343c49;font-size:.94rem;color:#b8c3d4}
+.styles{display:inline-flex;border:1px solid #525b67;border-radius:6px;overflow:hidden;margin:0;padding:0}
+.styles label{position:relative;padding:7px 14px;cursor:pointer;color:#c7cfda}.styles input{position:absolute;opacity:0;width:1px;height:1px}
+.styles label:has(:checked){color:#261e18;background:#e4b394}.styles label:focus-within{outline:2px solid #94caff;outline-offset:-2px}
+.sim{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;padding:12px 18px;border-top:1px solid #343c49;background:#1b2028;font-size:.94rem}
+.sim input[type=range]{width:clamp(76px,8vw,125px)}.sim output{min-width:2.4em}.sim #shake{color:#ffc69b}
+summary{cursor:pointer}details p{max-width:86ch}
+label{display:inline-flex;align-items:center;gap:8px}output{min-width:3.1em;font-variant-numeric:tabular-nums}input[type=range]{width:clamp(80px,15vw,180px)}input{accent-color:#efbb96}
+#stats{font-variant-numeric:tabular-nums}.note{font-size:.93rem;color:#b5bfcd}a{color:#edbb99}
+@media(max-width:620px){main{padding:18px 10px}.bar,.panel{padding:10px;gap:9px}#stage{height:55vh}#reference{width:26%;min-width:0;right:6px;top:6px}.note{line-height:1.65}}
+</style>
+<script>if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embedded');</script>
+<style>
+body{font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;background:#1b1d1c;color:#e6e3de}
+main{max-width:1440px}.embedded main{padding:8px}
+.embedded main>header h1,.embedded main>.note:not(p),.embedded main>details,.embedded .demo-source{display:none}
+.embedded header{margin:0 0 8px}.embedded #stage{height:clamp(250px,48vh,530px)}
+@media(max-width:640px){.embedded main{padding:4px}.embedded .sim,.embedded .bar,.embedded .panel{gap:6px 12px;padding:6px 9px}.embedded #stage{height:clamp(215px,38vh,370px)}}
+.demo-source{font-size:13px;color:#b7b8b4;line-height:1.6}.demo-source a,header nav a{color:#bdcbbf}
+#compare-label,#reference{display:none!important}
+</style><link rel="stylesheet" href="./embed.css">
+<main>
+ <header><h1>披发 <small>/ 毛发动力学</small></h1></header>
+ <section aria-label="发型几何查看器">
+  <div class="bar"><label><select id="mode" aria-label="显示模式"><option id="recording-option" value="recording" disabled>动态模拟</option><option value="guides" selected>游戏原始引导丝</option></select></label><span id="name">发丝几何</span><button id="reset" disabled>重置视角</button></div>
+  <div id="stage"><canvas id="canvas" aria-label="发丝三维视图"></canvas><div id="empty"><strong>载入发型</strong><p>可拖动模型查看侧面和后脑。</p></div></div>
+  <div id="simulation" class="sim" hidden><button id="play">暂停</button><button id="shake">甩一下头</button><label><input id="auto-turn" type="checkbox" checked>自动转头</label><label>转头<input id="turn" type="range" min="-78" max="78" value="0"><output id="turn-value">0°</output></label><label>侧风<input id="wind" type="range" min="0" max="100" value="12"><output id="wind-value">12%</output></label><label><input id="collision" type="checkbox" checked>肩胸碰撞</label><label><input id="debug" type="checkbox">显示碰撞体</label><output id="contact-count" hidden></output></div>
+  <div class="panel"><span id="stats" role="status" aria-live="polite">正在载入头模和发型</span><label id="density-label" hidden><span id="density-name">渲染发丝</span><input id="density" type="range" min="6400" max="40960" step="128" value="32768"><output id="density-value">32,768 根</output></label><label><input type="checkbox" id="fill" disabled>插值加密（网页演示）</label><label><input type="checkbox" id="head" checked disabled><span id="head-label">对照露西亚头模</span></label><label><input type="checkbox" id="roots" disabled>显示发根</label></div>
+  <div class="sim" id="scatteringControls" hidden><label><input type="checkbox" id="scattering" checked>毛发散射</label><label>主光方位<input id="hairLight" type="range" min="-180" max="180" value="-30"><output id="hairLightValue" for="hairLight">−30°</output></label></div>
+ </section>
+ <p class="note">拖动旋转，滚轮缩放。<span id="legend">铜色为发根，浅色为发梢。头模和引导丝按游戏坐标叠放。</span><span id="association">露西亚的发型绑定尚待核实。</span></p>
+
+
+<p class="demo-source">HairLab 披发实验。头模与引导丝来自项目内的研究样本，发型与角色的实际绑定仍待核实。<a href="https://negentropy.studio/protagonists/lucia/">头模来源</a> · <a href="https://github.com/holdmysocks/SixNG/blob/master/crates/sixng-core/src/groom.rs">引导丝格式</a> · <a href="./three-LICENSE.txt">Three.js 许可</a></p>
+</main>
+<script src="./samples.js"></script><script src="./viewer.js"></script>
+</html>
