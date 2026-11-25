@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>GTA头发如何制作 · DOTAFS</title>
-<meta name="description" content="从 GTA VI 披发样本看 GPU 逐点和逐束约束、发丝插值与窄带展开，附单步模拟耗时。"><meta name="theme-color" content="#1b1d1c">
-<meta property="og:title" content="GTA头发如何制作 · DOTAFS"><meta property="og:description" content="从 GTA VI 披发样本看 GPU 逐点和逐束约束、发丝插值与窄带展开，附单步模拟耗时。"><meta property="og:type" content="article"><meta property="article:published_time" content="2026-11-25">
+<meta name="description" content="沿一根披发引导丝，算发根蒙皮、Verlet 预测和 PBD 段长约束，再看 GPU 怎么插出细丝。"><meta name="theme-color" content="#1b1d1c">
+<meta property="og:title" content="GTA头发如何制作 · DOTAFS"><meta property="og:description" content="沿一根披发引导丝，算发根蒙皮、Verlet 预测和 PBD 段长约束，再看 GPU 怎么插出细丝。"><meta property="og:type" content="article"><meta property="article:published_time" content="2026-11-25">
 <link rel="canonical" href="https://dotafs.com/articles/hairlab.html"><link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
@@ -107,38 +107,56 @@ th { background: var(--next-card); font-weight: 500; }
 <div class="next-page-layout">
 <main id="content" class="next-main"><article class="ai-note">
 <header class="note-header"><p class="note-meta">图形学笔记 · <time datetime="2026-11-25">2026-11-25</time></p><h1>GTA头发如何制作</h1><details class="note-mobile-contents"><summary>目录</summary><nav aria-label="文章章节"><a href="#lab">披发 Demo</a>
-<a href="#motion">GPU 怎么算头发运动</a>
-<a href="#strands">GPU 怎么画出细丝</a>
-<a href="#timing">模拟一步花多久</a></nav></details></header>
+<a href="#guides">哪些点拿来算物理</a>
+<a href="#binding">发根怎么蒙皮</a>
+<a href="#motion">PBD 怎么把一段拉回原长</a>
+<a href="#stability">转头时为什么有时会炸开</a>
+<a href="#strands">一根细丝该跟哪几根引导丝</a>
+<a href="#timing">GPU 模拟一步花多久</a></nav></details></header>
 <div class="note-prose"><section class="hair-lab" id="lab" aria-label="HairLab 页内实验">
-  <div class="lab-console"><span class="lab-prompt">披发实验</span><a id="start-lab" href="../assets/hairlab/index.html?motion=2">运行披发 Demo</a><button type="button" id="stop-lab" hidden>关闭 Demo</button></div>
+  <div class="lab-console"><span class="lab-prompt">披发实验</span><a id="start-lab" href="../assets/hairlab/index.html?motion=2&amp;v=4026aa981c8d">运行披发 Demo</a><button type="button" id="stop-lab" hidden>关闭 Demo</button></div>
   <div id="lab-poster"><img loading="lazy" src="../assets/hairlab-figures/guide-comparison.webp" width="1324" height="440" alt="附件里的发丝对照，疏密不同的引导线与最终渲染的披发并排展示。"></div>
   <div id="lab-view"></div>
   <p class="lab-caption">切换「游戏原始引导丝」和「动态模拟」，对照 192 根引导丝和插值后的披发。</p>
 </section>
-<p>这份 GTA VI 披发样本里，一根引导丝从发根到发梢有 35 个点，整头一共 192 根。转头时，先解这 6,720 个点怎么动，再在引导丝之间插出可见的细丝。</p>
-<h2 id="motion">GPU 怎么算头发运动</h2>
-<p>我们回放这束头发时，GPU 的计算分成两步。先逐点处理速度和碰撞，再沿每根引导丝修正相邻两点的距离。</p>
-<p>取相邻两点的位置 <math><mrow><msub><mi>p</mi><mrow><mi>i</mi><mo>−</mo><mn>1</mn></mrow></msub><mo separator="true">,</mo><msub><mi>p</mi><mi>i</mi></msub></mrow></math>，记它们静止时相距 <math><msub><mi>L</mi><mi>i</mi></msub></math>。段长约束和需要消掉的拉伸量可以写成</p>
-<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><mi>d</mi><mo>=</mo><msub><mi>p</mi><mi>i</mi></msub><mo>−</mo><msub><mi>p</mi><mrow><mi>i</mi><mo>−</mo><mn>1</mn></mrow></msub><mo separator="true">,</mo><mspace width="2em"></mspace><mi>C</mi><mo form="prefix" stretchy="false">(</mo><mi>d</mi><mo form="postfix" stretchy="false">)</mo><mo>=</mo><mo form="prefix" stretchy="false">‖</mo><mi>d</mi><mo form="postfix" stretchy="false">‖</mo><mo>−</mo><msub><mi>L</mi><mi>i</mi></msub><mi>.</mi></mrow></math></div>
-<p>如果这段原长 10 mm，转头后两点相距 12 mm，就沿着 <math><mi>d</mi></math> 的方向收回 2 mm。修正只沿这段的方向做，发束仍然可以弯。</p>
-<p>本页 Demo 把引导丝放在 CPU 上，用带阻尼的 Verlet 积分预测位置。<math><msub><mi>a</mi><mi>n</mi></msub></math> 是当前加速度，<math><mrow><mi>h</mi><mo>=</mo><mn>1</mn><mi>/</mi><mn>90</mn></mrow></math> 秒。每一步先算下式，再做五轮段长和碰撞修正。</p>
-<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msubsup><mi>p</mi><mrow><mi>n</mi><mo>+</mo><mn>1</mn></mrow><mo lspace="0em" rspace="0em" class="tml-med-pad">∗</mo></msubsup><mo>=</mo><msub><mi>p</mi><mi>n</mi></msub><mo>+</mo><mn>0.965</mn><mspace width="0.1667em"></mspace><mo form="prefix" stretchy="false">(</mo><msub><mi>p</mi><mi>n</mi></msub><mo>−</mo><msub><mi>p</mi><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></msub><mo form="postfix" stretchy="false">)</mo><mo>+</mo><msub><mi>a</mi><mi>n</mi></msub><msup><mi>h</mi><mn>2</mn></msup><mi>.</mi></mrow></math></div>
-<p>侧风拉满时，两点可以分别从耳朵两边绕过去，连线却从耳朵里面穿过去。所以头部碰撞还要检查整段发丝。把引导点转回头部坐标，在头模的皮肤三角形上求交。设交点为 <math><mi>s</mi></math>，朝外的单位法向为 <math><mi>n</mi></math>。当 <math><mrow><mo form="prefix" stretchy="false">(</mo><mi>p</mi><mo>−</mo><mi>s</mi><mo form="postfix" stretchy="false">)</mo><mo>⋅</mo><mi>n</mi><mo>&lt;</mo><mn>0</mn></mrow></math>，点已经到了皮肤内侧，要把它推回去。</p>
-<h2 id="strands">GPU 怎么画出细丝</h2>
-<p>每根可见发丝存两项重心权重，第三项用 <math><mrow><mn>1</mn><mo>−</mo><msub><mi>w</mi><mn>1</mn></msub><mo>−</mo><msub><mi>w</mi><mn>2</mn></msub></mrow></math> 补出来。取三根引导丝上相同编号的点 <math><mrow><msub><mi>g</mi><mrow><mn>1</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo separator="true">,</mo><msub><mi>g</mi><mrow><mn>2</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo separator="true">,</mo><msub><mi>g</mi><mrow><mn>3</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub></mrow></math>，Demo 在顶点着色器里算出细丝上的第 <math><mi>k</mi></math> 个点</p>
-<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msub><mi>q</mi><mi>k</mi></msub><mo>=</mo><msub><mi>w</mi><mn>1</mn></msub><msub><mi>g</mi><mrow><mn>1</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo>+</mo><msub><mi>w</mi><mn>2</mn></msub><msub><mi>g</mi><mrow><mn>2</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo>+</mo><mo form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><msub><mi>w</mi><mn>1</mn></msub><mo>−</mo><msub><mi>w</mi><mn>2</mn></msub><mo form="postfix" stretchy="false">)</mo><msub><mi>g</mi><mrow><mn>3</mn><mo separator="true">,</mo><mi>k</mi></mrow></msub><mi>.</mi></mrow></math></div>
-<p>从根到梢都用同一组权重。比如第一根占一半，只把它的第 17 个点往右挪 8 mm，细丝在这里就跟着挪 4 mm。换一组权重，就得到另一根细丝。头顶另外铺一层贴着头皮的短发，沿发缝两侧各自的走向排。转头时这层跟着头皮走，侧风能吹开外面的长发，发根处还留着一条细缝。</p>
-<p>中心线还没有宽度。我们在顶点着色器里用相邻点求切线，再沿横向把中心线展开。记单位横向量为 <math><msub><mi>b</mi><mi>k</mi></msub></math>，半宽为 <math><msub><mi>r</mi><mi>k</mi></msub></math>，左右两个顶点就是</p>
-<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msubsup><mi>v</mi><mi>k</mi><mo lspace="0em" rspace="0em" class="tml-sml-pad">−</mo></msubsup><mo>=</mo><msub><mi>q</mi><mi>k</mi></msub><mo>−</mo><msub><mi>r</mi><mi>k</mi></msub><msub><mi>b</mi><mi>k</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><msubsup><mi>v</mi><mi>k</mi><mo lspace="0em" rspace="0em" class="tml-sml-pad">+</mo></msubsup><mo>=</mo><msub><mi>q</mi><mi>k</mi></msub><mo>+</mo><msub><mi>r</mi><mi>k</mi></msub><msub><mi>b</mi><mi>k</mi></msub><mi>.</mi></mrow></math></div>
-<p>把相邻两对顶点连成两个三角形，就是一段可以光栅化的发丝。这个 Demo 默认画 32,768 根，参与物理求解的还是那 192 根。</p>
-<h2 id="timing">模拟一步花多久</h2>
-<p>我们单独测了 GPU 物理求解器。单人披发，192 根引导丝，连续跑 32 步，用总耗时除以 32。测了 12 组，每步耗时的中位数是 <strong>0.04 毫秒出头</strong>。</p>
+<p>在上面的 Demo 里，把显示模式切到「游戏原始引导丝」。看耳朵后面那一束，画面里原本挤着一大片头发，切过去只剩几条线。转头时我们先算这些线怎么动，再用它们带动外面看得见的细丝。下面取披发样本里的第 0 根，顺着它从发根算到发梢。</p>
+<h2 id="guides">哪些点拿来算物理</h2>
+<p>打开这份 groom，已经有 192 根引导丝，每根 35 个位置，编号 0 到 34。第 <math><mi>g</mi></math> 根的第 <math><mi>k</mi></math> 个点就在位置数组的第 <math><mrow><mn>35</mn><mi>g</mi><mo>+</mo><mi>k</mi></mrow></math> 项。顺着编号把相邻两点连起来，一根就有 34 段。网页直接读取这批点。样本保留了选好的引导丝，美术制作时具体怎么选的，光看这个文件推不出来。</p>
+<figure class="evidence guide-figure"><picture><source media="(max-width: 600px)" srcset="../assets/hairlab-figures/guide-nodes-mobile.webp" width="880" height="1264"><img loading="lazy" src="../assets/hairlab-figures/guide-nodes.webp" width="1764" height="630" alt="披发样本的第 0 根引导丝，以及发根附近的固定点和自由点"></picture><figcaption>按这份披发样本的静止坐标绘制，点编号从 0 开始。</figcaption></figure>
+<p>每一段的原长各存一份。第 0 根沿折线量下来是 402.38 mm，点 2 到点 3 这一段是 11.84 mm。自己从一条连续曲线做类似的数据，可以先累加曲线的弧长，再按弧长取 35 个位置。读取现成样本时，按每对相邻点的实际距离建约束，就能保留原来的疏密和弯曲。</p>
+<h2 id="binding">发根怎么蒙皮</h2>
+<p>第 0 根的点 0 长在头皮上。角色向右转头，这个点应该先跟头走。样本的骨骼表里只有一根 <code>BM_Head</code>。算它的蒙皮位置，要把点从绑定姿势变到头骨的局部坐标，再用这一帧的头骨矩阵送回去。记原位置为 <math><mi>r</mi></math>，绑定时的骨骼矩阵为 <math><mi>B</mi></math>，动画这一帧的矩阵为 <math><mrow><mi>M</mi><mo form="prefix" stretchy="false">(</mo><mi>t</mi><mo form="postfix" stretchy="false">)</mo></mrow></math>。如果一个点有多根骨骼影响，就按骨骼权重 <math><msub><mi>α</mi><mi>b</mi></msub></math> 混合，权重之和为 1。</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><mrow><mo fence="true" form="prefix">[</mo><mtable><mtr><mtd style="padding-left:0em;padding-right:0em;"><mrow><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">^</mo></mover><mo form="prefix" stretchy="false">(</mo><mi>t</mi><mo form="postfix" stretchy="false">)</mo></mrow></mtd></mtr><mtr><mtd style="padding-left:0em;padding-right:0em;"><mn>1</mn></mtd></mtr></mtable><mo fence="true" form="postfix">]</mo></mrow><mo>=</mo><mrow><munder><mo movablelimits="false">∑</mo><mi>b</mi></munder></mrow><msub><mi>α</mi><mi>b</mi></msub><mspace width="0.1667em"></mspace><msub><mi>M</mi><mi>b</mi></msub><mo form="prefix" stretchy="false">(</mo><mi>t</mi><mo form="postfix" stretchy="false">)</mo><msubsup><mi>B</mi><mi>b</mi><mrow class="tml-med-pad"><mo lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msubsup><mrow><mo fence="true" form="prefix">[</mo><mtable><mtr><mtd style="padding-left:0em;padding-right:0em;"><mi>r</mi></mtd></mtr><mtr><mtd style="padding-left:0em;padding-right:0em;"><mn>1</mn></mtd></mtr></mtable><mo fence="true" form="postfix">]</mo></mrow><mi>.</mi></mrow></math></div>
+<p>放到这束披发上，就是头骨这一项，权重为 1。网页把动作简化成绕竖轴转头，目标位置可以直接写成 <math><mrow><msub><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">^</mo></mover><mi>i</mi></msub><mo>=</mo><msub><mi>R</mi><mi>y</mi></msub><mo form="prefix" stretchy="false">(</mo><mi>θ</mi><mo form="postfix" stretchy="false">)</mo><msub><mi>r</mi><mi>i</mi></msub></mrow></math>。比如第 0 根的点 0 原来在 <math><mrow><mo form="prefix" stretchy="false">(</mo><mo form="prefix" stretchy="false">−</mo><mn>63.17,675.29,29.39</mn><mo form="postfix" stretchy="false">)</mo></mrow></math> mm，转 <math><mrow><mo>+</mo><mn>30</mn><mi>°</mi></mrow></math> 后落在 <math><mrow><mo form="prefix" stretchy="false">(</mo><mo form="prefix" stretchy="false">−</mo><mn>40.01,675.29,57.04</mn><mo form="postfix" stretchy="false">)</mo></mrow></math> mm。绕竖轴转，高度还是 675.29 mm。</p>
+<p>每个物理步都把点 0、1、2 放到各自的目标位置，连同上一时刻的位置一起更新。固定三点，发根伸出头皮的方向就跟着转。点 3 开始可以落后，耳边那束头发才甩得起来。整头一共有 576 个固定点，剩下 6,144 个点交给求解器。</p>
+<h2 id="motion">PBD 怎么把一段拉回原长</h2>
+<p>用点 2 和点 3 算一次。点 2 已经跟着头骨走了，点 3 先按惯性往前走。网页用带阻尼的 Verlet 算预测位置，<math><mrow><mi>h</mi><mo>=</mo><mn>1</mn><mi>/</mi><mn>90</mn></mrow></math> 秒，<math><mrow><msub><mi>p</mi><mi>n</mi></msub><mo>−</mo><msub><mi>p</mi><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></msub></mrow></math> 是上一物理步的位移。靠根的自由点先跟头转一部分，前后两个位置一起转。记转过来的位移为 <math><mi>v</mi></math>，只在它过长时沿原方向截短，记为 <math><msub><mi>v</mi><mpadded lspace="0"><mi>lim</mi></mpadded></msub></math>。这个上限从靠根的约 6 mm 逐渐增加到梢部的 12 mm。加速度 <math><mi>a</mi></math> 里有重力、侧风，还有一项把发束拉向当前的蒙皮姿态。靠近发根，这项拉力大一些。到了发梢，风和惯性更容易把它带走。</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msubsup><mi>p</mi><mrow><mi>n</mi><mo>+</mo><mn>1</mn></mrow><mo class="tml-med-pad">∗</mo></msubsup><mo>=</mo><msub><mi>p</mi><mi>n</mi></msub><mo>+</mo><mn>0.94</mn><mspace width="0.1667em"></mspace><msub><mi>v</mi><mpadded lspace="0"><mi>lim</mi></mpadded></msub><mo>+</mo><mi>a</mi><msup><mi>h</mi><mn>2</mn></msup><mi>.</mi></mrow></math></div>
+<p>现在量预测后的距离。假设点 3 被带到了离点 2 <strong>15.00 mm</strong> 的地方，这一段原长只有 <strong>11.84 mm</strong>，多出来 <strong>3.16 mm</strong>。取点 2 指向点 3 的单位向量 <math><mi>n</mi></math>，点 2 固定，直接让点 3 沿 <math><mrow><mo>−</mo><mi>n</mi></mrow></math> 退回 3.16 mm。这样用约束误差直接修正位置，就是这里的 PBD（Position Based Dynamics）。<a href="https://matthias-research.github.io/pages/publications/posBasedDyn.pdf">PBD 原文</a></p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><mi>d</mi><mo>=</mo><msub><mi>p</mi><mi>b</mi></msub><mo>−</mo><msub><mi>p</mi><mi>a</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><mi>n</mi><mo>=</mo><mfrac><mi>d</mi><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">‖</mo><mi>d</mi><mo form="postfix" stretchy="false" lspace="0em" rspace="0em">‖</mo></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mi>C</mi><mo>=</mo><mo form="prefix" stretchy="false">‖</mo><mi>d</mi><mo form="postfix" stretchy="false">‖</mo><mo>−</mo><mi>L</mi><mi>.</mi></mrow></math></div>
+<p>再往下看点 3 和点 4。它俩都能动，网页把同一份误差分给两端，靠根的点移动 <math><mrow><mo>+</mo><mn>0.45</mn><mi>C</mi><mi>n</mi></mrow></math>，靠梢的点移动 <math><mrow><mo>−</mo><mn>0.55</mn><mi>C</mi><mi>n</mi></mrow></math>。压短时 <math><mrow><mi>C</mi><mo>&lt;</mo><mn>0</mn></mrow></math>，移动方向就反过来。改完点 3 和点 4，刚修好的上一段又会差一点，所以同一个时间步沿整根来回扫五轮。这里的 45% 和 55% 只是这次段长修正的分摊，跟前面头骨的蒙皮权重各有各的用途。</p>
+<h2 id="stability">转头时为什么有时会炸开</h2>
+<p>单根的段长约束只管前后两个点。假设耳朵边有两根并排的引导丝，一根从耳前滑过去，另一根跑到耳后。你把每一段都拉回原长，两根发梢照样可以跑得很远。旧版满风反复换向时，同一小簇里原本相隔不到半毫米的发梢就出现过这种分离。细丝跟着两边一起跑，画面上看着像整束突然炸开。</p>
+<p>这次用上了资产里每簇三根引导丝的对应关系。取同簇三根的第 17 点，分别算它们偏离自己蒙皮目标的位移 <math><mrow><msub><mi>d</mi><mi>i</mi></msub><mo>=</mo><msub><mi>p</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">^</mo></mover><mi>i</mi></msub></mrow></math>。把三个位移取平均，每根向这个平均位移靠一半，再解各自的段长和碰撞。这样整簇仍然能甩出去，同一簇里的三根也能沿皮肤各自滑动。</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><mover><mi>d</mi><mo stretchy="false" class="chr-lrg wbk-lrg-acc" style="math-depth:0;">‾</mo></mover><mo>=</mo><mfrac><mrow><msub><mi>d</mi><mn>1</mn></msub><mo>+</mo><msub><mi>d</mi><mn>2</mn></msub><mo>+</mo><msub><mi>d</mi><mn>3</mn></msub></mrow><mn>3</mn></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>p</mi><mi>i</mi></msub><mo stretchy="false">←</mo><msub><mi>p</mi><mi>i</mi></msub><mo>+</mo><mn>0.5</mn><mo form="prefix" stretchy="false">(</mo><mover><mi>d</mi><mo stretchy="false" class="chr-lrg wbk-lrg-acc" style="math-depth:0;">‾</mo></mover><mo>−</mo><msub><mi>d</mi><mi>i</mi></msub><mo form="postfix" stretchy="false">)</mo><mi>.</mi></mrow></math></div>
+<p>头部接触也要看整段。两个点都在皮肤外面，连线仍可能穿过耳廓。网页把节点变回头部局部坐标，用头模的皮肤三角形检查这条线段。碰到耳缘时，把发段移回表面外，再检查相邻段的长度。把一点从皮肤里推出去，有时一步就要挪好几毫米。要是把这段位移原样留给下一步的 Verlet，它又会向外飞一次。求解器会同步修正它记录的上一位置，削掉这部分额外的弹出速度。</p>
+<p>我们把侧风拉满，在 −78° 和 +78° 之间反复换向，连续跑 10 秒。看一个物理步里跳得最远的那个引导丝发梢，旧版跳了 242.9 mm，改完是 26.4 mm。</p>
+<h2 id="strands">一根细丝该跟哪几根引导丝</h2>
+<p>样本里还有 64 组发根索引，每组三根。读第一组拿到的是 72、73、74，它们是三条引导丝的编号。只在这种很窄的小簇里插，簇与簇之间容易留缝。网页先在静止姿态给每组算一条平均曲线，取它的点 0、5、15、34 和别组比较。根离得近、往同一侧长、下半段也挨得近的，排在前面。留下六组邻居，生成普通细丝时从本组挑一根，再从两个不同的邻组各挑一根。填发根空隙时也会只用两根。</p>
+<p>比如一根细丝跟三条引导丝 <math><mrow><mi>A</mi><mo separator="true">,</mo><mi>B</mi><mo separator="true">,</mo><mi>C</mi></mrow></math>，给它三个非负权重 <math><mrow><msub><mi>w</mi><mi>A</mi></msub><mo separator="true">,</mo><msub><mi>w</mi><mi>B</mi></msub><mo separator="true">,</mo><msub><mi>w</mi><mi>C</mi></msub></mrow></math>，加起来是 1。引导丝解完以后，GPU 要画这根细丝的第 17 个点，就去读三条引导丝各自的第 17 个点。往下画第 18 个点，还是这三根、这三个权重，只换节点编号。</p>
+<div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><msub><mi>q</mi><mi>k</mi></msub><mo>=</mo><msub><mi>w</mi><mi>A</mi></msub><msub><mi>g</mi><mrow><mi>A</mi><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo>+</mo><msub><mi>w</mi><mi>B</mi></msub><msub><mi>g</mi><mrow><mi>B</mi><mo separator="true">,</mo><mi>k</mi></mrow></msub><mo>+</mo><msub><mi>w</mi><mi>C</mi></msub><msub><mi>g</mi><mrow><mi>C</mi><mo separator="true">,</mo><mi>k</mi></mrow></msub><mi>.</mi></mrow></math></div>
+<p>先算这个加权位置。取 Demo 里编号为 1 的细丝，读到的三根引导丝是 158、167、155 号，权重约为 0.2014、0.2034、0.5952。只把 155 号的第 17 点向右挪 10 mm，算出来的插值中心就向右挪 5.95 mm。急转时三根引导丝有时会绕到头部两侧，这时再把插值中心限制在权重最大的引导丝附近。细丝碰到皮肤时，两条边沿同一条中心线一起修正，避免一侧被推出去，另一侧还留在原地，扯出一个长三角形。</p>
+<p>把 Demo 的「渲染发丝」往左拉，可以看到头发变稀，底下参与求解的始终是那 192 根。</p>
+<h2 id="timing">GPU 模拟一步花多久</h2>
+<p>我们另外测了一份 GPU 求解器。它把引导点排成一张 35 列、192 行的纹理，一行对应一根引导丝。第一趟并行算每个点的蒙皮目标、预测位置和碰撞，第二趟沿每根引导丝从根到梢恢复段长。单人披发，连续跑 32 步，用总时间除以 32，12 组的中位数是每步 <strong>0.04 毫秒出头</strong>。上面这个交互 Demo 的 PBD 跑在 CPU，解完的引导点交给 GPU 插细丝。</p>
 </div><footer class="note-end"><a href="/home/#articles">文章目录</a><a href="hairlab.md" download>Markdown 原稿</a></footer></article></main>
 <aside class="note-toc" aria-label="文章目录"><p>本文目录</p><nav><a href="#lab"><span>·</span><span>披发 Demo</span></a>
-<a href="#motion"><span>1.</span><span>GPU 怎么算头发运动</span></a>
-<a href="#strands"><span>2.</span><span>GPU 怎么画出细丝</span></a>
-<a href="#timing"><span>3.</span><span>模拟一步花多久</span></a></nav><hr><a href="/home/#articles">全部文章</a></aside></div>
+<a href="#guides"><span>1.</span><span>哪些点拿来算物理</span></a>
+<a href="#binding"><span>2.</span><span>发根怎么蒙皮</span></a>
+<a href="#motion"><span>3.</span><span>PBD 怎么把一段拉回原长</span></a>
+<a href="#stability"><span>4.</span><span>转头时为什么有时会炸开</span></a>
+<a href="#strands"><span>5.</span><span>一根细丝该跟哪几根引导丝</span></a>
+<a href="#timing"><span>6.</span><span>GPU 模拟一步花多久</span></a></nav><hr><a href="/home/#articles">全部文章</a></aside></div>
 <footer class="next-footer"><p>© 2026 DOTAFS</p><p>界面结构基于 <a href="https://theme-next.js.org/">NexT · Gemini</a></p></footer>
 <script>
 const tocLinks = [...document.querySelectorAll('.note-toc nav a')];

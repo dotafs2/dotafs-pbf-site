@@ -257,4 +257,6 @@ adapted from the supplied HairLab Mac Lite research project (2026-11-25).
 Hair and character materials are attributed to their respective owners.
 See the [head model provenance](https://negentropy.studio/protagonists/lucia/)
 and [groom format reader](https://github.com/holdmysocks/SixNG/blob/master/crates/sixng-core/src/groom.rs).
+The control-point diagram in the article was plotted from the rest positions
+of guide 0 and the other 191 guides in the supplied loose-hair sample.
 The bundled Three.js code is covered by its [MIT license](assets/hairlab/three-LICENSE.txt).
