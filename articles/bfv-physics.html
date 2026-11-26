@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1b1d1c">
+  <meta name="description" content="用《战地 V》农舍做 UE 刚体实验。读分裂帧的计时，拖动凸包看碰撞，再查一块停在半空的碎片。">
+  <title>BFV 农舍的建筑破坏与刚体物理 · DOTAFS</title>
+  <link rel="canonical" href="https://dotafs.com/articles/bfv-physics.html">
+  <link rel="icon" href="data:,">
+  <style>
+    :root { color-scheme: dark; --bg: #1b1d1c; --panel: #222423; --ink: #d6d3cd; --heading: #f0ede7; --muted: #acada8; --link: #b8c6bc; --line: #424643; --mono: "IBM Plex Mono", ui-monospace, monospace; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 1rem/1.8 "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    a { color: var(--link); text-underline-offset: .22em; }
+    a:hover, a:focus-visible { color: var(--heading); }
+    :focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+    .top { border-bottom: 1px solid var(--line); }
+    nav, main { max-width: 56rem; margin-inline: auto; padding-inline: clamp(1.15rem, 4vw, 3.5rem); }
+    nav { min-height: 54px; display: flex; align-items: center; gap: 1.5rem; font-size: .9rem; }
+    nav a { color: var(--ink); }
+    .brand { color: var(--heading); font-family: var(--mono); letter-spacing: .08em; text-decoration: none; }
+    main { padding-block: clamp(1.5rem,4vw,3rem) 3rem; background: var(--panel); }
+    h1, h2 { color: var(--heading); font-weight: 550; line-height: 1.4; text-wrap: balance; }
+    h1 { margin: .25rem 0 .6rem; font-size: clamp(1.65rem, 3vw, 2.25rem); }
+    h2 { margin: 2.2rem 0 .7rem; font-size: 1.32rem; }
+    p { margin: .6rem 0; }
+    .date, small, caption { color: var(--muted); font-size: .87rem; }
+    .date, time { font-family: var(--mono); }
+    .contents { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+    .contents li { padding: .72rem 0; border-bottom: 1px solid var(--line); }
+    .contents a { font-weight: 550; }
+    .contents p { margin: .12rem 0 0; color: var(--muted); font-size: .95rem; }
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .94rem; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: .52rem .65rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-weight: 550; color: var(--heading); }
+    thead { background: var(--bg); }
+    caption { text-align: left; padding: .3rem 0 .55rem; }
+    .times { min-width: 30rem; }
+    .times td:not(:first-child) { white-space: nowrap; }
+    footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  </style>
+</head>
+<body>
+  <header class="top"><nav aria-label="网站导航"><a class="brand" href="/home/">DOTAFS</a><a href="/home/#articles">学习笔记</a></nav></header>
+  <main>
+    <article>
+      <header>
+        <p class="date">2026-11-23 — 11-26 · BFVDestructionUE5</p>
+        <h1>BFV 农舍的建筑破坏与刚体物理</h1>
+        <p>农舍的一面墙脱开时，可以先把整块墙当成一个刚体。等它落地，再把它拆成一堆能各自翻滚的碎块。下面三篇笔记分别跟着分裂的那一帧、碰在一起的两个凸包，以及最后落到地上的那堆碎块，往下查了一层。</p>
+      </header>
+      <section aria-labelledby="read">
+        <h2 id="read">实验笔记</h2>
+        <ul class="contents">
+          <li><a href="bfv-fracture-performance.html">分裂帧性能与原资产核对</a><p>把单栋农舍换成 20 栋同时分裂。沿着游戏线程的计时，找出哪部分时间花在创建刚体，哪部分花在更新可见碎片。</p></li>
+          <li><a href="bfv-convex-collision.html">SAT、GJK 和 GSK · 凸包碰撞检测</a><p>拖动两个多边形，看它们在轴上的投影什么时候分开。让它们重叠，再逐步看 EPA 怎么找到推出方向。</p></li>
+          <li><a href="bfv-rigid-bodies.html">刚体物理四种实现对照</a><p>从 RigidSim 的一次 Jacobi 迭代，到 GPU 上分组执行的 Gauss–Seidel。用同一堆碎块看求解、缓存和休眠分别改变了什么。</p></li>
+        </ul>
+      </section>
+      <section aria-labelledby="sleep">
+        <h2 id="sleep">墙已经拆了，为什么碎块还停在半空？</h2>
+        <p>11 月 26 日的对照场景里，GPU 这边偶尔留下一块悬空的碎片。往前看，它原本好好地睡在一面墙上。休眠会让物理引擎暂时跳过这块碎片。后来墙被删掉了，GPU 只改了墙自己的状态，睡在上面的碎片还留在原来的高度。</p>
+        <p>验证时每隔 2 秒撤去一面墙。到第 20 秒，统一叫醒场里的碎片。要是它还受着支撑，醒来以后应该留在附近。要是早就悬空了，这时候才会补上那一段下落。</p>
+        <div class="table-wrap"><table>
+          <caption>同一组分批撤墙实验，观察强制唤醒后的下落</caption>
+          <thead><tr><th scope="col">移除墙体时的处理</th><th scope="col">项目记录中的现象</th></tr></thead>
+          <tbody>
+            <tr><td>只移除墙体</td><td>每次有 5–10 块碎片停在约 3.9–5.9 米高处。叫醒后又落了 3–5 米。</td></tr>
+            <tr><td>同时唤醒附近的休眠碎片</td><td>高处的补落消失，贴地碎块仍有约 0.5–0.8 米的沉降。</td></tr>
+          </tbody>
+        </table></div>
+        <p>改动放在删墙的那一步。先取被删形状的包围球，再找同一栋农舍里包围球与它相交的休眠刚体，叫醒它们。这个范围会多选一些碎片，但这些碎片在下一步就能重新检查自己的支撑。</p>
+      </section>
+      <section aria-labelledby="step">
+        <h2 id="step">把 1 栋换成 20 栋，物理步进要多久？</h2>
+        <p>另一次测试从第一面墙倒下开始，记录接下来的 600 帧。GPU 变体 4 已经有暖启动和岛休眠。变体 5 又改了凸包外壳、窄相分段和休眠等待时间。下面的结果包含这几项改动的共同影响。</p>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="可横向滚动的步进计时表"><table class="times">
+          <caption>物理步进，单位 ms。每格为均值 / P95（第 95 百分位）</caption>
+          <thead><tr><th scope="col">工程中的实现</th><th scope="col">单栋全碎</th><th scope="col">20 栋</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Havok 2013 · 游戏线程</th><td>0.335 / 0.668</td><td>6.284 / 12.720</td></tr>
+            <tr><th scope="row">变体 4 · GPU</th><td>1.58 / 3.55</td><td>3.68 / 5.68</td></tr>
+            <tr><th scope="row">变体 5 · GPU</th><td>1.372 / 2.183</td><td>2.278 / 3.746</td></tr>
+          </tbody>
+        </table></div>
+        <p>还得看碎块停在哪。单栋全碎时，拿最终碎块高度的中位数跟 Havok 比，变体 5 一次低了 0.5 厘米，再跑一次却高了 16.2 厘米。项目给这项比较留了 10 厘米容差，同一组设置跑两次，只有一次过线。表里的步进耗时也只覆盖各自那段物理工作，整帧还要做破坏逻辑和渲染。</p>
+      </section>
+      <footer><small>数据出自 BFVDestructionUE5 项目 11 月 25–26 日的《求解器变体对照实验》。Havok 数据来自该 UE 工程的 CPU 对照组。碰撞文章中的可拖动几何图在浏览器内独立运行。</small></footer>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,971 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="BFVDestructionUE5 农舍分裂帧的实测分解、原资产核对与 GPU 凸包刚体后端记录。">
+<title>分裂帧性能与原资产核对 · DOTAFS</title><style>
+:root{color-scheme:dark;--canvas:#1b1d1c;--reading:#222423;--rail:#171918;--text:#d6d3cd;--heading:#f0ede7;
+--muted:#acada8;--accent:#a7b5ab;--line:rgb(232 232 228 / 14%);--tint:rgb(232 232 228 / 5%);
+--sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--canvas);color:var(--text);font:16px/1.75 var(--sans)}
+a{color:var(--accent)}a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.top{height:54px;display:flex;align-items:center;gap:18px;padding:0 clamp(22px,2.6vw,52px);background:var(--rail);
+border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header.top .site{color:var(--heading);font-weight:500}header.top .meta{color:var(--muted);font:13px var(--mono)}
+.layout{display:grid;grid-template-columns:clamp(205px,16vw,266px) 1fr;min-height:calc(100vh - 54px)}
+nav.toc{position:sticky;top:54px;align-self:start;max-height:calc(100vh - 54px);overflow:auto;background:var(--rail);
+border-right:1px solid var(--line);padding:18px 0;font-size:14px}
+nav.toc .group{color:var(--heading);font-weight:500;padding:12px 18px 4px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 18px 4px 16px;border-left:2px solid transparent;line-height:1.45}
+nav.toc a.h3{padding-left:30px;font-size:13px}
+nav.toc a:hover{color:var(--text)}
+nav.toc a[aria-current="location"]{color:var(--heading);border-left-color:var(--accent);background:var(--tint)}
+main{background:var(--reading);padding:24px clamp(22px,2.6vw,52px) 80px;min-width:0}
+article{margin-bottom:64px}
+article p,article li,article blockquote{max-width:72em}
+.date{color:var(--muted);font:13px var(--mono);margin-top:8px}
+h1{color:var(--heading);font-weight:500;font-size:clamp(26px,2.4vw,35px);line-height:1.3;margin:6px 0 10px}
+h2{color:var(--heading);font-weight:500;font-size:23px;margin:29px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{color:var(--heading);font-weight:500;font-size:17px;margin:22px 0 8px}
+p{margin:10px 0}ul,ol{padding-left:1.4em}li{margin:4px 0}
+code{font:0.9em var(--mono);background:var(--tint);padding:1px 5px;border-radius:3px}
+pre{background:var(--rail);border:1px solid var(--line);padding:12px 14px;overflow:auto;font-size:14px;line-height:1.55}
+pre code{background:none;padding:0}
+.table-wrap{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:7px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--heading);background:var(--tint);font-weight:500}
+td:not(:first-child),th:not(:first-child){font-variant-numeric:tabular-nums}
+blockquote{margin:12px 0;padding:2px 14px;border-left:2px solid var(--line);color:var(--muted)}
+details.toc-mobile{display:none}
+@media (max-width:799px){
+ .layout{display:block}nav.toc{display:none}
+ main{padding:16px clamp(16px,3.4vw,26px) 60px}
+ details.toc-mobile{display:block;margin:4px 0 14px;border:1px solid var(--line);background:var(--rail)}
+ details.toc-mobile summary{padding:8px 12px;cursor:pointer;color:var(--heading)}
+ details.toc-mobile a{display:block;padding:5px 14px;color:var(--muted);text-decoration:none;font-size:14px}
+ details.toc-mobile a.h3{padding-left:28px}
+}
+
+html { scroll-padding-top: 70px; }
+header.top a { text-decoration: none; }
+header.top a:hover { text-decoration: underline; }
+main { overflow-wrap: anywhere; }
+article { max-width: 880px; margin-inline: auto; }
+article p, article ul, article ol { max-width: 76ch; }
+nav.toc a.group { padding-left: 16px; }
+.table-wrap { max-width: 100%; }
+.table-wrap:focus-visible { outline: 2px solid var(--accent); }
+th, td { overflow-wrap: normal; }
+table { min-width: min(100%, 460px); }
+.table-wrap.wide table { min-width: 680px; }
+details.toc-mobile { scroll-margin-top: 70px; }
+@media(max-width:799px) {
+ header.top { gap: 14px; padding-inline: 16px; }
+ header.top .meta { display: none; }
+ article { margin-bottom: 45px; }
+}
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } }
+</style></head><body>
+<header class="top"><a class="site" href="/home/">DOTAFS 首页</a><a href="bfv-physics.html">BFV 物理笔记</a><span class="meta">BFVDestructionUE5</span></header>
+<div class="layout"><nav class="toc" aria-label="目录"><a class="group" href="#note-top">笔记：分裂帧性能与原资产核对</a><a href="#note-先把一次分裂拆开">先把一次分裂拆开</a><a href="#note-单栋-没什么可优化的">单栋：没什么可优化的</a><a href="#note-20-栋-卡在游戏线程-但不卡在物理">20 栋：卡在游戏线程，但不卡在物理</a><a href="#note-能挪的挪走-不能挪的不动">能挪的挪走，不能挪的不动</a><a href="#note-中间那块为什么碎不了">中间那块为什么碎不了</a><a href="#note-三个原资产相关的开关">三个原资产相关的开关</a><a href="#note-编辑器里看开销">编辑器里看开销</a><a href="#note-还没做">还没做</a><a class="group" href="#report-top">完整报告：分裂帧与 20 栋耗时分解</a><a href="#report-1-测试条件">1. 测试条件</a><a href="#report-2-单栋-碎开那一帧花在哪">2. 单栋：碎开那一帧花在哪</a><a href="#report-3-20-栋同时碎-瓶颈在哪">3. 20 栋同时碎：瓶颈在哪</a><a href="#report-4-改动">4. 改动</a><a href="#report-5-改动前后-同条件-两次运行">5. 改动前后（同条件，两次运行）</a><a href="#report-6-走过的弯路-已回退">6. 走过的弯路（已回退）</a><a href="#report-7-下一步">7. 下一步</a><a class="group" href="#gpunote-top">笔记：GPU 凸包刚体后端</a><a href="#gpunote-要做的事">要做的事</a><a href="#gpunote-先在-cpu-上把算法做对">先在 CPU 上把算法做对</a><a href="#gpunote-搬到-gpu">搬到 GPU</a><a href="#gpunote-对齐">对齐</a><a href="#gpunote-性能">性能</a><a href="#gpunote-havok-不受影响">Havok 不受影响</a><a class="group" href="#gpustatus-top">GPU 后端：结构、对齐与耗时</a><a href="#gpustatus-怎么跑">怎么跑</a><a href="#gpustatus-结构-文件">结构（文件）</a><a href="#gpustatus-和-rigidsim-havok-的对应-做了什么">和 RigidSim / Havok 的对应（做了什么）</a><a href="#gpustatus-关键修复-为什么第一版不睡-会穿">关键修复（为什么第一版不睡 / 会穿）</a><a href="#gpustatus-ue-内对齐-havok-vs-gpu-同一-exe-d3d12-sm6">UE 内对齐（Havok vs GPU，同一 exe，D3D12 SM6）</a><a href="#gpustatus-gpu-时间">GPU 时间</a><a href="#gpustatus-已知差异-没做的">已知差异 / 没做的</a><a href="#gpustatus-回归-havok-默认路径不变">回归（Havok 默认路径不变）</a><a href="#gpustatus-下一步-没做完的">下一步（没做完的）</a></nav>
+<main><details class="toc-mobile"><summary>目录</summary><a href="#note-top"><b>笔记：分裂帧性能与原资产核对</b></a><a href="#note-先把一次分裂拆开">先把一次分裂拆开</a><a href="#note-单栋-没什么可优化的">单栋：没什么可优化的</a><a href="#note-20-栋-卡在游戏线程-但不卡在物理">20 栋：卡在游戏线程，但不卡在物理</a><a href="#note-能挪的挪走-不能挪的不动">能挪的挪走，不能挪的不动</a><a href="#note-中间那块为什么碎不了">中间那块为什么碎不了</a><a href="#note-三个原资产相关的开关">三个原资产相关的开关</a><a href="#note-编辑器里看开销">编辑器里看开销</a><a href="#note-还没做">还没做</a><a href="#report-top"><b>完整报告：分裂帧与 20 栋耗时分解</b></a><a href="#report-1-测试条件">1. 测试条件</a><a href="#report-2-单栋-碎开那一帧花在哪">2. 单栋：碎开那一帧花在哪</a><a href="#report-3-20-栋同时碎-瓶颈在哪">3. 20 栋同时碎：瓶颈在哪</a><a href="#report-4-改动">4. 改动</a><a href="#report-5-改动前后-同条件-两次运行">5. 改动前后（同条件，两次运行）</a><a href="#report-6-走过的弯路-已回退">6. 走过的弯路（已回退）</a><a href="#report-7-下一步">7. 下一步</a><a href="#gpunote-top"><b>笔记：GPU 凸包刚体后端</b></a><a href="#gpunote-要做的事">要做的事</a><a href="#gpunote-先在-cpu-上把算法做对">先在 CPU 上把算法做对</a><a href="#gpunote-搬到-gpu">搬到 GPU</a><a href="#gpunote-对齐">对齐</a><a href="#gpunote-性能">性能</a><a href="#gpunote-havok-不受影响">Havok 不受影响</a><a href="#gpustatus-top"><b>GPU 后端：结构、对齐与耗时</b></a><a href="#gpustatus-怎么跑">怎么跑</a><a href="#gpustatus-结构-文件">结构（文件）</a><a href="#gpustatus-和-rigidsim-havok-的对应-做了什么">和 RigidSim / Havok 的对应（做了什么）</a><a href="#gpustatus-关键修复-为什么第一版不睡-会穿">关键修复（为什么第一版不睡 / 会穿）</a><a href="#gpustatus-ue-内对齐-havok-vs-gpu-同一-exe-d3d12-sm6">UE 内对齐（Havok vs GPU，同一 exe，D3D12 SM6）</a><a href="#gpustatus-gpu-时间">GPU 时间</a><a href="#gpustatus-已知差异-没做的">已知差异 / 没做的</a><a href="#gpustatus-回归-havok-默认路径不变">回归（Havok 默认路径不变）</a><a href="#gpustatus-下一步-没做完的">下一步（没做完的）</a></details><article id="note-top"><h1 id="note-分裂帧性能与原资产核对">分裂帧性能与原资产核对</h1><div class="date">2026-11-23 至 11-24 · 项目实验记录</div>
+<p>一栋农舍有 3 个簇在同一帧碎开，分裂只花了 0.15 ms。把同一段破坏过程复制到 20 栋，整帧却要 39 ms。下面先看时间花在哪，再看哪些工作可以提前或推迟。计时来自我们的 UE 实验工程，CPU 对照用移植的 Havok 2013.2.0-r1。详细数字见<a href="#report-top">分阶段性能报告</a>，后两节记录 GPU 后端的实现和对照结果。</p>
+<h2 id="note-先把一次分裂拆开">先把一次分裂拆开</h2>
+<p>起点是 <code>ABFVFarmActor::Split</code>。它原来只有一个总计时，<code>all</code> 场景里峰值 0.15 ms，看不出钱花在哪。这一帧里它做了几件事：读出整簇刚体的位姿，从 Havok 世界删掉它，给每个子块的句柄组件写位姿，再用预先准备好的形状 <code>new hkpRigidBody</code>，最后 <code>addEntity</code>。</p>
+<p><code>addEntity</code> 是黑盒，我在 <code>hkpWorld.cpp</code> 里加了三个 tick 时间戳，分成岛、宽相和回调三段。宽相这一段会顺手给新刚体和周围所有重叠的物体建碰撞代理。子块之间本来就贴在一起，所以这一步最贵。单栋峰值帧有 3 个簇同时分裂，激活 26 个刚体，新建 103 个碰撞代理。分裂合计 0.15 ms，其中宽相约 0.05 ms。</p>
+<p>物理步进也拆了。<code>hkpWorld::stepDeltaTime</code> 在这个配置下（离散仿真、SAP 宽相、没有内存看门狗）就是依次调 <code>integrate</code>、<code>collide</code>、<code>advanceTime</code>。我逐行对过源码，确认两种调法等价，才把它拆成三段分别计时。这些计时都挂在 <code>-bfvphaseprobe</code> 上，默认构建不走这条路。</p>
+<p>测到一半，单栋第一次分裂突然变成 4 ms。查下来是 <code>hkStopwatch</code> 第一次被调用时会 <code>Sleep</code> 校准时钟，正好落在第一次分裂的计时里。现在 <code>bfvCreateWorld</code> 里先调一次 <code>getTicksPerSecond</code>，这 4 ms 就没了。</p>
+<h2 id="note-单栋-没什么可优化的">单栋：没什么可优化的</h2>
+<p>单位 ms，数字是均值 / P95 / 最大：</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">单栋 <code>all</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>生成并激活子块</td>
+<td style="text-align: right;">0.10 / 0.15 / 0.15</td>
+</tr>
+<tr>
+<td>物理步进（游戏线程）</td>
+<td style="text-align: right;">0.34 / 0.67 / 0.91</td>
+</tr>
+<tr>
+<td>画碎块，CPU 渲染线程增量</td>
+<td style="text-align: right;">0.13 / 0.45 / 1.26</td>
+</tr>
+<tr>
+<td>画碎块，GPU 增量</td>
+<td style="text-align: right;">0.12 / 0.38 / 0.60</td>
+</tr>
+</tbody>
+</table></div>
+<p>增量的测法是同一镜头、同一条破坏时间线跑两遍，一遍用 <code>-bfvprobehide</code> 把碎块组件设为不可见，物理照常模拟，两遍逐帧相减。单栋最大的单项是第一次脱落时注册渲染组件，每簇 0.3–0.5 ms。</p>
+<h2 id="note-20-栋-卡在游戏线程-但不卡在物理">20 栋：卡在游戏线程，但不卡在物理</h2>
+<p>20 栋同时碎时整帧 39 ms。其中游戏线程 35 ms，渲染线程 8 ms，GPU 5.7 ms，所以要看的是游戏线程。拆开以后：</p>
+<ul>
+<li><code>EndOfFrameUpdates</code> 15 ms：每帧把 440 个复合骨骼网格的骨骼数据交给渲染</li>
+<li>碎屑 ProceduralMesh 每帧重建 6.6 ms，偶发 171 ms</li>
+<li>物理步进 6.6 ms</li>
+<li>分裂 3.8 ms，峰值 8.3 ms。那一帧有 60 个簇分裂，激活 520 个刚体，新建 2060 个碰撞代理</li>
+<li>首次脱落最重的一帧 10.1 ms：60 个簇同帧注册渲染组件，其中渲染状态创建占 4.5 ms</li>
+</ul>
+<h2 id="note-能挪的挪走-不能挪的不动">能挪的挪走，不能挪的不动</h2>
+<p>先看哪一步值得提前做或异步做。碰撞代理是 <code>addEntity</code> 同步建的。改用 <code>addEntityBatch</code> 或推迟加入都会改变岛和接触的顺序，结果就和基线对不上了，所以这一步不动。渲染组件不参与物理，晚一两帧建不影响任何事件。</p>
+<ul>
+<li><code>-bfvdefervisuals</code>：脱落时只建刚体，渲染组件进队列，所有农舍共用每帧 1 ms 的预算慢慢建。组件建好的那一帧才隐藏完好的墙，中间不会露洞。如果这时要分裂，就当场先把组件建好。20 栋首次脱落那一帧从 10.1 降到 1.4 ms。</li>
+<li><code>-bfvparallelstep</code>：20 个世界本来就互不相干。我在 DLL 里放了一个工作线程池，每个线程有自己的 <code>hkMemoryRouter</code>。<code>ABFVStepCoordinator</code> 等所有农舍的前半步跑完，把 20 个世界一起交给线程池，再按原来的顺序跑各农舍的后半步。物理占游戏线程的时间从 6.6 / 15.4 降到 1.0 / 2.5 ms。代价是各线程耗时加起来 10.3 ms，总 CPU 多了约 55%。</li>
+</ul>
+<p>两个开关都开时，游戏线程 35.0 → 29.2 ms，帧时间 39.3 → 34.3 ms。开着这两个开关，release、drive、shoot、all、stress 五项逐事件、逐碎块高度都和 11-21 的基线一致（<code>Tools/TestVariants.ps1</code>）。</p>
+<p>碎屑也试过一次：把 <code>CreateMeshSection</code> 换成 <code>UpdateMeshSection</code> 加预留容量。游戏线程只省了 1 ms，渲染线程却从 9.4 涨到 34 ms。UE 5.8 的 <code>UpdateMeshSection</code> 每帧都在渲染线程把整段顶点缓冲重写一遍，20 栋乘上几个 section 就是这个数，所以这个改动已经撤掉。</p>
+<h2 id="note-中间那块为什么碎不了">中间那块为什么碎不了</h2>
+<p>中央纵墙在项目里始终留在原地。我们把 UE 中的几何和农舍原资产逐项核对，检查中间这块在原资产中如何定义。</p>
+<ul>
+<li>23 个部件中，只有编号 0 的部件标记为固定；它没有关联的破坏对象。</li>
+<li>部件与破坏点的对应表里，部件 0 对应的区间为空。</li>
+<li>网格顶点自带 part 编号，part 0 有 4,078 个三角。UE 端 21,060 个三角逐个能在原资产里找到同一 part 的对应三角，误差在 1e-5 m 以内。</li>
+</ul>
+<p>中央纵墙的大部分归部件 0。二层楼板外圈、山墙和墙端分属其他部件，在这个项目里可以分裂。样本地图中的摆放保留了部件 0 的固定属性。原游戏运行时是否还会通过其他途径显示局部破损，目前缺少实机观测。</p>
+<h2 id="note-三个原资产相关的开关">三个原资产相关的开关</h2>
+<ul>
+<li><code>-bfvdv</code>：显示墙面局部损伤。在 UE 材质里，用 103 个球体近似距离场，把场内墙面的外观切换到损伤图集。改正坐标方向以后，103 个点都落在各自的部件上。</li>
+<li><code>-bfvbreakpart0</code>：项目为固定部件补做的分裂效果。将它的 46 个碰撞凸体分成 28 片，地基和墙脚继续作静态锚点。</li>
+<li><code>-bfvmapplacement</code>：采用样本地图中的摆放角度。事件顺序一致，最终碎块高度相差 0.3–0.6 m，drive 测试里有一次删除提前了 16 ms。旋转坐标后的浮点舍入会影响求解。</li>
+</ul>
+
+<h2 id="note-编辑器里看开销">编辑器里看开销</h2>
+<p>在编辑器里 PIE，控制台输入 <code>bfv.PerfHud 1</code>，左上角会列出本帧、1 秒均值、5 秒峰值，只算这个工程的破坏开销。数据和 CSV 用同一组打点（<code>BFV_STAT</code>），面板上的数字和报告能直接对照。</p>
+<h2 id="note-还没做">还没做</h2>
+<ul>
+<li>20 栋场景下游戏线程剩下最大的是 15 ms 的骨骼提交和 6.6 ms 的碎屑重建。下一步可以先试：已休眠的簇不再提交骨骼；碎屑改成共享的 InstancedStaticMesh。</li>
+<li>DV 材质每个墙面像素要算 104 次球距离。可以先试改成累加 <code>dot(v,v)/r²</code>，再按 8 个槽一组提前退出。</li>
+<li>原版运行时会不会通过别的路径让 part 0 局部破损，实机数据还是 0 条。</li>
+</ul></article><article id="report-top"><h1 id="report-分裂帧与-20-栋压力场景的耗时分解-2026-11-23">分裂帧与 20 栋压力场景的耗时分解（2026-11-23）</h1>
+<p>本机 Ryzen 7 7700 / RTX 5060 Ti / Win64 Development / D3D12 SM5 / 1600×900 / Epic / 100% 渲染比例 / 关闭垂直同步与动态分辨率 / 固定 60 Hz / 原生 Havok 2013.2.0-r1（默认纯 2013.2 构建）。
+数字从 UE CSV Profiler 的逐帧记录汇总，下面列出测试窗口、汇总口径和两次运行的数值。</p>
+<h2 id="report-1-测试条件">1. 测试条件</h2>
+<ul>
+<li>场景：<code>all</code> 在单栋农舍里每隔 0.4 s 触发一次拆墙，<code>stress</code> 让 20 栋同步执行同一脚本。</li>
+<li>窗口：从首次 <code>ReleasePart</code> 所在帧起连续 600 帧（10 s）。"分裂帧"指该帧 <code>Split</code> 耗时 &gt; 0，单栋与 20 栋都是 12 帧。</li>
+<li>均值取 600 帧；分裂项的均值 / P95 / 最大只取分裂帧（12 帧时 P95 即最大）。</li>
+<li>显示/隐藏对照：同镜头、同破坏时间线；<code>-bfvprobehide</code> 只关碎块组件的可见性，物理照常。<code>RenderThreadTime</code> 与 <code>GPUTime</code>（及 33 个 <code>GPU/*</code> 分项）各自计时，增量按帧对齐相减。</li>
+<li><strong>物理步进实际所在线程</strong>：默认是<strong>游戏线程</strong>，每栋农舍在自己的 Tick（TG_PrePhysics）里调 <code>hkpWorld::stepDeltaTime</code>。表中是 20 栋同帧累计。开 <code>-bfvparallelstep</code> 后改在原生 Havok 工作线程池上执行，游戏线程只等它。</li>
+<li>分阶段计时用 <code>-bfvphaseprobe</code>：把 <code>stepDeltaTime</code> 拆成等价的 <code>integrate / collide / advanceTime</code> 三段分别计时（已对照 hkpWorld / hkpSimulation 源码确认：本配置是离散仿真 + SAP + 无内存看门狗，两者逐步等价）；<code>addEntity</code> 内部加 tick 时间戳。默认构建不受影响。</li>
+<li>每项至少有两次独立运行。下表的峰值取两次中较大者，均值取两次均值的平均。</li>
+</ul>
+<h2 id="report-2-单栋-碎开那一帧花在哪">2. 单栋：碎开那一帧花在哪</h2>
+<p>单栋 <code>all</code>，基线（默认构建 + <code>-bfvphaseprobe</code>），单位 ms。</p>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>线程</th>
+<th style="text-align: right;">均值</th>
+<th style="text-align: right;">P95</th>
+<th style="text-align: right;">单帧最大</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>分裂：生成并激活子块</strong>（<code>Split</code> 合计）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.099</td>
+<td style="text-align: right;">0.151</td>
+<td style="text-align: right;">0.151</td>
+</tr>
+<tr>
+<td>　读取位姿 + 删除整簇刚体</td>
+<td>游戏</td>
+<td style="text-align: right;">0.010</td>
+<td style="text-align: right;">0.016</td>
+<td style="text-align: right;">0.016</td>
+</tr>
+<tr>
+<td>　写子块句柄组件位姿</td>
+<td>游戏</td>
+<td style="text-align: right;">0.031</td>
+<td style="text-align: right;">0.045</td>
+<td style="text-align: right;">0.045</td>
+</tr>
+<tr>
+<td>　<code>hkpRigidBody</code> 构造（预备好的形状与质量）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.006</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">0.009</td>
+</tr>
+<tr>
+<td>　加入世界：岛</td>
+<td>游戏</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">0.001</td>
+</tr>
+<tr>
+<td>　加入世界：宽相 + 新建碰撞代理（"注册碰撞"）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.029</td>
+<td style="text-align: right;">0.049</td>
+<td style="text-align: right;">0.049</td>
+</tr>
+<tr>
+<td>　加入世界：回调与合并岛</td>
+<td>游戏</td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">0.006</td>
+<td style="text-align: right;">0.006</td>
+</tr>
+<tr>
+<td>　UE 侧簿记</td>
+<td>游戏</td>
+<td style="text-align: right;">0.015</td>
+<td style="text-align: right;">0.022</td>
+<td style="text-align: right;">0.022</td>
+</tr>
+<tr>
+<td><strong>整簇首次脱落</strong>（创建组件 + 注册 + 刚体）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.55（每次）</td>
+<td style="text-align: right;">0.73</td>
+<td style="text-align: right;">0.73</td>
+</tr>
+<tr>
+<td>　创建组件（<code>NewObject</code>、<code>SetSkeletalMesh</code>）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.137</td>
+<td style="text-align: right;">0.172</td>
+<td style="text-align: right;">0.172</td>
+</tr>
+<tr>
+<td>　注册组件（<code>RegisterComponent</code>，其中渲染状态 0.23）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.33</td>
+<td style="text-align: right;">0.47</td>
+<td style="text-align: right;">0.47</td>
+</tr>
+<tr>
+<td>　Havok 加刚体 / 删完好静态体</td>
+<td>游戏</td>
+<td style="text-align: right;">0.035</td>
+<td style="text-align: right;">0.060</td>
+<td style="text-align: right;">0.060</td>
+</tr>
+<tr>
+<td><strong>模拟碎块</strong>（<code>hkpWorld</code> 步进）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">0.668</td>
+<td style="text-align: right;">0.912</td>
+</tr>
+<tr>
+<td>　integrate（岛拆分 + 求解 + 积分）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.129</td>
+<td style="text-align: right;">0.269</td>
+<td style="text-align: right;">0.498</td>
+</tr>
+<tr>
+<td>　collide（宽相 + 窄相）</td>
+<td>游戏</td>
+<td style="text-align: right;">0.205</td>
+<td style="text-align: right;">0.406</td>
+<td style="text-align: right;">0.629</td>
+</tr>
+<tr>
+<td>碎块位姿同步 + <code>FlushPose</code></td>
+<td>游戏</td>
+<td style="text-align: right;">0.12</td>
+<td style="text-align: right;">0.23</td>
+<td style="text-align: right;">0.66</td>
+</tr>
+<tr>
+<td>碎屑 <code>UpdateChips</code></td>
+<td>游戏</td>
+<td style="text-align: right;">0.33</td>
+<td style="text-align: right;">0.92</td>
+<td style="text-align: right;">9.8</td>
+</tr>
+<tr>
+<td>CPU 渲染线程（整帧）</td>
+<td>渲染</td>
+<td style="text-align: right;">2.42</td>
+<td style="text-align: right;">3.02</td>
+<td style="text-align: right;">5.08</td>
+</tr>
+<tr>
+<td>GPU（整帧）</td>
+<td>GPU</td>
+<td style="text-align: right;">3.57</td>
+<td style="text-align: right;">3.90</td>
+<td style="text-align: right;">4.04</td>
+</tr>
+</tbody>
+</table></div>
+<p>峰值分裂帧：同帧 <strong>3 个簇分裂，激活 26 个刚体，新建 103 个碰撞代理</strong>，该帧清醒刚体 80 个；分裂合计 0.15 ms，该帧物理步进 0.27 ms，下一帧（新刚体第一次被求解）0.45 ms。</p>
+<p><strong>画碎块的增量</strong>（显示 − 隐藏，两次运行；同镜头同时间线，物理照常）：</p>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">均值</th>
+<th style="text-align: right;">P95</th>
+<th style="text-align: right;">单帧最大</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU 渲染线程增量</td>
+<td style="text-align: right;">0.13</td>
+<td style="text-align: right;">0.45</td>
+<td style="text-align: right;">1.26</td>
+</tr>
+<tr>
+<td>GPU 增量</td>
+<td style="text-align: right;">0.12</td>
+<td style="text-align: right;">0.38</td>
+<td style="text-align: right;">0.60</td>
+</tr>
+<tr>
+<td>RHI 绘制调用增量</td>
+<td style="text-align: right;">+355 次 / 帧</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table></div>
+<p>结论（单栋）：子块的生成与激活只要约 0.1 ms，其中较贵的一段是 Havok 宽相建碰撞代理；物理步进均值 0.34、最大 0.9 ms；画碎块的 CPU 与 GPU 增量各 0.1 ms 量级。单栋<strong>没有</strong>值得优化的分裂尖峰，最大的单帧项是首次脱落时注册渲染组件（0.33–0.47 ms），以及碎屑网格偶发重建（9.8 ms，发生在首批碎屑爆出的那一帧）。</p>
+<h2 id="report-3-20-栋同时碎-瓶颈在哪">3. 20 栋同时碎：瓶颈在哪</h2>
+<p>基线（默认构建 + <code>-bfvphaseprobe</code>），20 栋同帧累计，单位 ms。</p>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>线程</th>
+<th style="text-align: right;">均值</th>
+<th style="text-align: right;">P95</th>
+<th style="text-align: right;">单帧最大</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>分裂合计</strong></td>
+<td>游戏</td>
+<td style="text-align: right;">3.8</td>
+<td style="text-align: right;">8.3</td>
+<td style="text-align: right;">8.3</td>
+</tr>
+<tr>
+<td>　宽相 + 新建碰撞代理</td>
+<td>游戏</td>
+<td style="text-align: right;">2.2</td>
+<td style="text-align: right;">5.5</td>
+<td style="text-align: right;">5.5</td>
+</tr>
+<tr>
+<td>　<code>hkpRigidBody</code> 构造</td>
+<td>游戏</td>
+<td style="text-align: right;">0.56</td>
+<td style="text-align: right;">1.89</td>
+<td style="text-align: right;">1.89</td>
+</tr>
+<tr>
+<td>　写子块句柄组件位姿</td>
+<td>游戏</td>
+<td style="text-align: right;">0.43</td>
+<td style="text-align: right;">0.76</td>
+<td style="text-align: right;">0.76</td>
+</tr>
+<tr>
+<td><strong>整簇首次脱落</strong>（60 簇同帧）</td>
+<td>游戏</td>
+<td style="text-align: right;">6.1</td>
+<td style="text-align: right;">10.1</td>
+<td style="text-align: right;">10.1</td>
+</tr>
+<tr>
+<td>　注册组件（其中渲染状态 4.5）</td>
+<td>游戏</td>
+<td style="text-align: right;">3.4</td>
+<td style="text-align: right;">5.9</td>
+<td style="text-align: right;">5.9</td>
+</tr>
+<tr>
+<td><strong>物理步进</strong></td>
+<td>游戏</td>
+<td style="text-align: right;">6.6</td>
+<td style="text-align: right;">13.5</td>
+<td style="text-align: right;">15.4</td>
+</tr>
+<tr>
+<td>　integrate</td>
+<td>游戏</td>
+<td style="text-align: right;">2.6</td>
+<td style="text-align: right;">5.5</td>
+<td style="text-align: right;">6.1</td>
+</tr>
+<tr>
+<td>　collide</td>
+<td>游戏</td>
+<td style="text-align: right;">4.1</td>
+<td style="text-align: right;">8.4</td>
+<td style="text-align: right;">9.9</td>
+</tr>
+<tr>
+<td>碎屑 <code>UpdateChips</code></td>
+<td>游戏</td>
+<td style="text-align: right;">6.6</td>
+<td style="text-align: right;">19.0</td>
+<td style="text-align: right;">171</td>
+</tr>
+<tr>
+<td>粒子 <code>UpdateFx</code></td>
+<td>游戏</td>
+<td style="text-align: right;">2.1</td>
+<td style="text-align: right;">6.3</td>
+<td style="text-align: right;">7.6</td>
+</tr>
+<tr>
+<td>碎块位姿同步 + <code>FlushPose</code></td>
+<td>游戏</td>
+<td style="text-align: right;">2.3</td>
+<td style="text-align: right;">4.4</td>
+<td style="text-align: right;">5.4</td>
+</tr>
+<tr>
+<td><code>EndOfFrameUpdates</code>（骨骼数据等提交渲染）</td>
+<td>游戏</td>
+<td style="text-align: right;">15.2</td>
+<td style="text-align: right;">42.4</td>
+<td style="text-align: right;">53.2</td>
+</tr>
+<tr>
+<td><strong>游戏线程整帧</strong></td>
+<td>游戏</td>
+<td style="text-align: right;">35.0</td>
+<td style="text-align: right;">80.4</td>
+<td style="text-align: right;">158.8</td>
+</tr>
+<tr>
+<td>CPU 渲染线程（整帧）</td>
+<td>渲染</td>
+<td style="text-align: right;">8.0</td>
+<td style="text-align: right;">14.1</td>
+<td style="text-align: right;">37.0</td>
+</tr>
+<tr>
+<td>GPU（整帧）</td>
+<td>GPU</td>
+<td style="text-align: right;">5.7</td>
+<td style="text-align: right;">8.5</td>
+<td style="text-align: right;">9.5</td>
+</tr>
+<tr>
+<td>帧时间</td>
+<td></td>
+<td style="text-align: right;">39.3</td>
+<td style="text-align: right;">80.4</td>
+<td style="text-align: right;">198</td>
+</tr>
+</tbody>
+</table></div>
+<p>峰值分裂帧：<strong>60 个簇同帧分裂，激活 520 个刚体，新建 2060 个碰撞代理</strong>，清醒刚体 1600；该帧分裂 6.8–8.3 ms，宽相/碰撞代理占 3.9–5.5 ms。最重的首次脱落帧同帧 60 个簇（20 栋 × 3），合计 10.1 ms。</p>
+<p>画碎块的增量（20 栋）：CPU 渲染线程 <strong>+1.66 / 3.6 / 9.2 ms</strong>，GPU <strong>+0.86 / 1.47 / 2.24 ms</strong>（均值 / P95 / 最大），绘制调用 +4435 次 / 帧。</p>
+<p><strong>瓶颈</strong>：20 栋时整帧 39 ms，被<strong>游戏线程</strong>卡住（35 ms），渲染线程 8 ms、GPU 5.7 ms 都有余量。游戏线程里物理步进只占 6.6 ms；更大的是 <code>EndOfFrameUpdates</code> 15 ms（20 栋共 440 个复合骨骼网格及其阴影网格的骨骼数据提交）、碎屑 ProceduralMesh 每帧重建 6.6 ms（峰值 171 ms）与粒子 2.1 ms，三者之和接近 24 ms。分裂本身均值 3.8 ms，最大 8.3 ms，是第二梯队的尖峰。</p>
+<h2 id="report-4-改动">4. 改动</h2>
+<p>三项都是开关，默认关闭。默认构建的五种测试模式（release、drive、shoot、all、stress）都和 2026-11-21 的基线逐事件、逐碎块高度一致。</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>开关</th>
+<th>做法</th>
+<th>结果是否与默认一致</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-bfvdefervisuals</code></td>
+<td>首次脱落时只建刚体、关完好网格碰撞；整簇的渲染组件（创建 + 注册 + 渲染状态）放进队列，按所有农舍共享的每帧预算（默认 1 ms，<code>-bfvvisualbudget=</code>，每栋每帧至少 1 个）在之后几帧建好。建好那一帧才隐藏完好网格，不会露出空洞；分裂前强制建好。</td>
+<td>五项全部 identical</td>
+</tr>
+<tr>
+<td><code>-bfvparallelstep[=N]</code></td>
+<td>新的 <code>ABFVStepCoordinator</code> 在所有农舍 Tick 之后、仍在 TG_PrePhysics 内，把 20 个独立 Havok 世界交给原生工作线程池并行步进（每个线程有自己的 <code>hkMemoryRouter</code>；并行期间关闭进程级引用锁，前提是世界间不共享 <code>hkReferencedObject</code>），然后按原顺序完成各农舍后半步。默认线程数 = 逻辑核数 − 2，上限 48。</td>
+<td>五项全部 identical</td>
+</tr>
+<tr>
+<td>（诊断）<code>-bfvphaseprobe</code></td>
+<td>只加计时</td>
+<td>默认构建同样 identical</td>
+</tr>
+</tbody>
+</table></div>
+
+<p>为什么只推迟视觉、不推迟碰撞：碰撞代理是 Havok 宽相在 <code>addEntity</code> 里同步建的（2060 个代理 3.9–5.5 ms），推迟或改批量 <code>addEntityBatch</code> 都会改变岛与接触顺序，结果不再逐位一致。渲染组件不参与物理，推迟一两帧不影响事件与位置。</p>
+<h2 id="report-5-改动前后-同条件-两次运行">5. 改动前后（同条件，两次运行）</h2>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>20 栋，显示</th>
+<th style="text-align: right;">改动前</th>
+<th style="text-align: right;"><code>-bfvdefervisuals -bfvparallelstep</code></th>
+<th style="text-align: right;">差值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>首次脱落帧峰值（创建 + 注册 + 刚体）</td>
+<td style="text-align: right;">10.1 ms</td>
+<td style="text-align: right;">1.4 ms（视觉在之后的帧里每帧 ≤ 4.4 ms）</td>
+<td style="text-align: right;">−8.7 ms</td>
+</tr>
+<tr>
+<td>物理步进占用游戏线程（均值 / P95 / 最大）</td>
+<td style="text-align: right;">6.6 / 13.5 / 15.4 ms</td>
+<td style="text-align: right;">1.02 / 2.07 / 2.5 ms</td>
+<td style="text-align: right;">−5.6 / −11.4 / −12.9 ms</td>
+</tr>
+<tr>
+<td>物理步进各工作线程耗时之和</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">10.3 / 21.0 / 24.6 ms</td>
+<td style="text-align: right;">多线程争用带来约 +55% 总 CPU</td>
+</tr>
+<tr>
+<td>分裂（分裂帧均值 / 最大）</td>
+<td style="text-align: right;">3.8 / 8.3 ms</td>
+<td style="text-align: right;">3.6 / 7.7 ms</td>
+<td style="text-align: right;">基本不变（未改分裂本身）</td>
+</tr>
+<tr>
+<td>游戏线程整帧（均值 / P95）</td>
+<td style="text-align: right;">35.0 / 80.4 ms</td>
+<td style="text-align: right;">29.2 / 73.6 ms</td>
+<td style="text-align: right;">−5.8 / −6.8 ms</td>
+</tr>
+<tr>
+<td>帧时间（均值 / P95）</td>
+<td style="text-align: right;">39.3 / 80.4 ms</td>
+<td style="text-align: right;">34.3 / 73.8 ms</td>
+<td style="text-align: right;">−5.0 / −6.6 ms</td>
+</tr>
+<tr>
+<td>CPU 渲染线程</td>
+<td style="text-align: right;">8.0 ms</td>
+<td style="text-align: right;">8.1 ms</td>
+<td style="text-align: right;">不变</td>
+</tr>
+<tr>
+<td>GPU</td>
+<td style="text-align: right;">5.7 ms</td>
+<td style="text-align: right;">5.6 ms</td>
+<td style="text-align: right;">不变</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>单栋，显示</th>
+<th style="text-align: right;">改动前</th>
+<th style="text-align: right;">改动后</th>
+<th style="text-align: right;">差值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>分裂（分裂帧均值 / 最大）</td>
+<td style="text-align: right;">0.10 / 0.15 ms</td>
+<td style="text-align: right;">0.10 / 0.14 ms</td>
+<td style="text-align: right;">不变</td>
+</tr>
+<tr>
+<td>首次脱落帧（ReleasePart）</td>
+<td style="text-align: right;">0.55 / 0.74 ms</td>
+<td style="text-align: right;">0.09 / 0.34 ms</td>
+<td style="text-align: right;">−0.46 ms（视觉移到后续帧 0.46 ms）</td>
+</tr>
+<tr>
+<td>物理步进</td>
+<td style="text-align: right;">0.34 / 0.67 / 0.91 ms</td>
+<td style="text-align: right;">0.33 / 0.67 / 0.95 ms</td>
+<td style="text-align: right;">不变（单世界无可并行）</td>
+</tr>
+<tr>
+<td>游戏线程 / 渲染线程 / GPU</td>
+<td style="text-align: right;">3.28 / 2.42 / 3.57 ms</td>
+<td style="text-align: right;">3.21 / 2.36 / 3.64 ms</td>
+<td style="text-align: right;">噪声内</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="report-6-走过的弯路-已回退">6. 走过的弯路（已回退）</h2>
+<ul>
+<li>碎屑 / 粒子改用 <code>UpdateMeshSection</code> + 预留容量：游戏线程只省 1 ms，CPU 渲染线程却从 9.4 涨到 34 ms（UE 5.8 的 <code>UpdateMeshSection</code> 每帧在渲染线程重写整段顶点缓冲）。这项改动已回退。</li>
+<li>一处计时假象：<code>hkStopwatch</code> 首次调用会 <code>Sleep</code> 校准时钟，让第一次分裂看起来要 4 ms。现在 <code>bfvCreateWorld</code> 里提前校准，表中数字已不含它。</li>
+</ul>
+<h2 id="report-7-下一步">7. 下一步</h2>
+<ul>
+<li>20 栋剩下的游戏线程大头是 <code>EndOfFrameUpdates</code>（15 ms）和碎屑网格重建（6.6 ms，偶发 160+ ms）。前者可以让远处、已休眠簇停止提交骨骼（<code>bNeedPose</code> 机制已在），或合并同栋的阴影网格；后者应换成共享 InstancedStaticMesh / Niagara，或只给玩家农舍开碎屑。</li>
+<li>分裂里一半是宽相建碰撞代理；若可以接受与 2013.2 基线不逐位一致，<code>addEntityBatch</code> 能把同帧同簇的子块一次加进世界。</li>
+</ul></article><article id="gpunote-top"><h1 id="gpunote-gpu-凸包刚体后端-bfvgpusim">GPU 凸包刚体后端（BFVGpuSim）</h1><div class="date">2026-11-24 · BFVDestructionUE5</div>
+<p>下面按开发的先后记录问题与修复。后面附有<a href="#gpustatus-top">同一版 GPU 与 Havok 后端的结构、参数和对照结果</a>。</p>
+<h2 id="gpunote-要做的事">要做的事</h2>
+<p>把 RigidSim 搬进这个工程，改成能吃凸包，用农舍的碎块模型；底层是 GPU 上的 GSK（GJK + 单纯形缓存 + TIM），再加上 RigidSim 已有的优化。Havok 不动，作为对照；新后端用 <code>-bfvgpusim</code> 打开。</p>
+<h2 id="gpunote-先在-cpu-上把算法做对">先在 CPU 上把算法做对</h2>
+<p>GPU 上调物理很难看到中间状态，所以先写了一份和着色器同一份代码的 CPU 镜像（<code>BfvConvexCore.ush</code> 同时被 C++ 和 HLSL 编译），在 CPU 上把 158 块原叶片从半米高扔到地上，要求全部睡着、不穿地、不互相陷进去。</p>
+<p>第一版不睡。追了几轮，问题都在“静止”上，不在“碰撞”上：</p>
+<ul>
+<li>作者摆放的叶片本来就互相重叠，最深 0.28 m。穿透恢复放在速度里做，推开的速度就变成了动能，堆子一直抖。改成分离冲量：推开只改位置，不进速度。</li>
+<li>只看速度阈值的休眠，打不过接触抖动。照着 Havok 的源码加了两层：低速体每步减速（LOW 类 solver deactivation），以及位置参考盒（物体在 2 cm 的盒子里待够时间才算静止，每 8 帧再用一个 8 cm 的盒子看一次）。</li>
+<li>有几对叶片会越陷越深。原因是深穿透时 SAT 选了边轴，流形只剩一个点，物体绕着这个点转进邻居里。现在 SAT 偏向面轴，流形太浅或为空时用一个按 SAT 深度的点兜底。</li>
+<li>睡着的体被醒着的体压着时，只吃冲量不积分，等于一堵墙。求解前先把接触到的睡体叫醒，和 Havok 合并岛的行为一样。</li>
+</ul>
+<p>做完以后 23 个簇单独落地、158 块、186 块（含地基碎块）全部通过。</p>
+<h2 id="gpunote-搬到-gpu">搬到 GPU</h2>
+<p>每步大约 20 个 compute pass：积分和空间哈希、配对、窄相、地面、着色和求解、休眠、回读。几个跟 CPU 不一样的地方：</p>
+<ul>
+<li>农舍的大部件直径到 15 m，放不进 RigidSim 的 13 邻格，单独放一个“大体列表”，所有体都和它测。</li>
+<li>着色 + 求解原来是每色一次 dispatch，一步 290 个 pass。改成每栋农舍一个 1024 线程的线程组，色与色之间用组内屏障。</li>
+<li>结果异步回读，晚 1–3 帧。分裂、删叶的判定在游戏线程用回读的接触事件，规则和 Havok 路径一样。</li>
+</ul>
+<h2 id="gpunote-对齐">对齐</h2>
+<p>5 个回归模式里，部件释放、整簇分裂、支撑门的类型和数量全部一致，结束时全部睡着，没有爆炸。单栋全部打碎（<code>all</code>）落点中位数差 +3.4 cm。</p>
+<p>两个没对齐的地方：</p>
+<ul>
+<li>20 栋（<code>stress</code>）的落点中位数差在几次运行之间是 +2 到 +12.6 cm。GPU 的原子操作顺序每次不同，结果不能逐位复现。</li>
+<li>车撞碎片删叶（速度 &gt; 5 m/s 才删）每次 0–3 个，Havok 固定 2 个。这个规则对车和碎片接触那一帧的速度很敏感。</li>
+</ul>
+<h2 id="gpunote-性能">性能</h2>
+<p>单位 ms，数字是均值 / P95：</p>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">Havok（游戏线程）</th>
+<th style="text-align: right;">GPU 步进（GPU）</th>
+<th style="text-align: right;">GPU 提交（游戏线程）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单栋 <code>all</code></td>
+<td style="text-align: right;">0.34 / 0.67</td>
+<td style="text-align: right;">1.29 / 2.70</td>
+<td style="text-align: right;">0.007</td>
+</tr>
+<tr>
+<td>20 栋 <code>stress</code></td>
+<td style="text-align: right;">6.28 / 12.72</td>
+<td style="text-align: right;">3.95 / 5.12</td>
+<td style="text-align: right;">0.017</td>
+</tr>
+</tbody>
+</table></div>
+<p>单栋 GPU 比 Havok 慢，GPU 有大约 0.5 ms 的固定开销（宽相清表、几十个 pass 的依赖链）。20 栋时 GPU 更快，而且物理整个离开了游戏线程：游戏线程上的物理帧从 8.7 ms 降到 6.3 ms，剩下的是分裂和位姿同步，两边一样。</p>
+<p>GPU 时间里窄相占大头：每个穿透的凸包对都要做 SAT，20 栋时 22 000 对。已经做了 SAT 轴缓存（浅接触沿用上一步的轴），车只测面轴，窄相大约快了一倍。下一步是把 SAT 的边×边放到一个 wave 里并行。</p>
+<h2 id="gpunote-havok-不受影响">Havok 不受影响</h2>
+<p>最终构建不加 <code>-bfvgpusim</code> 跑 5 个模式，事件日志、刚体位置、清醒统计和存档的基线逐位相同。</p></article><article id="gpustatus-top"><h1 id="gpustatus-bfvgpusim-状态与结果-2026-11-24">BFVGpuSim 状态与结果（2026-11-24）</h1>
+<p><code>-bfvgpusim</code> = 第二物理后端：GPU 上的凸包刚体（GSK 风格 GJK + SAT + 一次性流形 + 着色 Gauss–Seidel + 暖启动 + 分离冲量 + Havok 式休眠）。Havok 2013 仍是默认路径，开关关闭时没有任何代码路径变化（见文末回归）。</p>
+<h2 id="gpustatus-怎么跑">怎么跑</h2>
+<p>实验在同一 UE 构建中切换后端：默认使用 CPU 上的 Havok，对照组启用项目的 <code>-bfvgpusim</code> 选项。每次都记录事件、数量、休眠和碎块落点。</p>
+<ul>
+<li>需要 D3D12 SM6（<code>Config/DefaultEngine.ini</code> 已切 DX12 + PCD3D_SM6）。<code>-nullrhi</code> 下 GPU 后端不能跑（会 Fatal 提示）。</li>
+<li>首次启动会编译全部 SM6 着色器（约 1 分钟，之后进 DDC）。</li>
+<li>两条路径使用同一批形状。烘焙数据有 481 个凸包，分别来自部件 222 个、叶片 207 个、地基残留 15 个和车身 37 个。</li>
+<li>可选参数：<code>-bfvgpuiters=N</code>（求解迭代，默认 4）、<code>-bfvgpumaxbodies=N</code>（默认 8192）、cvar <code>bfv.gpu.MaxColors</code>（默认 24，剩余接触进串行色）。</li>
+</ul>
+<h2 id="gpustatus-结构-文件">结构（文件）</h2>
+<div class="table-wrap" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Plugins/BFVGpuSim/Shaders/Private/BfvConvexCore.ush</code></td>
+<td>C++/HLSL 共用：支撑点、Johnson 单纯形 GJK（id 暖启动）、SAT（面/面/边×边，偏好面轴）、面裁剪流形 ≤4 点、边-边接触、深穿透兜底</td>
+</tr>
+<tr>
+<td><code>.../BFVGpuSimStep.usf</code></td>
+<td>每步 pass：Command → Clear → Integrate(+哈希/大体列表) → Pair → Narrow(TIM+GJK+SAT) → Ground → WakeEarly → 按世界分桶 → WorldSolve（组内：着色 ≤24 轮 + 串行剩余色、WarmStart、Solve×4、PositionSolve×2）→ StoreImpulse/事件 → Support → Finalize → WorldIsland → IslandMin → Sleep → Wake → Pose → Evict</td>
+</tr>
+<tr>
+<td><code>.../Private/BFVGpuWorld*.cpp</code></td>
+<td>RDG 图、持久缓冲（体、对缓存、休眠参考位姿）、3 槽异步回读 + 时间戳查询、命令队列、几何增量上传</td>
+</tr>
+<tr>
+<td><code>Plugins/BFVGpuSim/Tests/sim_tests.cpp</code></td>
+<td>与 GPU 同算法的 CPU 镜像（调参、诊断用），<code>build_v.bat sim_tests</code></td>
+</tr>
+<tr>
+<td><code>Source/BFVDestruction/Private/BFVFarmGpu.cpp</code></td>
+<td>农舍接入：静态部件、簇/叶片刚体（烘焙的多面体惯量 + 主轴系）、车（运动学）、地面平面、事件 → 分裂/删除规则</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="gpustatus-和-rigidsim-havok-的对应-做了什么">和 RigidSim / Havok 的对应（做了什么）</h2>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>环节</th>
+<th>RigidSim（原版）</th>
+<th>Havok 2013</th>
+<th>BFVGpuSim</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>形状</td>
+<td>球/盒</td>
+<td>凸包（带 1 cm 半径）</td>
+<td>凸包（烘焙的面、边、面环；体局部、COM 居中）</td>
+</tr>
+<tr>
+<td>宽相</td>
+<td>空间哈希 13 正向邻格</td>
+<td>SAP</td>
+<td>RigidSim 哈希（4 m 格）；直径 &gt; 格子的体（大部件、整簇、车）走“大体列表”，所有体都和它们测</td>
+</tr>
+<tr>
+<td>窄相</td>
+<td>解析</td>
+<td>GSK（GJK + 单纯形缓存 + TIM）</td>
+<td>GJK（缓存单纯形顶点 id 暖启动）+ TIM 早出 + 穿透时 SAT（轴缓存）</td>
+</tr>
+<tr>
+<td>接触</td>
+<td>—</td>
+<td>持久流形</td>
+<td>一次性流形（参考面/入射面裁剪 ≤4 点），特征 id 跨帧匹配</td>
+</tr>
+<tr>
+<td>求解</td>
+<td>Jacobi + 定点原子</td>
+<td>顺序冲量 4 次 τ=0.6</td>
+<td>接触图着色 GS（哈希优先级，每色无共享体），4 次，暖启动 0.95；每个农舍世界一个 1024 线程组里着色+求解（<code>bfv.gpu.GroupSolve 1</code>，0 = 每色一次 dispatch）</td>
+</tr>
+<tr>
+<td>穿透恢复</td>
+<td>推出 + 上限</td>
+<td>Baumgarte</td>
+<td>分离冲量（伪速度，只改位置不进动能），体间上限 1 m/s，地面 3 m/s</td>
+</tr>
+<tr>
+<td>静止</td>
+<td>接触阻尼 0.6</td>
+<td>求解器减速（LOW 类）+ 位置盒</td>
+<td>两者都做：RigidSim 静止阻尼 + Havok LOW 类减速 + Havok 双参考盒（2 cm / 8 cm 每 8 帧）</td>
+</tr>
+<tr>
+<td>休眠</td>
+<td>无</td>
+<td>岛</td>
+<td>GPU 岛（接触标签传播 + 指针跳跃），全岛满足才睡；碰撞唤醒（接近速度 &gt; 0.3 m/s）+ 接触即并岛</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="gpustatus-关键修复-为什么第一版不睡-会穿">关键修复（为什么第一版不睡 / 会穿）</h2>
+<ol>
+<li>Baumgarte 偏置放在速度求解里 → 作者摆放的叶片本来就互相重叠 0.28 m，推出速度变成动能，堆子一直抖。改成分离冲量。</li>
+<li>只看速度阈值的休眠打不过接触抖动 → 加 Havok 的位置参考盒（<code>hkRigidMotionUtilCanDeactivateFinal</code>）和 LOW 类求解器减速。</li>
+<li>深穿透时流形为空/只有 1 点 → 物体倾斜后陷进邻居 0.15–0.25 m。SAT 偏好面轴（边轴要好 5% + 5 mm 才用），流形为空/太浅时用支撑点兜底一个深度 = SAT 深度的点。</li>
+<li>睡着的体被醒着的体压着时只吃冲量不积分 → 求解前“接触即并岛”唤醒。</li>
+<li>农舍大部件（直径到 15 m）在 1.5 m 格子的 13 邻格外 → 大体列表，所有体都和它们测。</li>
+</ol>
+<p>CPU 镜像结果（<code>orig_leaves.txt</code>，158 原叶片从 0.5 m 高落地）：4 次迭代第 240 帧全部睡着，新增穿透 1.1 cm，地面穿透 0.8 cm；23 个簇单独落地全部 PASS；186 叶（含地基碎块）744 帧全部睡着。</p>
+<h2 id="gpustatus-ue-内对齐-havok-vs-gpu-同一-exe-d3d12-sm6">UE 内对齐（Havok vs GPU，同一 exe，D3D12 SM6）</h2>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>模式</th>
+<th>释放 H/G</th>
+<th>分裂 H/G</th>
+<th>删叶 H/G</th>
+<th>支撑 H/G</th>
+<th>刚体 H/G</th>
+<th>结束清醒 G</th>
+<th>落点中位 cm H/G (差)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>release</td>
+<td>5/5</td>
+<td>5/5</td>
+<td>0/0</td>
+<td>1/1</td>
+<td>38/38</td>
+<td>0</td>
+<td>40.3/46.1 (+5.8)</td>
+</tr>
+<tr>
+<td>drive</td>
+<td>5/5</td>
+<td>5/5</td>
+<td>2/1</td>
+<td>1/1</td>
+<td>36/37</td>
+<td>0</td>
+<td>73.0/86.3 (+13.2)</td>
+</tr>
+<tr>
+<td>shoot</td>
+<td>4/4</td>
+<td>4/4</td>
+<td>1/1</td>
+<td>0/0</td>
+<td>26/26</td>
+<td>0</td>
+<td>13.3/9.1 (-4.2)</td>
+</tr>
+<tr>
+<td>all</td>
+<td>22/22</td>
+<td>22/22</td>
+<td>0/0</td>
+<td>3/3</td>
+<td>158/158</td>
+<td>0</td>
+<td>19.8/23.2 (+3.4)</td>
+</tr>
+<tr>
+<td>stress</td>
+<td>22/22</td>
+<td>22/22</td>
+<td>0/0</td>
+<td>3/3</td>
+<td>158/158</td>
+<td>0</td>
+<td>19.8/32.4 (+12.6)</td>
+</tr>
+</tbody>
+</table></div>
+<p>数据来自项目归档的 GPU 和 CPU 对照报告，RTX 5060 Ti，离屏渲染，固定 60 Hz。H = Havok，G = GPU。</p>
+<ul>
+<li>释放、分裂、支撑门的类型与数量 5 个模式全部一致，结束时全部休眠，没有爆炸（最高点与 Havok 差 &lt; 10 cm）。</li>
+<li><code>all</code>（单栋全部打碎，158 块）对齐检查 PASS：落点中位数差 +3.4 cm。</li>
+<li><code>stress</code>（20 栋）落点中位数差在多次运行之间为 +2.0 / +8.1 / +10.1 / +12.6 cm：GPU 原子操作顺序每次不同，结果不可逐位复现；本轮 +12.6 cm 超过 10 cm 标准。</li>
+<li><code>drive</code> 的删叶数（车撞碎片且速度 &gt; 5 m/s）在 GPU 上每次 0–3 个，Havok 固定 2 个：这个规则对车-碎片接触的瞬时速度非常敏感，见下文“车”。</li>
+<li><code>shoot</code>：第 3 炮打碎片（射线命中 GPU 碎块）一致。</li>
+</ul>
+<h2 id="gpustatus-gpu-时间">GPU 时间</h2>
+<div class="table-wrap wide" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table>
+<thead>
+<tr>
+<th>模式</th>
+<th>农舍</th>
+<th>Havok 步进 均值/P95 ms（游戏线程）</th>
+<th>GPU 步进 均值/P95/最大 ms（GPU）</th>
+<th>GPU 提交 均值/P95 ms（游戏线程）</th>
+<th>物理帧 均值 ms H/G（游戏线程）</th>
+<th>清醒均值 H/G</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>release</td>
+<td>1</td>
+<td>0.100/0.212</td>
+<td>1.017/3.397/4.454</td>
+<td>0.006/0.007</td>
+<td>0.154/1.066</td>
+<td>17.99/12.76</td>
+</tr>
+<tr>
+<td>drive</td>
+<td>1</td>
+<td>0.103/0.190</td>
+<td>1.189/3.128/6.759</td>
+<td>0.006/0.008</td>
+<td>0.166/1.241</td>
+<td>21.5/12.35</td>
+</tr>
+<tr>
+<td>shoot</td>
+<td>1</td>
+<td>0.052/0.152</td>
+<td>0.616/1.471/2.598</td>
+<td>0.006/0.007</td>
+<td>0.086/0.656</td>
+<td>8.03/6.83</td>
+</tr>
+<tr>
+<td>all</td>
+<td>1</td>
+<td>0.335/0.668</td>
+<td>1.292/2.701/4.428</td>
+<td>0.007/0.008</td>
+<td>0.475/1.417</td>
+<td>82.34/54.66</td>
+</tr>
+<tr>
+<td>stress</td>
+<td>20</td>
+<td>6.284/12.720</td>
+<td>3.953/5.115/6.868</td>
+<td>0.017/0.026</td>
+<td>8.691/6.328</td>
+<td>1646.8/1145.52</td>
+</tr>
+</tbody>
+</table></div>
+<p>“GPU 步进”是 BFVGpuSim 整个 RDG 图的 GPU 时间（时间戳查询，异步取回）；“GPU 提交”是游戏线程上取结果 + 录 RDG 的时间。Havok 的步进在游戏线程。</p>
+<p>阶段分解（<code>all</code> 碎落最忙的 2 秒，每 120 步平均，ms）：宽相 0.27，窄相 1.1–1.4，着色+求解 0.17–0.21，休眠+回读 0.06。20 栋：宽相 0.38–0.53，窄相 3.4–3.6，求解 0.22–0.28（22 000 凸包对、7 200 接触点）。</p>
+<p>要点：</p>
+<ol>
+<li><strong>游戏线程</strong>：GPU 后端把物理从游戏线程拿走了。20 栋时 Havok 步进 6.3 ms（P95 12.7）在游戏线程；GPU 后端游戏线程只剩 0.017 ms 提交，物理帧 8.7 → 6.3 ms（剩下的是分裂逻辑、位姿同步，两边一样）。</li>
+<li><strong>GPU 时间</strong>：单栋 GPU 步进 1.0–1.3 ms，比 Havok 单栋 CPU 时间（0.1–0.33 ms）慢；20 栋 3.95 ms，比 Havok 6.3 ms 快且不在游戏线程。GPU 时间几乎不随农舍数线性增长（1 → 20 栋：1.3 → 4.0 ms），因为大部分是固定开销（宽相 0.2 ms、调度链）和窄相长尾。</li>
+<li><strong>窄相是大头</strong>：每个穿透的凸包对都要做 SAT（面×点 + 边×边×点，农舍碎块平均 10 顶点 10 条边方向，车身最大 315 条）。已做：SAT 轴缓存（浅接触沿用上一步的轴，每 8 步全量一次，CPU 镜像 6.3 → 2.6 ms/帧，结果不变）、车只用面轴、流形构建只有一个调用点（寄存器/本地数组减半）。</li>
+</ol>
+<h2 id="gpustatus-已知差异-没做的">已知差异 / 没做的</h2>
+<ul>
+<li>回读晚 1–3 帧：分裂和删叶判定用的是 GPU 结果，事件时间比 Havok 晚约 16–50 ms。五个场景的分裂数一致，drive 的删叶数在不同运行间有波动。</li>
+<li>地形是一个平面（农舍底下地形中位高度），地形起伏 &lt; 50 cm；Havok 用的是三角网格。</li>
+<li>车只做运动学凸包（37 个凸包），轮子不参与。</li>
+<li>射线/扫掠查询：静态部件和地面仍在 Havok 世界里做（开炮、车撞部件判定）；碎块射线在 GPU 模式下用回读位姿 + 凸包平面裁剪（<code>GpuRay</code>）。</li>
+<li>车：Havok 用 <code>setPositionAndRotation</code> 瞬移车（刚体速度 0），碎块靠穿透恢复被推开；GPU 侧对运动学伙伴也用速度级 Baumgarte 推出（其他接触用分离冲量），车速度默认不给（<code>-bfvgpucarvel</code> 打开）。删叶数仍和 Havok 不稳定一致。</li>
+<li>结果不可逐位复现（原子累加、着色优先级与线程调度有关）。</li>
+<li>Jacobi 对照开关没有接到 UE（CPU 镜像里也只做了 GS）。</li>
+</ul>
+<h2 id="gpustatus-回归-havok-默认路径不变">回归（Havok 默认路径不变）</h2>
+<p>在最终构建（DX12 SM6、GPU 插件及所有 GPU 改动）里关闭 <code>-bfvgpusim</code>，release、drive、shoot、all、stress 五种模式的事件日志、刚体位置、清醒统计都与 Havok 基线逐位一致。</p>
+<h2 id="gpustatus-下一步-没做完的">下一步（没做完的）</h2>
+<ol>
+<li>窄相：SAT 边×边放到 wave 内并行（一对凸包一个 wave，32 线程分摊边对）。当时估算窄相可能提速 3–5 倍，尚待实测。</li>
+<li>宽相固定 0.2 ms：哈希清空 8192 + 13 邻格链表遍历；可以换成排序（按格子 id radix sort）或只在有醒体时跑。</li>
+<li>确定性：着色优先级已是确定的，剩下原子累加顺序（接触槽位、事件槽位）；按 (体对, 凸包对) 排序接触后求解可以逐位复现。</li>
+<li>车：删叶规则对车-碎片速度敏感，可以把 Havok 的车代理容差（10 cm）和 TIM 做进 GPU 的车对。</li>
+</ol><p><a href="bfv-physics.html">返回 BFV 物理笔记</a></p></article></main></div>
+<script>
+const links = Array.from(document.querySelectorAll('nav.toc a'));
+const targets = links.map(link => document.getElementById(decodeURIComponent(link.hash.slice(1))));
+function updateContents() {
+  let current = 0;
+  for (let i = 0; i < targets.length; i++) {
+    if (targets[i].getBoundingClientRect().top <= 96) current = i;
+    else break;
+  }
+  for (let i = 0; i < links.length; i++) {
+    if (i === current) links[i].setAttribute('aria-current', 'location');
+    else links[i].removeAttribute('aria-current');
+  }
+}
+addEventListener('scroll', updateContents, { passive: true });
+updateContents();
+const mobileContents = document.querySelector('.toc-mobile');
+mobileContents.addEventListener('click', event => {
+  const link = event.target.closest('a[href^="#"]');
+  if (!link) return;
+  mobileContents.open = false;
+  const heading = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+  if (heading) {
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+});
+</script></body></html>

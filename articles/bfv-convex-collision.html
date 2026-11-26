@@ -1,0 +1,1443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAT、GJK 和 GSK · 凸包碰撞检测 | DOTAFS</title>
+<meta name="description" content="拖动两个凸包，逐步查看分离轴、最近点、穿透深度，以及 GSK 如何复用上一帧的结果。">
+<style>
+:root{color-scheme:dark;--canvas:#1b1d1c;--reading:#222423;--rail:#171918;--text:#d6d3cd;--heading:#f0ede7;
+--muted:#acada8;--accent:#a7b5ab;--line:rgb(232 232 228 / 14%);--tint:rgb(232 232 228 / 5%);
+--a:#7fa7c9;--b:#d9a55b;--ok:#93b88a;--bad:#d27c6e;
+--sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--canvas);color:var(--text);font:16px/1.75 var(--sans)}
+a{color:var(--accent)}a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.top{height:54px;display:flex;align-items:center;gap:18px;padding:0 clamp(22px,2.6vw,52px);background:var(--rail);
+border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header.top .site{color:var(--heading);font-weight:500}header.top .meta{color:var(--muted);font:13px var(--mono)}
+.layout{display:grid;grid-template-columns:clamp(205px,16vw,266px) 1fr;min-height:calc(100vh - 54px)}
+nav.toc{position:sticky;top:54px;align-self:start;max-height:calc(100vh - 54px);overflow:auto;background:var(--rail);
+border-right:1px solid var(--line);padding:18px 0;font-size:14px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 18px 4px 16px;border-left:2px solid transparent;line-height:1.45}
+nav.toc a.h3{padding-left:30px;font-size:13px}
+nav.toc a:hover{color:var(--text)}
+nav.toc a.on{color:var(--heading);border-left-color:var(--accent);background:var(--tint)}
+main{background:var(--reading);padding:24px clamp(22px,2.6vw,52px) 80px;min-width:0}
+article p,article li,article blockquote{max-width:72em}
+.date{color:var(--muted);font:13px var(--mono);margin-top:8px}
+h1{color:var(--heading);font-weight:500;font-size:clamp(26px,2.4vw,35px);line-height:1.3;margin:6px 0 10px}
+h2{color:var(--heading);font-weight:500;font-size:23px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{color:var(--heading);font-weight:500;font-size:17px;margin:22px 0 8px}
+p{margin:10px 0}ul,ol{padding-left:1.4em}li{margin:4px 0}
+pre{background:var(--rail);border:1px solid var(--line);padding:12px 14px;overflow:auto;font:14px/1.6 var(--mono);max-width:72em}
+pre code{background:none;padding:0}
+code{font:0.9em var(--mono);background:var(--tint);padding:1px 5px;border-radius:3px}
+.table-wrap{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:7px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--heading);background:var(--tint);font-weight:500}
+blockquote{margin:12px 0;padding:2px 14px;border-left:2px solid var(--line);color:var(--muted)}
+figure{margin:16px 0 22px;max-width:1100px}
+.stage{background:var(--rail);border:1px solid var(--line);position:relative}
+.stage canvas{display:block;width:100%;touch-action:none;cursor:grab}
+.stage canvas.drag{cursor:grabbing}
+.bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+.bar label{display:flex;align-items:center;gap:8px}
+.bar input[type=range]{width:160px;accent-color:var(--accent)}
+.bar button{background:var(--tint);color:var(--heading);border:1px solid var(--line);padding:4px 12px;font:14px var(--sans);cursor:pointer}
+.bar button:hover{border-color:var(--accent)}
+.bar button:disabled{opacity:.48;cursor:default}
+#eRot{width:clamp(88px,24vw,160px)}
+#eRotValue{min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}
+.epa-contact-examples{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,225px),1fr));gap:12px 24px;max-width:720px}
+.epa-contact-examples svg{display:block;width:100%;max-width:340px;background:var(--rail);font:13px var(--sans)}
+.epa-contact-examples span{display:block;margin-top:4px;color:var(--text);font-size:14px}
+.epa-measure{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.epa-d{color:var(--ok)}.epa-h,.epa-vertex-b{color:var(--b)}.epa-gap,.epa-vertex-a{color:var(--a)}
+#epa-how .epa-current::marker{color:var(--ok);font-weight:bold}
+#epa-how .epa-current b{color:var(--ok)}
+#epa-how .epa-pair{display:inline-block;inline-size:13ch;white-space:nowrap;vertical-align:baseline;font:0.94em/1.4 var(--mono)}
+#epaReading{min-block-size:3lh}
+#eOut{min-block-size:calc(2lh + 21px)}
+/* These figures share B and update above the EPA canvas while it is being dragged. */
+#o2Out,#gjkOut,#satOut{min-block-size:calc(3lh + 21px)}
+@media(max-width:1100px){#o2Out{min-block-size:calc(4lh + 21px)}}
+@media(max-width:600px){
+  #o2Out{min-block-size:calc(7lh + 21px)}
+  #gjkOut,#satOut{min-block-size:calc(5lh + 21px)}
+  article p code,article li code{overflow-wrap:anywhere}
+}
+@media(max-width:360px){#o2Out{min-block-size:calc(9lh + 21px)}#satOut{min-block-size:calc(7lh + 21px)}}
+@media(max-width:799px){
+  #epaReading{min-block-size:6lh}
+  #eOut{min-block-size:calc(3lh + 21px)}
+}
+.readout{font:13px/1.6 var(--mono);color:var(--text);padding:10px 12px;border-top:1px solid var(--line);white-space:pre-wrap}
+figcaption{color:var(--muted);font-size:14px;margin-top:8px}
+.key{display:inline-block;width:10px;height:10px;margin:0 4px 0 10px;vertical-align:middle}
+@media (max-width:799px){.layout{display:block}nav.toc{display:none}main{padding:16px clamp(16px,3.4vw,26px) 60px}}
+.top a{text-decoration:none}.top a:hover,.top a:focus-visible{text-decoration:underline}
+header.top a.site{font-family:var(--mono);font-weight:600;letter-spacing:.06em}
+[id]{scroll-margin-top:68px}
+.canvas-key:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.mobile-toc{display:none}
+.readout{overflow-wrap:anywhere}
+@media(max-width:799px){
+ .mobile-toc{display:block;margin:12px 16px 0;color:var(--muted);font-size:14px}
+ .mobile-toc a{display:block;padding:.25em .75em}
+ .mobile-toc summary{cursor:pointer}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<header class="top"><a class="site" href="../home/">DOTAFS</a><a href="bfv-physics.html">BFV 刚体物理笔记</a></header>
+<div class="layout">
+<details class="mobile-toc"><summary>本篇目录</summary>
+<a href="#sat">SAT 与分离轴</a><a href="#gjk">GJK 与最近距离</a><a href="#epa">EPA 与穿透深度</a>
+<a href="#chaos">Chaos 的接触点</a><a href="#gsk">GSK 与跨帧缓存</a><a href="#ours">GPU 后端的实验记录</a>
+</details>
+<nav class="toc" aria-label="目录">
+  <a href="#q">要回答的问题</a>
+  <a href="#sat">SAT：找一条能分开它们的轴</a>
+  <a href="#sat-demo" class="h3">图 1：拖动看投影</a>
+  <a href="#sat-why-b" class="h3">图 1b：为什么也要循环 B</a>
+  <a href="#sat-loop" class="h3">把 SAT 写成循环</a>
+  <a href="#gjk">GJK：问原点离差集多远</a>
+  <a href="#origin" class="h3">“原点”到底是什么</a>
+  <a href="#pairs" class="h3">a 和 b 是哪些点</a>
+  <a href="#count" class="h3">一共多少对：m × n</a>
+  <a href="#outline" class="h3">A − B 的轮廓怎么来的</a>
+  <a href="#gjk-demo" class="h3">图 2：一步一步走单纯形</a>
+  <a href="#epa">EPA：相交后求深度</a>
+  <a href="#epa-demo" class="h3">图 2f：从白三角形往外找</a>
+  <a href="#epa-bullet" class="h3">拿图里的数读 Bullet</a>
+  <a href="#epa-chaos" class="h3">对照 Chaos 和 Havok</a>
+  <a href="#cmp">两者放在一起</a>
+  <a href="#mink">Minkowski difference 和边界</a>
+  <a href="#gauss" class="h3">Gauss map 剔除 edge 对</a>
+  <a href="#chaos">Chaos 遇到全部重叠怎么做</a>
+  <a href="#chaos-sat" class="h3">SATPenetration 三轮</a>
+  <a href="#gsk">GSK：给 GJK 加上记忆</a>
+  <a href="#gsk-demo" class="h3">图 3：逐帧看省了多少</a>
+  <a href="#ours">我们的 GPU 版怎么组合</a>
+  <a href="#glossary">术语表 Glossary</a>
+</nav>
+<main>
+<article>
+<h1>SAT、GJK 和 GSK</h1>
+<div class="date">DOTAFS · 2026-11-24 · 约 30 分钟</div>
+<p>这篇讲 GPU 凸包后端窄相用到的三样东西。图都是二维的，三维的道理一样，只是候选轴和单纯形多一维。图里蓝色是 A，橙色是 B，<b>拖动橙色的 B</b>，用滑条转它。图 1、图 2 和图 2f 共用同一个 B 的位置。在这几张图里，也可以用 Tab 选中画布，用方向键移动 B，用 Home 恢复初始姿态。</p>
+
+<h2 id="q">要回答的问题</h2>
+<p>两个凸包，窄相要回答三件事：</p>
+<ol>
+<li>碰没碰。</li>
+<li>没碰的话，离多远，最近的方向是哪边。这决定要不要提前生成“预测接触”，也决定下一帧还要不要再算。</li>
+<li>碰了的话，陷进去多深，往哪个方向推开最省。这就是接触法线和深度，求解器拿它去算冲量。</li>
+</ol>
+<p>SAT 和 GJK 是两种思路。SAT 擅长第 3 件，GJK 擅长第 2 件。两件都要，所以我们两个都用。</p>
+
+<h2 id="sat">SAT：找一条能分开它们的轴</h2>
+<p>分离轴定理说的是：两个凸体不相交，当且仅当存在一条轴，把两个物体投影到这条轴上，得到的两段区间不重叠。</p>
+<p>听起来要试无数条轴，其实凸多边形只需要试有限几条：二维是两个多边形每条边的法线；三维是两个凸包所有的面法线，再加上“A 的每条边方向 × B 的每条边方向”。</p>
+<p>做法就是挨个轴投影：</p>
+<ul>
+<li>只要有一条轴上两段不重叠，就是没碰，可以提前结束。</li>
+<li>所有轴都重叠，就是碰了。重叠量最小的那条轴就是接触法线，那个重叠量就是穿透深度。</li>
+</ul>
+<p>代价是“轴数 × 顶点数”。三维的边×边那一项是平方级的：农舍碎块一般 10 个顶点、10 个边方向，就是 100 条边轴，每条都要把两边所有顶点投影一遍。我们 GPU 窄相的时间大部分花在这里。</p>
+
+<figure id="sat-demo">
+<div class="stage">
+  <canvas aria-label="拖动 B 查看各轴投影" id="cSat" height="430"></canvas>
+  <div class="bar">
+    <label>B 旋转 <input id="rot" type="range" min="0" max="360" value="20"></label>
+    <span><span class="key" style="background:var(--a)"></span>A 的投影 <span class="key" style="background:var(--b)"></span>B 的投影 <span class="key" style="background:var(--bad)"></span>重叠 <span class="key" style="background:var(--ok)"></span>间隙</span>
+  </div>
+  <div class="readout" id="satOut"></div>
+</div>
+<figcaption>图 1：画面中的长虚线是当前选中的轴，A 和 B 投影到它上面变成两段色条。轴列表给出全部候选轴：条形往右是重叠量，往左是间隙。点列表里的某一行，就把那条轴画出来。默认画的是“结论轴”：没碰时是分离轴，碰了是重叠最小的轴。</figcaption>
+</figure>
+
+<h3 id="sat-why-b">为什么只循环 A 的边不够</h3>
+<p>下面是一个具体例子。A 是正方形 (0,0)–(2,0)–(2,2)–(0,2)；B 是三角形 (1.6,3.0)、(3.0,1.6)、(3.5,3.5)，它的斜边正对着 A 的右上角，两者<b>没有碰到</b>，中间有一条斜着的缝。</p>
+<p>按“for A 的每条边”去试，4 条边给出的法线只有 x、y 两个方向，两个方向上投影<b>都重叠</b>（各 0.4）。如果只循环 A，就会误判成“碰上了”。接着循环 B 的边，到了斜边那条法线 (1,1)/√2，两段投影分开了，间隙约 0.42，这才证明没碰。</p>
+<figure id="sat-thumbs">
+<div class="stage">
+  <canvas aria-label="A 和 B 的七条候选分离轴" id="cThumb" height="620"></canvas>
+</div>
+<figcaption>图 1b：每个小格是一条候选轴。先画 A 的 4 条边，再画 B 的 3 条边。小格里加粗的是产生这条轴的那条边，虚线是轴，下面两条色条是 A、B 投影到轴上的区间。红色表示重叠，绿色表示有间隙。只有 B 的斜边那一格是绿的。</figcaption>
+</figure>
+<p>直观上可以这么想：一个物体的面法线，只能看出“对方是不是在我这个面的外面”。B 是从 A 的<b>角</b>这边靠过来的，缝是斜的，A 的哪个面都对不上这道缝，只有 B 自己那条斜边对得上。所以两边的面都得试一遍：真正的分界线可能贴着 A 的面，也可能贴着 B 的面。三维还要再加边×边，因为分界线还可能夹在两条边之间。</p>
+
+<h3 id="sat-loop">把 SAT 写成循环</h3>
+<p>两点容易写错：候选轴是边的<b>法线</b>（normal），不是边本身；A 和 B 的边都要循环。“至少有一条轴分开”只在两者<b>没碰</b>时成立；碰了的话一条都找不到，这正是判断碰撞的依据。</p>
+<pre><code>minOverlap = +inf
+for each candidate axis n            // A 每条边的 normal + B 每条边的 normal；3D 再加 edge × edge；都要 normalize
+    [Amin, Amax] = project all vertices of A onto n
+    [Bmin, Bmax] = project all vertices of B onto n
+    overlap = min(Amax - Bmin, Bmax - Amin)
+    if overlap &lt; 0: return SEPARATED              // 找到 separating axis，提前结束（early out）
+    if overlap &lt; minOverlap:
+        minOverlap = overlap
+        normal = n if Amax - Bmin &lt;= Bmax - Amin else -n    // 平移 B 的方向
+return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
+<p>我们 GPU 代码里的 <code>bfvSat</code> 是三维版，没有 early out：调用它时 GJK 已经确定相交了，它只负责找重叠最小的那条轴。</p>
+
+<h2 id="gjk">GJK：问原点离差集多远</h2>
+<p>GJK 换了个角度看。把 A 的每个点减去 B 的每个点，得到一个新的凸形状，叫闵可夫斯基差 A−B。它有个好性质：</p>
+<ul>
+<li>A 和 B 相交 ⇔ A−B 包含原点。</li>
+<li>A 和 B 的最近距离 = 原点到 A−B 的距离。</li>
+</ul>
+
+<h3 id="origin">“原点”到底是什么</h3>
+<p>这里的原点<b>不是世界坐标的原点</b>，跟物体摆在哪无关。A − B 不是摆在场景里的形状，而是一张“差值”的图：A 上任取一点 a，B 上任取一点 b，算出 a − b，这是一个从 b 指向 a 的箭头，把它当成一个点画出来。A 和 B 所有点两两相减，画出来的点合起来就是 A − B。</p>
+<p>原点就是 (0, 0)，也就是“差为零”。a − b = 0 只有一种可能：a 和 b 是<b>同一个位置</b>。所以：</p>
+<ul>
+<li>A − B 里有原点 ⇔ 能找到一个点同时在 A 里又在 B 里 ⇔ A 和 B 相交。</li>
+<li>A − B 里没有原点 ⇔ 任何一对点都差一点 ⇔ 没相交。A − B 离原点最近的那个点，就是“差得最少的那一对点”的差向量，它的长度就是两个物体的最近距离。</li>
+</ul>
+
+<h3 id="pairs">a 和 b 是哪些点？是全部的点</h3>
+<p>a 和 b 不是随便挑的某一个点，也不只是顶点。A 里的<b>每一个点</b>（顶点、边上、内部都算）和 B 里的<b>每一个点</b>，两两配对，每一对都算一次 a − b。所有结果放在一起，才是 A − B。</p>
+<p>先用一维、只取整数点来数一遍。A 是 {2, 3, 4, 5}（4 个点），B 是 {4, 5, 6, 7}（4 个点），A 里挑一个 × B 里挑一个，一共 4 × 4 = 16 对：</p>
+<figure id="pairs-1d">
+<div class="stage">
+  <canvas aria-label="离散顶点配对与差值" id="cP1" height="430"></canvas>
+  <div class="bar">
+    <button id="p1All">全部配对一遍</button><button id="p1Clear">清空</button>
+    <span>鼠标移到表格里的某一格，看这一对 a、b 和它们的差</span>
+  </div>
+  <div class="readout" id="p1Out"></div>
+</div>
+<figcaption>图 2c：左边表格的每一格是一对 (a, b)，格子里写的是 a − b。右上是物体：蓝点是 A，橙点是 B。右下数轴是“差值的图”，每算一对就在上面落一个点。红格子是 a − b = 0 的那几对：a 和 b 是<b>同一个位置</b>（这里是 4 和 5，正好是两段重叠的地方）。</figcaption>
+</figure>
+<p>所以“a − b = 0”的意思就是：找到了一对点，它们其实是同一个点，也就是一个公共点。只要有一个公共点，两个物体就相交。</p>
+<p>二维也一样，只是点多到数不过来。下面可以自己拖一对 a、b，也可以让它随机撒很多对：</p>
+<figure id="pairs-2d">
+<div class="stage">
+  <canvas aria-label="连续点对和差集" id="cP2" height="500"></canvas>
+  <div class="bar">
+    <button id="p2Spray">随机撒 2000 对</button><button id="p2Clear">清空</button>
+    <span>拖动左边的白点 a（只能在 A 里）和黑点 b（只能在 B 里）</span>
+  </div>
+  <div class="readout" id="p2Out"></div>
+</div>
+<figcaption>图 2d：左边拖 a 和 b，右边的点就是 a − b。两边网格刻度一样大：左边从 b 到 a 横走 Δx、竖走 Δy；右边从原点出发走同样的 Δx、Δy，落到的点就是 a − b，箭头长度的数值也一样。淡色虚线把两根箭头的尾和尾、头和头对应起来。把 a、b 拖到同一个位置（只有两块重叠的地方才可能做到），右边的点就正好落在原点上。点“随机撒”会在 A、B 里各随机取一个点、算一次差，撒很多次之后，右边的点云就把整个 A − B 填满了。</figcaption>
+</figure>
+
+
+<h3 id="count">一共有多少对：m × n，不是组合数 C</h3>
+<p>配对是“A 里挑一个 × B 里挑一个”，用的是<b>乘法原理</b>：A 有 m 个点、B 有 n 个点，就有 <b>m × n</b> 对，每一对算一次 a − b。</p>
+<div class="table-wrap"><table>
+<tr><th>情况</th><th>A 的点数 m</th><th>B 的点数 n</th><th>配对数 m × n</th></tr>
+<tr><td>图 2c（一维整数点）</td><td>4</td><td>4</td><td>4 × 4 = 16</td></tr>
+<tr><td>图 2e（多边形顶点）</td><td>6</td><td>4</td><td>6 × 4 = 24</td></tr>
+<tr><td>两个立方体</td><td>8</td><td>8</td><td>8 × 8 = 64</td></tr>
+<tr><td>两块农舍碎块（约 10 个顶点）</td><td>10</td><td>10</td><td>10 × 10 = 100</td></tr>
+</table></div>
+<p>这<b>不是</b>组合数 C(n, k)。C(n, k) 是“从<b>同一堆</b>里挑 k 个、不分先后”，比如 C(5, 4) = 5 是从 5 个点里挑 4 个的挑法数。这里是从<b>两堆</b>里各挑一个，而且有顺序（a 一定来自 A，b 一定来自 B，a − b 和 b − a 是相反的两个点），所以是 m × n。</p>
+<p>点数是有限的只是因为只取了顶点；如果把内部的点也算上，就是无穷多对（图 2d 只是随机撒了 2000 对）。GJK 连 m × n 都不算：它每一步只取一个 support point（扫一遍 A 的 m 个顶点 + 扫一遍 B 的 n 个顶点，是 m + n 次而不是 m × n 次），几步就停。</p>
+
+<h3 id="outline">右边那圈虚线轮廓是怎么来的</h3>
+<p>轮廓只用顶点就能画出来，分三步：</p>
+<ol>
+<li><b>顶点两两相减</b>：A 有 6 个顶点，B 有 4 个，算出 6 × 4 = 24 个差 a<sub>i</sub> − b<sub>j</sub>，每个画成右边的一个点。</li>
+<li><b>套一根橡皮筋</b>（convex hull，凸包）：把这 24 个点最外面的那些用线连起来，里面的点不管。</li>
+<li>这圈线就是 A − B 的边界。A、B 内部的点相减，结果一定落在这圈里面，所以不用算，图 2d 撒的 2000 个点就是证明。</li>
+</ol>
+<p>还有一个更直观的看法：A − B = A + (−B)。先把 B <b>绕原点翻转</b>（每个点取负，得到 −B），再把 −B 的一个副本贴到 A 的每个顶点上。所有副本合起来，外面那圈正好就是同一个轮廓，相当于让 −B 沿着 A 的边“扫”一圈。</p>
+<figure id="outline-demo">
+<div class="stage">
+  <canvas aria-label="顶点差与凸包边界" id="cOut" height="460"></canvas>
+  <div class="bar">
+    <button id="oPrev" disabled>上一步</button><button id="oNext">下一个顶点对</button><button id="oAll">24 个全部算出</button><button id="oHull">套橡皮筋</button><button id="oCopies">换个看法：−B 贴到 A 的每个顶点</button><button id="oReset">从头开始</button>
+  </div>
+  <div class="readout" id="oOut"></div>
+</div>
+<figcaption>图 2e：左边是物体，顶点编了号（A1–A6、B1–B4）。“下一个顶点对”每次取一对顶点，左边画出 b → a 的箭头，右边落下 a − b 这个点。24 个点都出来后，“套橡皮筋”把最外面的点连起来，就是图 2d 里的那圈虚线。鼠标移到右边任意一个点上，可以看它是哪两个顶点相减来的。</figcaption>
+</figure>
+
+<p>为什么实际计算只用顶点？因为 A − B 是凸的，它的外轮廓只由“A 的顶点 − B 的顶点”决定，内部的点只是把中间填满。所以 GJK、图 2 里只用顶点相减，就够描出 A − B 的边界了。</p>
+
+<p>先看一维，最好理解。两段区间 A = [Amin, Amax]、B = [Bmin, Bmax]，所有 a − b 组成的还是一段区间：</p>
+<pre><code>A − B = [Amin − Bmax, Amax − Bmin]
+例 1：A = [2, 5]，B = [4, 7] → A − B = [2−7, 5−4] = [−5, 1]，包含 0 → 重叠（4 到 5 那段，a = b 时差为 0）
+例 2：A = [2, 3]，B = [4, 7] → A − B = [−5, −1]，不含 0 → 分开，离 0 最近的是 −1，距离 = 1（3 和 4 之间的缝）</code></pre>
+<figure id="origin-1d">
+<div class="stage">
+  <canvas aria-label="一维差集和原点" id="cO1" height="250"></canvas>
+  <div class="readout" id="o1Out"></div>
+</div>
+<figcaption>图 2a：一维。用鼠标左右拖橙色的 B。下面那条数轴是 A − B，白色竖线是 0（原点）。B 和 A 一重叠，A − B 就盖住 0；分开时，A − B 离 0 的距离正好是两段之间的缝。</figcaption>
+</figure>
+<p>二维也一样，只是区间变成了多边形。下面左边是物体本身，右边是 A − B。图里特意标出了“那一对点”：</p>
+<figure id="origin-2d">
+<div class="stage">
+  <canvas aria-label="二维差集和原点" id="cO2" height="440"></canvas>
+  <div class="readout" id="o2Out"></div>
+</div>
+<figcaption>图 2b：拖动橙色的 B（和图 1、图 2 共用位置）。相交时，左边标出一个 A、B 共有的点 p，它在右边对应 p − p = 原点，所以原点落在 A − B 里面（变红）。分开时，左边标出两物体最近的一对点 a、b，箭头 b → a 在右边就是从原点到 A − B 最近点的箭头，长度一样。</figcaption>
+</figure>
+
+<p>问题就变成了：原点离一个凸形状多远。但 A−B 有 A 的顶点数 × B 的顶点数那么多个点，不能真的把它算出来。GJK 的办法是只用“支撑点”：给一个方向 d，A−B 在 d 方向最远的点，就是“A 在 d 方向最远的顶点”减“B 在 −d 方向最远的顶点”。每次只要扫一遍两个凸包的顶点。</p>
+<p>然后用最多 3 个点（三维是 4 个）组成的“单纯形”，一步步往原点逼：</p>
+<ol>
+<li>求单纯形上离原点最近的点 v。</li>
+<li>朝 −v 方向取一个新支撑点 w，加进单纯形。</li>
+<li>如果 w 在 −v 方向上没比 v 走得更远，说明 v 就是整个 A−B 上的最近点，结束，距离就是 |v|。</li>
+<li>如果单纯形把原点包住了，就是相交，结束。</li>
+<li>否则把单纯形缩成离原点最近的那部分，回到 1。</li>
+</ol>
+<p>GJK 很快，一般几步就收敛，每步只扫一遍顶点。但相交时它只能说“相交了”，给不出深度和法线（v 已经是 0 了），这时要换别的方法。Havok 和 Bullet 用 <a href="#epa">EPA</a>，我们的 GPU 版用 SAT。</p>
+
+<figure id="gjk-demo">
+<div class="stage">
+  <canvas aria-label="GJK 单纯形迭代" id="cGjk" height="460"></canvas>
+  <div class="bar">
+    <button id="gPrev" disabled>上一步</button><button id="gStep">下一步</button><button id="gRun">走完</button><button id="gReset">从头开始</button>
+    <span><span class="key" style="background:#6d706b"></span>A−B（闵可夫斯基差） <span class="key" style="background:var(--heading)"></span>单纯形 <span class="key" style="background:var(--ok)"></span>当前最近点 v</span>
+  </div>
+  <div class="readout" id="gjkOut"></div>
+</div>
+<figcaption>图 2：左半边是 A、B 本身，右半边是它们的差集 A−B，图中的 + 标出原点 (0, 0)。“下一步”每次取一个支撑点。拖动 B 时，右边的差集会跟着变，GJK 自动从头开始。</figcaption>
+</figure>
+
+<h2 id="epa">EPA：已经相交了，B 要往哪边推，多远才刚好碰着？</h2>
+<h3 id="epa-goal">右边的白三角形是怎么画出来的？</h3>
+<p>先看左图。沿着蓝色多边形走一圈，六个角依次叫 <span class="epa-vertex-a">A1 到 A6</span>；橙色的四个角依次叫 <span class="epa-vertex-b">B1 到 B4</span>。比如 A4 就是蓝色的第 4 个角。拖动或转动 B，编号跟着原来的角走。点“摆成相交的例子”，看这一轮用白圈标出了哪两个角。</p>
+<ol id="epa-how">
+<li><b>画第一个白点 P1。</b> 先挑一个方向。在左图，沿这个方向找 A 最靠前的顶点，再反过来找 B 的顶点。用 A 的坐标减 B 的坐标，把算出来的点画在右图，这就是 P1。<span class="epa-pair" id="epaPair1">P1 = ·· − ··</span></li>
+<li><b>画第二个白点 P2，把两个点连起来。</b> 从 P1 朝原点看，沿这个新方向再挑一对顶点，相减得到 P2。右图现在有一条白线，一头是 P1，另一头是 P2。<span class="epa-pair" id="epaPair2">P2 = ·· − ··</span></li>
+<li><b>画第三个白点 P3。</b> 在白线上找到离原点最近的地方。从那里朝原点看，再挑一对顶点，相减得到 P3。把 P3 和白线的两头连起来，白三角形就画出来了。<span class="epa-pair" id="epaPair3">P3 = ·· − ··</span></li>
+<li><b>看原点有没有被圈住。</b> 这个例子里，原点在白三角形里面。三个白点都在灰圈里，连起来的三角形也整个在灰圈里，所以原点一定在灰圈里，左边的 A 和 B 相交。GJK 把这三个点原样交给 EPA。如果换个位置，前三个点没圈住原点，GJK 会留下离原点最近的白点或白边，再找下一个点。</li>
+</ol>
+<figure id="epa-demo">
+<div class="stage">
+  <canvas id="cEpa" height="440" aria-label="左边蓝色六个角标为 A1 到 A6，橙色四个角标为 B1 到 B4。白圈标出选中的角，右边画两点相减得到的白点。按“下一步”可以从一个白点看到完整三角形，再看 EPA 量边。"></canvas>
+  <div class="bar">
+    <button id="eExample">摆成相交的例子</button><button id="ePrev" disabled>上一步</button><button id="eStep">下一步</button><button id="eRun">走完</button><button id="eReset">从头开始</button><button id="ePush" disabled>把 B 推到刚好接触</button>
+    <label>旋转 B <input id="eRot" type="range" min="0" max="360" step="1" value="20" aria-valuetext="20 度"><span id="eRotValue" aria-hidden="true">20°</span></label>
+  </div>
+  <div class="readout" id="eOut" aria-live="polite"></div>
+</div>
+<figcaption>图 2f 和图 2 用的是同一对物体。右边的灰圈是 24 个差点套上橡皮筋后的轮廓。白点 P1、P2、P3 是 GJK 从这些差点里挑出来的。图上 1 个坐标单位按 1 cm 读数。</figcaption>
+</figure>
+<p id="epaReading"></p>
+<h3>拿到白三角形以后，EPA 做哪四步？</h3>
+<ol>
+<li><b>挑一条边。</b> 从原点往三条白边分别垂直量一下，挑最近的那条。图里把它涂成绿色。</li>
+<li><b>朝边外面找一个点。</b> 顺着绿尺指的方向，再拿一个蓝顶点减一个橙顶点，得到 W。过 W 画一条和绿边平行的橙线。</li>
+<li><b>比两把尺。</b> 从原点量到绿边是绿尺，量到橙线是橙尺。橙尺更长，说明绿边外面还有点。把 W 连进白线，回到第 1 步。</li>
+<li><b>两把尺一样长，就知道怎么推了。</b> 固定蓝色 A，把橙色 B 沿绿尺的方向挪一个绿尺的长度。左边两块刚好碰着，右边灰圈的边也刚好经过原点。</li>
+</ol>
+<h3 id="epa-relative">为什么图里只推 B？两块都能动呢？</h3>
+<ol>
+<li><b>绿尺量的是两块之间要错开多少。</b> EPA 只看形状和位置。图里固定 A，让 B 沿绿尺走完整段，是为了让你看见它们刚好碰着的那一刻。</li>
+<li><b>两块都能动，也能凑出同一段距离。</b> 假设绿尺朝右，又只考虑平移。A 向左走半个绿尺，B 向右走半个绿尺，两块之间也正好错开一个绿尺。</li>
+<li><b>质量不同时，轻的那块可以多挪一点。</b> 假设要一次消除这段重叠，不考虑转动，按质量的倒数来分。如果 A 比 B 重三倍，A 向左挪四分之一，B 向右挪四分之三。A 是固定墙时，就全由 B 挪。</li>
+<li><b>碰撞时的冲量先改速度。</b> 同一个接触点上，A 和 B 受到的冲量一样大、方向相反。质量小的那块，速度改得更多；撞偏了还会转。我们工程的 <code>SolveOne</code> 给 A 用 +P、给 B 用 −P，<code>PositionOne</code> 另外处理已经压进去的部分，每步可以只纠正一部分。两个函数都在工程的 <code>BFVGpuSimStep.usf</code> 里。</li>
+</ol>
+<h3 id="epa-contact">都是朝右推 B，为什么有时还会转？</h3>
+<p>看左图里的真实物体。蓝球 A 碰到橙块 B 的左侧面，白色接触点就是施力的位置。先把摩擦关掉：这个面是竖的，接触力就垂直于它。于是 A 朝右推 B，B 同时朝左推 A。两块都能自由运动，B 起初静止。</p>
+<figure>
+<div class="epa-contact-examples">
+  <div>
+    <svg viewBox="0 0 280 110" role="img" aria-label="蓝球碰到橙块左侧的正中。橙色箭头向右，沿箭头延长会经过 B 的质心。">
+      <rect x="108" y="12" width="114" height="84" rx="2" fill="var(--b)" fill-opacity=".14" stroke="var(--b)" stroke-width="2"/>
+      <circle cx="92" cy="54" r="16" fill="var(--a)" fill-opacity=".18" stroke="var(--a)" stroke-width="2"/>
+      <path d="M108 54 h-49 m7 -4 l-7 4 7 4" fill="none" stroke="var(--a)" stroke-width="2.5"/>
+      <path d="M108 54 h49 m-7 -4 l7 4 -7 4" fill="none" stroke="var(--b)" stroke-width="2.5"/>
+      <circle cx="108" cy="54" r="3" fill="var(--heading)"/>
+      <circle cx="165" cy="54" r="3" fill="var(--heading)"/>
+      <text x="171" y="59" fill="var(--heading)">质心</text>
+      <text x="83" y="86" fill="var(--a)">A</text><text x="203" y="87" fill="var(--b)">B</text>
+    </svg>
+    <span>推在正中，B 向右移动。</span>
+  </div>
+  <div>
+    <svg viewBox="0 0 280 110" role="img" aria-label="蓝球碰到橙块左侧靠上的位置。橙色箭头仍向右，沿箭头延长会从 B 的质心上方经过。">
+      <rect x="108" y="12" width="114" height="84" rx="2" fill="var(--b)" fill-opacity=".14" stroke="var(--b)" stroke-width="2"/>
+      <circle cx="92" cy="30" r="16" fill="var(--a)" fill-opacity=".18" stroke="var(--a)" stroke-width="2"/>
+      <path d="M108 30 h-49 m7 -4 l-7 4 7 4" fill="none" stroke="var(--a)" stroke-width="2.5"/>
+      <path d="M108 30 h49 m-7 -4 l7 4 -7 4" fill="none" stroke="var(--b)" stroke-width="2.5"/>
+      <circle cx="108" cy="30" r="3" fill="var(--heading)"/>
+      <circle cx="165" cy="54" r="3" fill="var(--heading)"/>
+      <text x="171" y="59" fill="var(--heading)">质心</text>
+      <text x="83" y="62" fill="var(--a)">A</text><text x="203" y="87" fill="var(--b)">B</text>
+    </svg>
+    <span>推在靠上的地方，B 向右移动，同时顺时针转。</span>
+  </div>
+</div>
+<figcaption>白点标出接触点和 B 的质心。两次给 B 同样大的向右冲量，质心的速度变化一样。把箭头沿直线延长，经过质心时，这一下给 B 的转动力矩为零；从质心上方经过时，这一下还会带着 B 顺时针转。</figcaption>
+</figure>
+<p>有摩擦时，接触点还可能沿着表面受到摩擦冲量。工程里的 <code>ApplyImpulse</code> 把同一个冲量 <code>P</code> 用了两次：第 776 行用它改线速度，第 777 行用 <code>cross(r, P)</code> 改角速度。<code>r</code> 是从质心指到接触点的箭头。前面 EPA 的绿尺只演示把两块沿法线平移到刚好接触；真正碰撞后转多少，由接触求解器算。</p>
+<h3 id="epa-bullet">拿刚才的数读 Bullet 源码</h3>
+<p><code>btGjkEpaSolver2::Penetration</code> 里，GJK 返回 <code>Inside</code> 就把它交给 <code>epa.Evaluate</code>。Bullet 做三维，开头用 <code>EncloseOrigin()</code> 把起点补成包住原点的四面体。二维刚才量一条边，三维换成量一个三角面。看循环里这三行就能认出图 2f 的动作。<a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L982-L991">GJK 交给 EPA</a> · <a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L651-L735">找面、取 W、扩展的循环</a></p>
+<pre><code>gjk.getsupport(best-&gt;n, *w);
+const btScalar wdist = btDot(best-&gt;n, w-&gt;w) - best-&gt;d;
+if (wdist &gt; EPA_ACCURACY)</code></pre>
+<p><code>best</code> 是这一轮选中的面，<code>best-&gt;n</code> 是朝外的单位法线。<span id="epaBulletReading"></span>你在调试器里看，EPA 内部把深度放在 <code>m_depth</code>，外层接口把它取负写进 <code>results.distance</code>，负值表示有穿透。<a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L994-L1003">结果写回的位置</a></p>
+<h3 id="epa-chaos">本机的 Chaos 和 Havok 怎么对上这张图</h3>
+<p>打开 UE 5.8 的 <code>Chaos/EPA.h</code>，搜 <code>DistanceToSupportPlane</code>（第 538–555 行）。<code>SupportA(n)</code>、<code>SupportB(−n)</code> 得到左图的两个顶点；<code>W = ASupport - BSupport</code> 得到右图的橙点。接下来 Chaos 记着两个数：</p>
+<ul>
+<li><code>LowerBound</code> 取当前最近面的距离。白线在灰圈里面，所以从原点最少得走这么远。</li>
+<li><code>UpperBound</code> 取到目前为止量过的最小支撑平面距离。整个灰圈都在每条支撑线的内侧，所以往最近的出口走，最多需要这么远。</li>
+</ul>
+<p><span id="epaBoundsReading"></span>Chaos 看上下界差到相对容差以内就停。在三维里，从新点 W 看过去，可能同时看见好几个旧面。第 582 行的 <code>EPAComputeVisibilityBorder</code> 找出这片旧面外围的一圈边，再拿每条边的两个端点和 W 连成新三角面。</p>
+<p>工程用于 CPU 对照的 Havok 2013 也有相应的接口。<code>hkpGsk.h</code> 第 290 行声明了 <code>hkCalculatePenetrationDepth</code>。本工程的链接映射第 1053–1056 行能查到 <code>builtTetrahedron</code>、<code>tryToExpandPolytope</code> 和 <code>calculatePenetrationDepth</code>。这几个函数的函数体在 <code>hkpInternal</code> 静态库里；上面能逐行对照的是 Bullet 和 Chaos。我们自己的 GPU 凸包后端走到图 2 的“相交”以后，交给 <code>bfvSat</code> 求深度和方向，见后面的<a href="#ours">“我们的 GPU 版怎么组合”</a>。</p>
+
+<h2 id="cmp">两者放在一起</h2>
+<div class="table-wrap"><table>
+<tr><th></th><th>SAT</th><th>GJK</th></tr>
+<tr><td>回答什么</td><td>碰没碰；碰了的话深度和法线</td><td>碰没碰；没碰的话最近距离、最近点、方向</td></tr>
+<tr><td>穿透时</td><td>直接给出最小重叠轴和深度</td><td>只知道“相交”，要另外求深度（EPA 或 SAT）</td></tr>
+<tr><td>分开时</td><td>知道有一条分离轴，但轴上的间隙不一定是真实最近距离</td><td>给出真实最近距离</td></tr>
+<tr><td>代价</td><td>轴数 × 顶点数；三维边×边是平方级</td><td>迭代次数 × 顶点数；一般 2–6 次迭代</td></tr>
+<tr><td>形状要求</td><td>要有面法线和边方向（多面体）</td><td>只要能求支撑点（球、胶囊、凸包都行）</td></tr>
+<tr><td>能不能利用上一帧</td><td>能：记住上次那条轴，先试它</td><td>能：记住上次单纯形的顶点 id，从那里开始（这就是 GSK）</td></tr>
+</table></div>
+
+<h2 id="mink">Minkowski difference 和它的边界</h2>
+<p>A 的每个点减去 B 的每个点，所有结果组成的新形状就是 <b>Minkowski difference</b>，记作 A − B，也叫 <b>CSO</b>（Configuration Space Obstacle）。图 2 右半边那个灰色多边形就是它。因为 A − B = A + (−B)，有的代码（比如 Chaos）把它叫 <b>Minkowski sum</b>，说的是同一个东西。</p>
+<ul>
+<li>A、B 相交 ⇔ A − B 包含原点。</li>
+<li>A、B 的最近距离 = 原点到 A − B 的距离（GJK 求的就是这个）。</li>
+<li><b>penetration depth</b> = 原点到 A − B 边界（surface）最近那个面的距离，那个面的法线就是 <b>contact normal</b>（EPA 和 SAT 求的都是这个）。</li>
+</ul>
+<h3 id="mink-faces">边界上的面从哪来</h3>
+<p>三维时，A − B 边界上的每个面只可能来自三种组合。SAT 的候选轴正好就是这些面的法线，所以只需要试这三类轴：</p>
+<div class="table-wrap"><table>
+<tr><th>组合</th><th>面的形状</th><th>面的 normal（= SAT 候选轴）</th></tr>
+<tr><td>face–vertex：A 的面 + B 的顶点</td><td>A 那个面平移过去</td><td>A 的 face normal</td></tr>
+<tr><td>vertex–face：A 的顶点 + B 的面</td><td>B 那个面翻转后平移过去</td><td>B 的 face normal</td></tr>
+<tr><td>edge–edge：A 的边 + B 的边</td><td>一个平行四边形</td><td>edgeA × edgeB</td></tr>
+</table></div>
+<h3 id="gauss">不是每一对 edge 都是真的面：Gauss map</h3>
+<p>大部分 edge 对算出来的叉积根本不是 A − B 的面法线，拿它当轴一定不会是最小那条，白算。判断用 <b>Gauss map</b>：把每个特征“负责”的方向画到单位球上。</p>
+<ul>
+<li>一个 face 对应球上一个点，就是它的 normal。</li>
+<li>一条 edge 夹在两个面之间，对应连接那两个 normal 的一段 arc：这些方向上，最远的特征就是这条 edge。A 的边是 n₁→n₂，B 的边要取反，是 −m₁→−m₂。</li>
+<li><b>两段 arc 相交 ⇔ 两条 edge 在 A − B 上真的形成一个面。</b>不相交就跳过。</li>
+</ul>
+<p>Chaos 的 <code>IsMinkowskiSumFace</code> 就是用几个叉积、点积的符号做这个判断。农舍碎块大约 100 个 edge 对里通常只有少数几对通过，所以它能砍掉 SAT 里最贵的那部分。我们的 GPU SAT 现在还是全部 edge 对都试，要加这个剔除，需要在烘焙时给每条边记下它两侧的面。</p>
+
+<h2 id="chaos">Chaos 遇到“全都重叠”时怎么做</h2>
+<p>读的是 UE 5.8 引擎源码 <code>Chaos/SAT.h</code> 和 <code>CollisionOneShotManifolds.cpp</code>。先说结论：<b>convex vs convex，Chaos 默认不用 SAT</b>，用的是 GJK + EPA；这里核对的另一条 SAT 路径用于 convex vs triangle（地形、三角网格），开关是 <code>p.Chaos.Collision.UseConvexTriangleGJKSAT</code>，默认打开。</p>
+<h3 id="chaos-cc">convex vs convex：GJK → EPA</h3>
+<p>分开时 GJK 求最近点和距离（带 warm start）。重叠时交给 <b>EPA</b>（Expanding Polytope Algorithm）：从 GJK 包住原点的 simplex 出发，把 A − B 的边界一点点向外“吹”出来，找到离原点最近的面，它的 normal 就是推出方向，距离就是 depth。</p>
+<h3 id="chaos-sat">Chaos 的 SATPenetration：三轮，最后挑最浅的</h3>
+<ol>
+<li><b>B 的每个面 vs A 的顶点</b>：对 B 的每个面，找 A 里离它最近（最靠里）的顶点，算 signed distance。</li>
+<li><b>A 的每个面 vs B 的顶点</b>：反过来再做一遍。这就是上面图 1b 那个“为什么也要循环 B”。</li>
+<li><b>edge × edge</b>：只试通过 <code>IsMinkowskiSumFace</code> 的 edge 对。</li>
+</ol>
+<p>任何一轮里只要某条轴的距离大于 <code>CullDistance</code>，就是分开了，直接返回。三轮都没分开时，挑 <b>signed distance 最大</b>的那条：全是负数时，最大就是穿透最浅，等价于“重叠最小的轴”。挑的时候有两个偏好：</p>
+<ul>
+<li><b>PlaneBias</b>：偏好 face，不偏好 edge。edge–edge 那条要比最好的 face 轴明显更浅才用，因为 face 接触能出多个接触点，edge 只有一个。</li>
+<li><b>ObjectBias</b>：两边的 face 差不多时固定偏向一边，防止逐帧来回跳（feature flipping），否则接触点会抖。</li>
+</ul>
+<h3 id="chaos-manifold">选出轴之后：生成 manifold</h3>
+<ul>
+<li>沿 contact normal 在两个物体上各找一个最正对它的面（<code>SelectContactPlane</code>），更正对的那个当 <b>reference face</b>，另一个是 <b>incident face</b>。这里也有 0.002 的偏好防抖。</li>
+<li>两个面都不正对 normal：是 edge–edge 接触，只出 1 个点。</li>
+<li>否则是 vertex–face 接触：用 reference face 的侧边裁剪 incident face 的多边形，留下穿进去的点，最多 4 个。</li>
+</ul>
+<div class="table-wrap"><table>
+<tr><th></th><th>Chaos</th><th>我们的 GPU 版</th></tr>
+<tr><td>convex vs convex，穿透时</td><td>GJK → <b>EPA</b></td><td>GJK → <b>SAT</b></td></tr>
+<tr><td>SAT 怎么挑轴</td><td>最浅的；PlaneBias 偏好 face，ObjectBias 偏好 B 的面</td><td>最浅的；偏好 face（edge 轴要好 5% + 5 mm 才用）</td></tr>
+<tr><td>edge × edge 剔除</td><td>只试 Minkowski 面上的 edge 对</td><td>全部 edge 方向两两试（SAT 慢的主要原因）</td></tr>
+<tr><td>生成接触点</td><td>reference / incident face 裁剪，≤ 4 点；edge–edge 1 点</td><td>一样</td></tr>
+</table></div>
+
+<h2 id="gsk">GSK：给 GJK 加上记忆</h2>
+<p>GSK 是 Havok 对它这套窄相的叫法。核心还是 GJK，不同的是每对物体有一份跨帧的缓存，利用的是“物体一帧只动一点点”这个事实。缓存里记三样东西，分别带来两种省法：</p>
+<ul>
+<li><b>暖启动</b>：记下上一帧收敛时单纯形用到的顶点编号（A 的第几个顶点、B 的第几个顶点）。这一帧直接用这几个顶点在新位置重建单纯形，通常一步就验证完了，不用从头逼近。</li>
+<li><b>TIM 早出</b>：记下上一帧的分离法线 n 和距离 d。这一帧先算一个上界：两个物体沿 n 最多接近了多少（相对速度 × dt，再加上旋转 × 半径 × dt）。如果 d 减掉这个上界仍然大于接触容差，这一帧它们不可能碰上，GJK 整个跳过，只把 d 更新成减过之后的值。</li>
+</ul>
+<p>碎块堆里大部分凸包对是“挨得近但没碰上”，或者“静止贴着”。前一种绝大多数被 TIM 直接跳过，后一种暖启动一步就完。</p>
+
+<figure id="gsk-demo">
+<div class="stage">
+  <canvas aria-label="逐帧比较冷启动和缓存迭代" id="cGsk" height="470"></canvas>
+  <div class="bar">
+    <button id="kPlay">暂停</button><button id="kReset">重新计数</button>
+    <label><input id="kWarm" type="checkbox" checked> 暖启动</label>
+    <label><input id="kTim" type="checkbox" checked> TIM 早出</label>
+    <label>速度 <input id="kSpeed" type="range" min="1" max="100" value="35"></label>
+    <span><span class="key" style="background:var(--bad)"></span>冷启动 GJK 迭代 <span class="key" style="background:var(--ok)"></span>GSK 实际迭代 <span class="key" style="background:#6d706b"></span>被 TIM 跳过</span>
+  </div>
+  <div class="readout" id="gskOut"></div>
+</div>
+<figcaption>图 3：上面是 B 绕着 A 来回慢慢移动；下面是最近 240 帧每帧的 GJK 迭代次数，红色是每帧从零开始的冷启动，绿色是带缓存的实际次数，灰色是那一帧被 TIM 整个跳过。关掉复选框可以分别看两种省法各省了多少。</figcaption>
+</figure>
+
+<h2 id="ours">我们的 GPU 版怎么组合</h2>
+<p>每个凸包对一个 GPU 线程，流程是：</p>
+<ol>
+<li><b>TIM</b>：用缓存的分离距离和这一步的最大接近量，判断能不能跳过。</li>
+<li><b>GJK</b>，带暖启动：分开时得到距离和方向。距离在 3 cm 容差以内，就沿 GJK 的方向做面裁剪，生成最多 4 个预测接触点。</li>
+<li>GJK 说相交时，转 <b>SAT</b> 求深度和法线，再做面裁剪出接触点。SAT 也有缓存：浅接触先试上一步的轴，每 8 步做一次全量。</li>
+</ol>
+<p>实测效果（CPU 镜像，同一套 158 块碎块落地）：</p>
+<ul>
+<li>GJK 暖启动：平均迭代次数从 4.7 降到 1.0。</li>
+<li>SAT 轴缓存：CPU 镜像测试里，每帧 6.3 ms 降到 2.6 ms，记录的落地结果相同。</li>
+</ul>
+<p>相关代码在 <code>Plugins/BFVGpuSim/Shaders/Private/BfvConvexCore.ush</code>：<code>bfvGjk</code>、<code>bfvSat</code>、<code>bfvSatCached</code>，TIM 在 <code>BFVGpuSimStep.usf</code> 的 <code>NarrowCS</code> 开头。</p>
+
+<h2 id="glossary">术语表 Glossary</h2>
+<div class="table-wrap"><table>
+<tr><th>English</th><th>意思</th></tr>
+<tr><td>Minkowski difference / sum</td><td>A − B，等价于 A + (−B)</td></tr>
+<tr><td>CSO（Configuration Space Obstacle）</td><td>A − B 的另一个名字</td></tr>
+<tr><td>support mapping / support point</td><td>给一个方向，返回形状上那个方向最远的点</td></tr>
+<tr><td>simplex</td><td>GJK 用的 1–4 个点（点、线段、三角形、四面体）</td></tr>
+<tr><td>separating axis</td><td>能把两个形状投影分开的轴</td></tr>
+<tr><td>early out</td><td>找到一条 separating axis 就提前结束</td></tr>
+<tr><td>penetration depth</td><td>原点到 A − B 边界的最短距离</td></tr>
+<tr><td>contact normal</td><td>推出方向</td></tr>
+<tr><td>EPA（Expanding Polytope Algorithm）</td><td>从 GJK 的 simplex 出发，向外扩展 A − B 的边界，求 penetration depth</td></tr>
+<tr><td>Gauss map</td><td>把 face、edge 映射到单位球上的点和 arc</td></tr>
+<tr><td>reference face / incident face</td><td>生成接触点时，用来裁剪的面 / 被裁剪的面</td></tr>
+<tr><td>manifold</td><td>一组接触点（最多 4 个）</td></tr>
+<tr><td>feature flipping</td><td>同一对物体逐帧在不同的 face 之间来回切换，接触点会抖</td></tr>
+<tr><td>warm start</td><td>用上一帧的结果作为这一帧的起点</td></tr>
+<tr><td>TIM（运动界限检查）</td><td>上一帧距离减去这一帧最大接近量，仍大于容差就跳过 GJK</td></tr>
+</table></div>
+<p><a href="bfv-physics.html">返回 BFV 刚体物理笔记</a></p>
+</article>
+</main>
+</div>
+
+<script>
+// ---------- 2D math ----------
+const V=(x,y)=>({x,y}), add=(a,b)=>V(a.x+b.x,a.y+b.y), sub=(a,b)=>V(a.x-b.x,a.y-b.y), mul=(a,s)=>V(a.x*s,a.y*s);
+const dot=(a,b)=>a.x*b.x+a.y*b.y, len=a=>Math.hypot(a.x,a.y), nrm=a=>{const l=len(a)||1;return V(a.x/l,a.y/l)};
+const rot=(p,t)=>V(p.x*Math.cos(t)-p.y*Math.sin(t),p.x*Math.sin(t)+p.y*Math.cos(t));
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C={a:css('--a'),b:css('--b'),ok:css('--ok'),bad:css('--bad'),text:css('--text'),muted:css('--muted'),head:css('--heading'),line:'rgba(232,232,228,0.14)',mink:'#6d706b'};
+
+// shapes (local, units)
+const A0=[V(-1.6,-0.9),V(0.4,-1.4),V(1.7,-0.2),V(1.1,1.2),V(-0.7,1.4),V(-1.8,0.3)];
+const B0=[V(-0.9,-0.6),V(1.0,-0.8),V(0.8,0.7),V(-0.6,0.9)];
+const shared={bx:3.5,by:0.9,bt:20*Math.PI/180};
+const world=(poly,px,py,t)=>poly.map(p=>add(rot(p,t),V(px,py)));
+const polyA=()=>A0.map(p=>V(p.x,p.y));
+const polyB=()=>world(B0,shared.bx,shared.by,shared.bt);
+const support=(poly,d)=>{let bi=0,bv=-1e9;poly.forEach((p,i)=>{const s=dot(p,d);if(s>bv){bv=s;bi=i}});return bi};
+const project=(poly,ax)=>{let lo=1e9,hi=-1e9;for(const p of poly){const s=dot(p,ax);lo=Math.min(lo,s);hi=Math.max(hi,s)}return [lo,hi]};
+const normals=poly=>poly.map((p,i)=>{const q=poly[(i+1)%poly.length];const e=sub(q,p);return nrm(V(e.y,-e.x))});
+
+// ---------- canvas helper ----------
+function setup(cv){
+  const dpr=window.devicePixelRatio||1, h=+cv.getAttribute('height');
+  const fit=()=>{const w=cv.clientWidth;cv.width=w*dpr;cv.height=h*dpr;cv.style.height=h+'px'};
+  fit(); return {fit,dpr,h};
+}
+function drawPoly(g,pts,toPx,fill,stroke,lw=2){g.beginPath();pts.forEach((p,i)=>{const q=toPx(p);i?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y)});g.closePath();if(fill){g.fillStyle=fill;g.fill()}g.lineWidth=lw;g.strokeStyle=stroke;g.stroke()}
+function drawOriginLabel(g,p,text,occupied=[]){
+  const width=g.canvas.clientWidth, w=g.measureText(text).width;
+  const offsets=[V(10,-10),V(10,22),V(-10-w,-10),V(-10-w,22)];
+  let best,least=Infinity;
+  for(const offset of offsets){
+    const x=Math.max(4,Math.min(width-w-4,p.x+offset.x)), y=p.y+offset.y;
+    const cost=Math.abs(x-p.x-offset.x)+occupied.reduce((sum,r)=>{
+      const dx=Math.min(x+w+2,r.x+r.w)-Math.max(x-2,r.x);
+      const dy=Math.min(y+4,r.y+r.h)-Math.max(y-14,r.y);
+      return sum+Math.max(0,dx)*Math.max(0,dy);
+    },0);
+    if(cost<least){best={x,y};least=cost}
+    if(cost===0) break;
+  }
+  g.lineJoin='round';g.lineWidth=3;g.strokeStyle=css('--rail');
+  g.strokeText(text,best.x,best.y);g.fillStyle=C.head;g.fillText(text,best.x,best.y);
+}
+function drawOrigin2D(g,p,occupied=[]){
+  g.save();g.font='13px '+css('--sans');g.setLineDash([]);
+  g.strokeStyle=C.head;g.lineWidth=1.5;g.beginPath();
+  g.moveTo(p.x-7,p.y);g.lineTo(p.x+7,p.y);g.moveTo(p.x,p.y-7);g.lineTo(p.x,p.y+7);g.stroke();
+  g.fillStyle=C.head;g.beginPath();g.arc(p.x,p.y,2,0,2*Math.PI);g.fill();
+  drawOriginLabel(g,p,'原点 (0, 0)',occupied);g.restore();
+}
+function drawOrigin1D(g,x,top,bottom){
+  g.save();g.font='13px '+css('--sans');g.setLineDash([]);
+  g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();g.moveTo(x,top);g.lineTo(x,bottom);g.stroke();
+  drawOriginLabel(g,V(x,top),'原点 (0)');g.restore();
+}
+function hexA(c,a){const n=parseInt(c.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
+function dragB(cv,toWorld,onChange){
+  cv.tabIndex=0;
+  cv.classList.add('canvas-key');
+  cv.addEventListener('keydown',event=>{
+    const offsets={ArrowLeft:[-0.15,0],ArrowRight:[0.15,0],ArrowUp:[0,0.15],ArrowDown:[0,-0.15]};
+    if(event.key==='Home'){
+      shared.bx=3.5;shared.by=0.9;setRotation(20);
+    }else if(Object.hasOwn(offsets,event.key)){
+      const [dx,dy]=offsets[event.key];shared.bx+=dx;shared.by+=dy;
+    }else return;
+    event.preventDefault();onChange();
+  });
+  let drag=null;
+  cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();const w=toWorld(e.clientX-r.left,e.clientY-r.top);if(!w)return;
+    if(len(sub(w,V(shared.bx,shared.by)))<1.6){drag=sub(V(shared.bx,shared.by),w);cv.setPointerCapture(e.pointerId);cv.classList.add('drag')}});
+  cv.addEventListener('pointermove',e=>{if(!drag)return;const r=cv.getBoundingClientRect();const w=toWorld(e.clientX-r.left,e.clientY-r.top,true);if(!w)return;shared.bx=w.x+drag.x;shared.by=w.y+drag.y;onChange()});
+  const up=()=>{drag=null;cv.classList.remove('drag')};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+}
+const listeners=[];const changed=reason=>listeners.forEach(f=>f(reason));
+const rotationInputs=['rot','eRot'].map(id=>document.getElementById(id));
+function setRotation(degrees){
+  shared.bt=degrees*Math.PI/180;
+  for(const slider of rotationInputs){
+    slider.value=degrees;
+    slider.setAttribute('aria-valuetext',degrees+' 度');
+  }
+  document.getElementById('eRotValue').textContent=degrees+'°';
+}
+rotationInputs.forEach(slider=>slider.addEventListener('input',()=>{
+  setRotation(slider.valueAsNumber);
+  changed('rotation');
+}));
+
+// ---------- Figure 1: SAT ----------
+(function(){
+  const cv=document.getElementById('cSat'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('satOut');
+  let sel=-1, rows=[];
+  const view=()=>{const W=cv.width/S.dpr, stacked=W<600;
+    const sw=stacked?W:W*0.62, plotH=stacked?168:S.h;
+    return {W,sw,stacked,plotH,sc:Math.min(sw/9.5,plotH/6.1),cx:sw*0.46,cy:plotH*0.45}};
+  const toPx=p=>{const v=view();return V(v.cx+p.x*v.sc,v.cy-p.y*v.sc)};
+  const toWorld=(x,y,force)=>{const v=view();if(!force&&(x>v.sw||y>v.plotH))return null;return V((x-v.cx)/v.sc,(v.cy-y)/v.sc)};
+  function compute(){
+    const A=polyA(),B=polyB();rows=[];
+    normals(A).forEach((n,i)=>rows.push({ax:n,from:'A',i}));normals(B).forEach((n,i)=>rows.push({ax:n,from:'B',i}));
+    for(const r of rows){const a=project(A,r.ax),b=project(B,r.ax);r.a=a;r.b=b;r.ov=Math.min(a[1]-b[0],b[1]-a[0]);r.normal=a[1]-b[0]<=b[1]-a[0]?r.ax:mul(r.ax,-1)}
+    let best=0;rows.forEach((r,i)=>{if(r.ov<rows[best].ov)best=i});return {A,B,best};
+  }
+  function draw(){
+    const {A,B,best}=compute();const v=view();const k=sel>=0&&sel<rows.length?sel:best;const r=rows[k];
+    g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,v.W,S.h);
+    // axis line through origin-ish, offset below shapes
+    const ax=r.ax;let perp=V(-ax.y,ax.x);if(perp.y>0)perp=mul(perp,-1);   // draw the axis below the shapes
+    let lowP=-1e9;for(const p of A.concat(B))lowP=Math.max(lowP,dot(p,perp));const base=mul(perp,lowP+0.9);
+    const p0=toPx(add(base,mul(ax,-6))),p1=toPx(add(base,mul(ax,6)));
+    g.setLineDash([6,6]);g.strokeStyle=C.muted;g.lineWidth=1;g.beginPath();g.moveTo(p0.x,p0.y);g.lineTo(p1.x,p1.y);g.stroke();g.setLineDash([]);
+    // projection guides
+    const seg=(lo,hi,col,off,w)=>{const q0=toPx(add(add(base,mul(perp,off)),mul(ax,lo))),q1=toPx(add(add(base,mul(perp,off)),mul(ax,hi)));g.strokeStyle=col;g.lineWidth=w;g.beginPath();g.moveTo(q0.x,q0.y);g.lineTo(q1.x,q1.y);g.stroke()};
+    const guide=(poly,iv,col)=>{g.strokeStyle=hexA(col,0.25);g.lineWidth=1;for(const s of iv){let bp=null,bd=1e9;for(const p of poly){const d=Math.abs(dot(p,ax)-s);if(d<bd){bd=d;bp=p}}const q=toPx(bp),t=toPx(add(base,mul(ax,s)));g.beginPath();g.moveTo(q.x,q.y);g.lineTo(t.x,t.y);g.stroke()}};
+    guide(A,r.a,C.a);guide(B,r.b,C.b);
+    drawPoly(g,A,toPx,hexA(C.a,0.18),C.a);drawPoly(g,B,toPx,hexA(C.b,0.18),C.b);
+    seg(r.a[0],r.a[1],C.a,0.18,6);seg(r.b[0],r.b[1],C.b,-0.18,6);
+    if(r.ov>0){seg(Math.max(r.a[0],r.b[0]),Math.min(r.a[1],r.b[1]),C.bad,0,10)}else{seg(Math.min(r.a[1],r.b[1]),Math.max(r.a[0],r.b[0]),C.ok,0,10)}
+    // highlight the edge that produced the axis
+    const P=r.from==='A'?A:B;const e0=toPx(P[r.i]),e1=toPx(P[(r.i+1)%P.length]);g.strokeStyle=C.head;g.lineWidth=4;g.beginPath();g.moveTo(e0.x,e0.y);g.lineTo(e1.x,e1.y);g.stroke();
+    // list
+    const lx=v.stacked?14:v.sw+18, lw=v.W-lx-18, top=v.stacked?v.plotH+28:40;
+    const rowH=Math.min(34,(S.h-top-8)/rows.length), mid=lx+lw*0.45;
+    g.font='13px '+css('--mono');g.fillStyle=C.head;g.fillText('候选轴（边法线）  ← 间隙 | 重叠 →',lx,top-14);
+    const maxv=Math.max(...rows.map(q=>Math.abs(q.ov)),0.5);
+    g.strokeStyle=C.line;g.beginPath();g.moveTo(mid,top);g.lineTo(mid,top+rows.length*rowH);g.stroke();
+    rows.forEach((q,i)=>{const y=top+i*rowH;if(i===k){g.fillStyle='rgba(232,232,228,0.07)';g.fillRect(lx,y,lw,rowH)}
+      g.fillStyle=q.from==='A'?C.a:C.b;g.fillText(`${q.from}${q.i+1}`,lx+4,y+rowH*0.65);
+      const w=(q.ov/maxv)*(lw*0.5);g.fillStyle=q.ov>0?C.bad:C.ok;g.fillRect(w>0?mid:mid+w,y+rowH*0.25,Math.abs(w),rowH*0.5);
+      g.fillStyle=C.text;g.fillText((q.ov>0?'+':'')+q.ov.toFixed(2),lx+lw-56,y+rowH*0.65);
+      if(i===best){g.fillStyle=C.head;g.fillText('◀',lx+30,y+rowH*0.65)}});
+    view.rows={lx,lw,rowH,top};
+    const depth=rows[best].ov;
+    if(Math.abs(depth)<=1e-8){
+      out.textContent='结论：刚好接触。沿 '+rows[best].from+(rows[best].i+1)+' 轴的穿透深度为 0。';
+      return;
+    }
+    out.textContent=depth<0
+      ? `结论：没碰。A 和 B 之间存在分离轴（${rows[best].from}${rows[best].i+1}，间隙 ${(-rows[best].ov).toFixed(3)}），扫到它就能提前结束。\n注意这个间隙只是这条轴上的间隙，不一定是两物体的真实最近距离（真实距离看图 2 的 GJK）。`
+      : `结论：碰了。全部 ${rows.length} 条轴都重叠，最小重叠在 ${rows[best].from}${rows[best].i+1}：\n  穿透深度 = ${rows[best].ov.toFixed(3)}，接触法线 = (${rows[best].normal.x.toFixed(2)}, ${rows[best].normal.y.toFixed(2)})，把 B 沿它推开这么远就分开了。`;
+  }
+  cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;const L=view.rows;if(!L||x<L.lx)return;const i=Math.floor((y-L.top)/L.rowH);if(i>=0&&i<rows.length){sel=sel===i?-1:i;draw()}});
+  dragB(cv,toWorld,()=>{changed()});
+  listeners.push(draw);window.addEventListener('resize',()=>{S.fit();draw()});draw();
+})();
+
+// ---------- GJK core (2D, records steps) ----------
+function closestOnSimplex(s){ // s: [{w,ia,ib}], returns {v, keep, inside}
+  if(s.length===1)return {v:s[0].w,keep:[s[0]]};
+  if(s.length===2){const a=s[0].w,b=s[1].w,ab=sub(b,a);const t=-dot(a,ab)/Math.max(dot(ab,ab),1e-12);
+    if(t<=0)return {v:a,keep:[s[0]]};if(t>=1)return {v:b,keep:[s[1]]};return {v:add(a,mul(ab,t)),keep:[s[0],s[1]]}}
+  const [a,b,c]=s.map(p=>p.w);const cr=(p,q)=>(q.x-p.x)*(0-p.y)-(q.y-p.y)*(0-p.x);
+  const s1=cr(a,b),s2=cr(b,c),s3=cr(c,a);
+  if((s1>=0&&s2>=0&&s3>=0)||(s1<=0&&s2<=0&&s3<=0))return {v:V(0,0),keep:s,inside:true};
+  let best=null;for(const pair of [[0,1],[1,2],[0,2]]){const r=closestOnSimplex([s[pair[0]],s[pair[1]]]);if(!best||len(r.v)<len(best.v))best=r}return best;
+}
+function gjk(A,B,warmIds){
+  const sv=(ia,ib)=>({w:sub(A[ia],B[ib]),ia,ib,a:A[ia],b:B[ib]});
+  const steps=[];let s=[];
+  if(warmIds&&warmIds.length){s=warmIds.map(([ia,ib])=>sv(ia,ib))}
+  else{const d=sub(B[0],A[0]);s=[sv(support(A,d),support(B,mul(d,-1)))]}
+  let r=closestOnSimplex(s);steps.push({simplex:s.slice(),v:r.v,inside:r.inside,note:warmIds?'用上一帧的顶点编号重建单纯形':'取第一个支撑点'});
+  let iters=1, v=r.v;s=r.keep;
+  for(let k=0;k<20&&!r.inside;k++){
+    if(len(v)<1e-9){r.inside=true;break}
+    const d=mul(v,-1);const w=sv(support(A,d),support(B,mul(d,-1)));iters++;
+    const prog=dot(v,v)-dot(v,w.w);
+    if(prog<=1e-7*dot(v,v)+1e-12||s.some(p=>p.ia===w.ia&&p.ib===w.ib)){steps.push({simplex:s.slice(),v,w,done:true,note:'新支撑点在 −v 方向没有更远：v 就是最近点，结束'});break}
+    const s2=s.concat([w]);r=closestOnSimplex(s2);steps.push({simplex:s2,v:r.v,w,inside:r.inside,note:r.inside?'单纯形包住了原点：相交，结束':'加入新支撑点，缩成离原点最近的部分'});
+    s=r.keep;v=r.v;if(r.inside)break;
+  }
+  return {steps,iters,dist:r.inside?0:len(v),v,inside:!!r.inside,ids:s.map(p=>[p.ia,p.ib])};
+}
+
+// ---------- Figure 1b: thumbnails, every candidate axis of A then of B ----------
+(function(){
+  const cv=document.getElementById('cThumb'),g=cv.getContext('2d'),S=setup(cv);
+  const A=[V(0,0),V(2,0),V(2,2),V(0,2)], B=[V(1.6,3.0),V(3.0,1.6),V(3.5,3.5)];
+  const cells=[];
+  const addCells=(P,name)=>P.forEach((p,i)=>{const q=P[(i+1)%P.length],e=sub(q,p);let n=nrm(V(e.y,-e.x));
+    const a=project(A,n),b=project(B,n),ov=Math.min(a[1]-b[0],b[1]-a[0]);cells.push({name,i,P,n,a,b,ov})});
+  addCells(A,'A');addCells(B,'B');
+  function draw(){
+    const W=cv.width/S.dpr,H=S.h;g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,W,H);
+    const cols=W<680?2:4,rowsN=8/cols,pad=8,cw=(W-pad*(cols+1))/cols,chh=(H-pad*(rowsN+1))/rowsN;
+    cells.forEach((c,k)=>{
+      const row=Math.floor(k/cols),col=k%cols;
+      const x0=pad+col*(cw+pad),y0=pad+row*(chh+pad);
+      g.fillStyle='rgba(232,232,228,0.03)';g.fillRect(x0,y0,cw,chh);g.strokeStyle=C.line;g.strokeRect(x0+0.5,y0+0.5,cw-1,chh-1);
+      // shapes centred under the 2-line label; axis line 2.75 units from the centre; drawing clipped to the cell
+      const top=50,bot=26,ctr=V(1.75,1.75),sc=Math.min(cw,chh-top-bot)/7.2;
+      const ox=x0+cw*0.5-ctr.x*sc,oy=y0+top+(chh-top-bot)*0.5+ctr.y*sc;const P=p=>V(ox+p.x*sc,oy-p.y*sc);
+      g.save();g.beginPath();g.rect(x0+1,y0+top-6,cw-2,chh-top-bot+10);g.clip();
+      const n=c.n;let perp=V(-n.y,n.x);if(perp.y>0||(Math.abs(perp.y)<1e-6&&perp.x<0))perp=mul(perp,-1);
+      const base=add(sub(ctr,mul(n,dot(ctr,n))),mul(perp,2.75));
+      const L=(s0,s1,col,off,w)=>{const p0=P(add(add(base,mul(perp,off)),mul(n,s0))),p1=P(add(add(base,mul(perp,off)),mul(n,s1)));g.strokeStyle=col;g.lineWidth=w;g.beginPath();g.moveTo(p0.x,p0.y);g.lineTo(p1.x,p1.y);g.stroke()};
+      g.setLineDash([4,4]);L(dot(ctr,n)-4,dot(ctr,n)+4,C.muted,0,1);g.setLineDash([]);
+      drawPoly(g,A,P,hexA(C.a,0.18),C.a,1.5);drawPoly(g,B,P,hexA(C.b,0.18),C.b,1.5);
+      const e0=P(c.P[c.i]),e1=P(c.P[(c.i+1)%c.P.length]);g.strokeStyle=C.head;g.lineWidth=4;g.beginPath();g.moveTo(e0.x,e0.y);g.lineTo(e1.x,e1.y);g.stroke();
+      L(c.a[0],c.a[1],C.a,0.22,5);L(c.b[0],c.b[1],C.b,-0.22,5);
+      if(c.ov>0)L(Math.max(c.a[0],c.b[0]),Math.min(c.a[1],c.b[1]),C.bad,0,8);else L(Math.min(c.a[1],c.b[1]),Math.max(c.a[0],c.b[0]),C.ok,0,8);
+      g.restore();
+      const sep=c.ov<0;
+      g.font='14px '+css('--sans');g.fillStyle=c.name==='A'?C.a:C.b;g.fillText(`${c.name} 的第 ${c.i+1} 条边`,x0+10,y0+22);
+      g.font='13px '+css('--mono');g.fillStyle=C.muted;g.fillText(`轴 (${n.x.toFixed(2)}, ${n.y.toFixed(2)})`,x0+10,y0+42);
+      g.font='15px '+css('--sans');g.fillStyle=sep?C.ok:C.bad;g.fillText(sep?`分开！间隙 ${(-c.ov).toFixed(2)}`:`重叠 ${c.ov.toFixed(2)}`,x0+10,y0+chh-12);
+      if(sep){g.strokeStyle=C.ok;g.lineWidth=2;g.strokeRect(x0+1,y0+1,cw-2,chh-2)}
+    });
+    // last cell (row B, col 3): verdict
+    const x0=pad+7%cols*(cw+pad),y0=pad+Math.floor(7/cols)*(chh+pad);g.font='14px '+css('--sans');
+    const lines=['只循环 A：4 格全红','→ 误判成“碰上了”','','再循环 B：第 1 条边（斜边）','分开了 → 真的没碰'];
+    lines.forEach((t,i)=>{g.fillStyle=i<2?C.bad:(i>2?C.ok:C.text);g.fillText(t,x0+8,y0+24+i*24,cw-16)});
+  }
+  window.addEventListener('resize',()=>{S.fit();draw()});draw();
+})();
+
+// ---------- Figure 2c: 1D, every pair ----------
+(function(){
+  const cv=document.getElementById('cP1'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('p1Out');
+  const A=[2,3,4,5],B=[4,5,6,7];let done=new Set(),hover=null,anim=null;
+  const L=()=>{const W=cv.width/S.dpr;const cell=Math.min(56,(W*0.42)/5),gx=24,gy=60;const rx=gx+cell*5+40;return {W,cell,gx,gy,rx,rw:W-rx-30}};
+  const numX=(v,lo,hi)=>{const l=L();return l.rx+((v-lo)/(hi-lo))*l.rw};
+  function axis(y,lo,hi,label){const l=L();g.strokeStyle=C.line;g.lineWidth=1;g.beginPath();g.moveTo(l.rx,y);g.lineTo(l.rx+l.rw,y);g.stroke();
+    g.font='12px '+css('--mono');g.fillStyle=C.muted;for(let v=lo;v<=hi;v++){const x=numX(v,lo,hi);g.fillRect(x,y-3,1,6);g.fillText((v<0?'−':'')+Math.abs(v),x-(v<0?8:3),y+18)}
+    g.font='13px '+css('--sans');g.fillStyle=C.text;g.fillText(label,l.rx,y-38)}
+  function draw(){
+    const l=L();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,l.W,S.h);
+    g.font='13px '+css('--sans');g.fillStyle=C.text;g.fillText('每一对 (a, b) 的 a − b',l.gx,24);
+    g.fillStyle=C.b;g.fillText('b →',l.gx+l.cell*0.2,l.gy-12+0);
+    B.forEach((b,j)=>{g.fillStyle=C.b;g.font='14px '+css('--mono');g.fillText(String(b),l.gx+l.cell*(j+1)+l.cell*0.4,l.gy+l.cell*0.6)});
+    A.forEach((a,i)=>{g.fillStyle=C.a;g.fillText(String(a),l.gx+l.cell*0.4,l.gy+l.cell*(i+1)+l.cell*0.6)});
+    g.fillStyle=C.a;g.font='13px '+css('--sans');g.fillText('a ↓',l.gx,l.gy+l.cell*0.25);
+    A.forEach((a,i)=>B.forEach((b,j)=>{const x=l.gx+l.cell*(j+1),y=l.gy+l.cell*(i+1),d=a-b,key=i+','+j;
+      const isH=hover&&hover[0]===i&&hover[1]===j;const shown=done.has(key)||isH;
+      g.fillStyle=d===0?(shown?hexA(C.bad,0.55):hexA(C.bad,0.15)):(shown?'rgba(232,232,228,0.10)':'rgba(232,232,228,0.03)');g.fillRect(x+2,y+2,l.cell-4,l.cell-4);
+      if(isH){g.strokeStyle=C.head;g.lineWidth=2;g.strokeRect(x+2,y+2,l.cell-4,l.cell-4)}
+      g.fillStyle=shown?C.head:C.muted;g.font='15px '+css('--mono');const t=(d<0?'−':'')+Math.abs(d);g.fillText(t,x+l.cell*0.5-g.measureText(t).width/2,y+l.cell*0.62)}));
+    // objects line
+    const y1=150,y2=330;axis(y1,0,9,'物体（世界里的位置）');
+    A.forEach(a=>{const x=numX(a,0,9);g.fillStyle=C.a;g.beginPath();g.arc(x,y1-8,6,0,7);g.fill()});
+    B.forEach(b=>{const x=numX(b,0,9);g.fillStyle=C.b;g.beginPath();g.arc(x,y1+8,6,0,7);g.fill()});
+    g.font='12px '+css('--sans');g.fillStyle=C.a;g.fillText('A',numX(2,0,9)-22,y1-4);g.fillStyle=C.b;g.fillText('B',numX(7,0,9)+12,y1+12);
+    axis(y2,-5,1,'A − B（差值的图）');
+    const x0=numX(0,-5,1);drawOrigin1D(g,x0,y2-28,y2+28);
+    const counts={};A.forEach((a,i)=>B.forEach((b,j)=>{const key=i+','+j;if(!done.has(key)&&!(hover&&hover[0]===i&&hover[1]===j))return;const d=a-b;counts[d]=(counts[d]||0)+1;const x=numX(d,-5,1);
+      g.fillStyle=d===0?C.bad:C.ok;g.beginPath();g.arc(x,y2-8-(counts[d]-1)*9,4.5,0,7);g.fill()}));
+    if(hover){const a=A[hover[0]],b=B[hover[1]],xa=numX(a,0,9),xb=numX(b,0,9);
+      g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();g.arc(xa,y1-8,9,0,7);g.stroke();g.beginPath();g.arc(xb,y1+8,9,0,7);g.stroke();
+      if(a!==b){g.strokeStyle=C.ok;g.lineWidth=2;g.beginPath();g.moveTo(xb,y1+30);g.lineTo(xa,y1+30);g.stroke();g.fillStyle=C.ok;g.fillText('b → a',(xa+xb)/2-16,y1+48)}
+      out.textContent=`这一对：a = ${a}（A 里的点），b = ${b}（B 里的点），a − b = ${a-b}。`+(a===b?'\na 和 b 是同一个位置 → 差为 0 → 落在原点上 → 这是一个公共点，所以 A 和 B 相交。':`\n差 ${a-b} 就是“从 b 走到 a 要走多远”（负数表示往左走）。不是 0，说明这两个点不是同一个位置。`);
+    }else out.textContent=`已配对 ${done.size} / 16 对。表格里有 2 格是 0：a = 4、b = 4 和 a = 5、b = 5，这两个位置 A、B 都有，所以相交。\n右下数轴上的点从 −5 到 1，盖住了 0。如果把 B 往右挪到没有公共点，就一格 0 都不会有，数轴上的点也盖不住 0。`;
+  }
+  cv.addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect(),l=L();const x=e.clientX-r.left,y=e.clientY-r.top;const j=Math.floor((x-l.gx)/l.cell)-1,i=Math.floor((y-l.gy)/l.cell)-1;
+    const h=(i>=0&&i<4&&j>=0&&j<4)?[i,j]:null;if(JSON.stringify(h)!==JSON.stringify(hover)){hover=h;if(h)done.add(h[0]+','+h[1]);draw()}});
+  cv.addEventListener('pointerleave',()=>{hover=null;draw()});
+  document.getElementById('p1All').onclick=()=>{clearInterval(anim);done.clear();let k=0;anim=setInterval(()=>{if(k>=16){clearInterval(anim);hover=null;draw();return}hover=[Math.floor(k/4),k%4];done.add(hover[0]+','+hover[1]);k++;draw()},350)};
+  document.getElementById('p1Clear').onclick=()=>{clearInterval(anim);done.clear();hover=null;draw()};
+  window.addEventListener('resize',()=>{S.fit();draw()});draw();
+})();
+
+// ---------- Figure 2d: 2D, drag a and b ----------
+(function(){
+  const cv=document.getElementById('cP2'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('p2Out');
+  const PA=[V(-1.6,-0.9),V(0.4,-1.4),V(1.7,-0.2),V(1.1,1.2),V(-0.7,1.4),V(-1.8,0.3)];
+  const PB=[V(0.8,-0.6),V(2.7,-0.8),V(2.5,0.7),V(1.1,0.9)];   // overlaps A a little, so a = b is possible
+  let a=V(-0.4,0.2), b=V(2.0,0.0), cloud=[], drag=null;
+  const view=()=>{const W=cv.width/S.dpr;const half=W/2;return {W,half,sc:Math.min(half/8,S.h/6.5)}};
+  const toL=p=>{const v=view();return V(v.half*0.42+p.x*v.sc,S.h*0.5-p.y*v.sc)};
+  const toR=p=>{const v=view();return V(v.half*1.74+p.x*v.sc,S.h*0.5-p.y*v.sc)};   // same scale as the left side
+  const fromL=(x,y)=>{const v=view();return V((x-v.half*0.42)/v.sc,(S.h*0.5-y)/v.sc)};
+  const inside=(P,p)=>P.every((q,i)=>{const r=P[(i+1)%P.length];return (r.x-q.x)*(p.y-q.y)-(r.y-q.y)*(p.x-q.x)>=0});
+  const ccw=P=>{let s2=0;P.forEach((p,i)=>{const q=P[(i+1)%P.length];s2+=p.x*q.y-q.x*p.y});return s2>0?P:P.slice().reverse()};
+  const A=ccw(PA),B=ccw(PB);
+  const clampIn=(P,p,prev)=>inside(P,p)?p:prev;
+  const randIn=P=>{const lo=V(Math.min(...P.map(q=>q.x)),Math.min(...P.map(q=>q.y))),hi=V(Math.max(...P.map(q=>q.x)),Math.max(...P.map(q=>q.y)));for(;;){const p=V(lo.x+Math.random()*(hi.x-lo.x),lo.y+Math.random()*(hi.y-lo.y));if(inside(P,p))return p}};
+  function arrow(p0,p1,col){if(len(sub(p1,p0))<3)return;g.strokeStyle=col;g.fillStyle=col;g.lineWidth=2.5;g.beginPath();g.moveTo(p0.x,p0.y);g.lineTo(p1.x,p1.y);g.stroke();const d=nrm(sub(p1,p0)),n=V(-d.y,d.x);g.beginPath();g.moveTo(p1.x,p1.y);g.lineTo(p1.x-d.x*10+n.x*5,p1.y-d.y*10+n.y*5);g.lineTo(p1.x-d.x*10-n.x*5,p1.y-d.y*10-n.y*5);g.closePath();g.fill()}
+  function draw(){
+    const v=view();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,v.W,S.h);
+    // 1-unit grid + axes on both sides (same scale), so values can be read off
+    const grid=(toP,x0,x1,label)=>{g.save();g.beginPath();g.rect(x0,0,x1-x0,S.h);g.clip();
+      for(let k=-8;k<=8;k++){const px=toP(V(k,0)).x,py=toP(V(0,k)).y;g.strokeStyle=k===0?'rgba(232,232,228,0.35)':'rgba(232,232,228,0.06)';g.lineWidth=1;
+        g.beginPath();g.moveTo(px,0);g.lineTo(px,S.h);g.moveTo(x0,py);g.lineTo(x1,py);g.stroke();
+        if(k!==0){g.fillStyle='rgba(172,173,168,0.7)';g.font='11px '+css('--mono');const t=(k<0?'−':'')+Math.abs(k);const o=toP(V(0,0));g.fillText(t,px-4,o.y+14);g.fillText(t,o.x+4,py+4)}}
+      g.fillStyle=C.muted;g.font='12px '+css('--sans');g.fillText(label,x0+10,S.h-12);g.restore()};
+    grid(toL,0,v.half,'坐标：物体在世界里的位置');grid(toR,v.half,v.W,'坐标：差值 a − b（原点 = 差为 0）');
+    g.strokeStyle=C.line;g.beginPath();g.moveTo(v.half,0);g.lineTo(v.half,S.h);g.stroke();
+    g.font='13px '+css('--sans');g.fillStyle=C.muted;g.fillText('物体：拖 a（白）和 b（黑）',14,22);g.fillText('差值的图：每个点是一对 a − b',v.half+14,22);
+    drawPoly(g,A,toL,hexA(C.a,0.18),C.a);drawPoly(g,B,toL,hexA(C.b,0.18),C.b);
+    // outline of A - B from vertex differences (light)
+    const M=[];A.forEach(p=>B.forEach(q=>M.push(sub(p,q))));
+    const hull=pts=>{pts=pts.slice().sort((x,y)=>x.x-y.x||x.y-y.y);const cr=(o,p,q)=>(p.x-o.x)*(q.y-o.y)-(p.y-o.y)*(q.x-o.x);const lo=[],up=[];for(const p of pts){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}for(const p of pts.slice().reverse()){while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}return lo.slice(0,-1).concat(up.slice(0,-1))};
+    g.setLineDash([5,5]);drawPoly(g,hull(M),toR,null,C.mink,1);g.setLineDash([]);
+    cloud.forEach(d=>{const q=toR(d);g.fillStyle=len(d)<0.08?C.bad:'rgba(147,184,138,0.55)';g.fillRect(q.x-1.5,q.y-1.5,3,3)});
+    const o=toR(V(0,0));
+    const qa=toL(a),qb=toL(b),d=sub(a,b),qd=toR(d);
+    // components: Δx (horizontal, dashed) then Δy (vertical, dashed), same on both sides
+    const comp=(toP,base)=>{const p0=toP(base),p1=toP(add(base,V(d.x,0))),p2=toP(add(base,d));
+      g.setLineDash([5,4]);g.lineWidth=1.5;g.strokeStyle=hexA(C.a,0.9);g.beginPath();g.moveTo(p0.x,p0.y);g.lineTo(p1.x,p1.y);g.stroke();
+      g.strokeStyle=hexA(C.b,0.9);g.beginPath();g.moveTo(p1.x,p1.y);g.lineTo(p2.x,p2.y);g.stroke();g.setLineDash([]);
+      g.font='12px '+css('--mono');g.fillStyle=C.a;g.fillText(`Δx = ${d.x.toFixed(2)}`,(p0.x+p1.x)/2-30,p0.y+(d.y>=0?16:-8));
+      g.fillStyle=C.b;g.fillText(`Δy = ${d.y.toFixed(2)}`,p1.x+(d.x>=0?6:-74),(p1.y+p2.y)/2+4);
+      const m=V((p0.x+p2.x)/2,(p0.y+p2.y)/2),nn=nrm(V(-(p2.y-p0.y),p2.x-p0.x));g.fillStyle=C.ok;g.font='13px '+css('--mono');
+      g.fillText(`长度 ${len(d).toFixed(2)}`,m.x+nn.x*18-30,m.y+nn.y*18+4)};
+    if(len(d)>0.08){comp(toL,b);comp(toR,V(0,0))}
+    arrow(qb,qa,C.ok);arrow(o,qd,C.ok);
+    // the left arrow is moved, not changed: faint lines tail-to-tail and tip-to-tip
+    g.setLineDash([2,6]);g.strokeStyle='rgba(240,237,231,0.25)';g.lineWidth=1;g.beginPath();g.moveTo(qb.x,qb.y);g.lineTo(o.x,o.y);g.moveTo(qa.x,qa.y);g.lineTo(qd.x,qd.y);g.stroke();g.setLineDash([]);
+    g.fillStyle='#ffffff';g.beginPath();g.arc(qa.x,qa.y,7,0,7);g.fill();g.fillStyle='#111';g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.arc(qb.x,qb.y,7,0,7);g.fill();g.stroke();
+    g.fillStyle=C.head;g.fillText('a',qa.x-16,qa.y-8);g.fillText('b',qb.x+10,qb.y-8);
+    const zero=len(d)<0.08;g.fillStyle=zero?C.bad:C.ok;g.beginPath();g.arc(qd.x,qd.y,6,0,7);g.fill();g.fillText(zero?'a − b = 0 ！':'a − b',qd.x+9,qd.y+16);
+    drawOrigin2D(g,o);
+    out.textContent=`a = (${a.x.toFixed(2)}, ${a.y.toFixed(2)})    b = (${b.x.toFixed(2)}, ${b.y.toFixed(2)})\n`+
+      `a − b = (${a.x.toFixed(2)} − ${b.x.toFixed(2)}, ${a.y.toFixed(2)} − ${b.y.toFixed(2)}) = (${d.x.toFixed(2)}, ${d.y.toFixed(2)})    长度 = √(${d.x.toFixed(2)}² + ${d.y.toFixed(2)}²) = ${len(d).toFixed(2)}\n`+
+      `左边：从 b 出发，横着走 Δx = ${d.x.toFixed(2)}、竖着走 Δy = ${d.y.toFixed(2)}，到达 a。右边：从原点出发走同样的 Δx、Δy，到达点 (${d.x.toFixed(2)}, ${d.y.toFixed(2)})。两根箭头方向、长度完全相同，只是起点不同。\n`+
+      (zero?'a 和 b 在同一个位置：差为 0，右边的点落在原点上。这个位置同时属于 A 和 B，就是公共点。'
+           :'右边的箭头和左边 b → a 的箭头完全一样，只是把起点挪到了原点。试着把 a、b 拖到同一个位置（只能在蓝橙重叠的那一小块里）。')+
+      (cloud.length?`\n已撒 ${cloud.length} 对随机点，虚线是只用顶点相减得到的轮廓：点云正好填满它，原点被盖住了（红点就是 a ≈ b 的那些对）。`:'');
+  }
+  cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();const p=fromL(e.clientX-r.left,e.clientY-r.top);
+    if(len(sub(p,a))<0.35)drag='a';else if(len(sub(p,b))<0.35)drag='b';if(drag){cv.setPointerCapture(e.pointerId);cv.classList.add('drag')}});
+  cv.addEventListener('pointermove',e=>{if(!drag)return;const r=cv.getBoundingClientRect();const p=fromL(e.clientX-r.left,e.clientY-r.top);if(drag==='a')a=clampIn(A,p,a);else b=clampIn(B,p,b);draw()});
+  const up=()=>{drag=null;cv.classList.remove('drag')};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+  document.getElementById('p2Spray').onclick=()=>{for(let k=0;k<2000;k++)cloud.push(sub(randIn(A),randIn(B)));draw()};
+  document.getElementById('p2Clear').onclick=()=>{cloud=[];draw()};
+  window.addEventListener('resize',()=>{S.fit();draw()});draw();
+})();
+
+// ---------- Figure 2e: building the A - B outline ----------
+(function(){
+  const cv=document.getElementById('cOut'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('oOut');
+  const A=[V(-1.6,-0.9),V(0.4,-1.4),V(1.7,-0.2),V(1.1,1.2),V(-0.7,1.4),V(-1.8,0.3)];
+  const B=[V(0.8,-0.6),V(2.7,-0.8),V(2.5,0.7),V(1.1,0.9)];
+  const pairs=[];A.forEach((a,i)=>B.forEach((b,j)=>pairs.push({i,j,d:sub(a,b)})));
+  let shown=0,hull=false,copies=false,hover=-1;
+  const view=()=>{const W=cv.width/S.dpr;const half=W/2;return {W,half,sc:Math.min(half/8,S.h/6.5)}};
+  const toL=p=>{const v=view();return V(v.half*0.42+p.x*v.sc,S.h*0.5-p.y*v.sc)};
+  const toR=p=>{const v=view();return V(v.half*1.62+p.x*v.sc*0.8,S.h*0.5-p.y*v.sc*0.8)};
+  const hullOf=pts=>{pts=pts.slice().sort((x,y)=>x.x-y.x||x.y-y.y);const cr=(o,p,q)=>(p.x-o.x)*(q.y-o.y)-(p.y-o.y)*(q.x-o.x);const lo=[],up=[];for(const p of pts){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}for(const p of pts.slice().reverse()){while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}return lo.slice(0,-1).concat(up.slice(0,-1))};
+  const H=hullOf(pairs.map(q=>q.d));const onHull=q=>H.some(h=>len(sub(h,q.d))<1e-9);
+  function arrow(p0,p1,col,w=2.5){if(len(sub(p1,p0))<3)return;g.strokeStyle=col;g.fillStyle=col;g.lineWidth=w;g.beginPath();g.moveTo(p0.x,p0.y);g.lineTo(p1.x,p1.y);g.stroke();const d=nrm(sub(p1,p0)),n=V(-d.y,d.x);g.beginPath();g.moveTo(p1.x,p1.y);g.lineTo(p1.x-d.x*10+n.x*5,p1.y-d.y*10+n.y*5);g.lineTo(p1.x-d.x*10-n.x*5,p1.y-d.y*10-n.y*5);g.closePath();g.fill()}
+  function draw(){
+    const v=view();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,v.W,S.h);
+    g.strokeStyle=C.line;g.beginPath();g.moveTo(v.half,0);g.lineTo(v.half,S.h);g.stroke();
+    document.getElementById('oPrev').disabled=!copies&&!hull&&shown===0;
+    document.getElementById('oNext').disabled=!copies&&shown>=pairs.length;
+    g.font='13px '+css('--sans');g.fillStyle=C.muted;g.fillText('物体',14,22);g.fillText(copies?'−B 的副本贴到 A 的每个顶点上':'顶点两两相减：a − b',v.half+14,22);
+    drawPoly(g,A,toL,hexA(C.a,0.18),C.a);drawPoly(g,B,toL,hexA(C.b,0.18),C.b);
+    g.font='12px '+css('--mono');
+    A.forEach((a,i)=>{const q=toL(a);g.fillStyle=C.a;g.beginPath();g.arc(q.x,q.y,4,0,7);g.fill();const o=nrm(a);g.fillText('A'+(i+1),q.x+o.x*16-8,q.y-o.y*16+4)});
+    const cB=mul(B.reduce((s2,q)=>add(s2,q),V(0,0)),1/B.length);
+    B.forEach((b,j)=>{const q=toL(b);g.fillStyle=C.b;g.beginPath();g.arc(q.x,q.y,4,0,7);g.fill();const o=nrm(sub(b,cB));g.fillText('B'+(j+1),q.x+o.x*16-8,q.y-o.y*16+4)});
+    const o=toR(V(0,0));
+    if(copies){
+      const nB=B.map(b=>mul(b,-1));
+      A.forEach((a,i)=>{const cp=nB.map(q=>add(q,a));drawPoly(g,cp,toR,hexA(C.b,0.10),hexA(C.b,0.7),1.2);const qa=toR(a);g.fillStyle=C.a;g.beginPath();g.arc(qa.x,qa.y,3.5,0,7);g.fill()});
+      drawPoly(g,A,toR,null,hexA(C.a,0.8),1.5);
+      g.setLineDash([5,5]);drawPoly(g,H,toR,null,C.head,1.5);g.setLineDash([]);
+      drawOrigin2D(g,o);
+      out.textContent='−B：把 B 的每个点取负，相当于绕原点转 180°。把 −B 平移到 A 的每个顶点上（蓝点是 A 的顶点，橙色小块是 6 个 −B 副本），\n所有副本最外面那圈就是 A − B 的轮廓（白色虚线）。直觉上：−B 沿着 A 的边扫一圈，扫过的区域就是 A − B。';
+      return;
+    }
+    for(let k=0;k<shown;k++){const q=pairs[k],r=toR(q.d);const isH=k===hover,last=k===shown-1&&hover<0;
+      g.fillStyle=hull&&!onHull(q)?'rgba(172,173,168,0.45)':C.ok;g.beginPath();g.arc(r.x,r.y,isH||last?6:4,0,7);g.fill();
+      if(shown<=24&&!hull){g.fillStyle=C.muted;g.font='11px '+css('--mono');g.fillText(`A${q.i+1}−B${q.j+1}`,r.x+6,r.y-5)}}
+    if(hull){drawPoly(g,H,toR,'rgba(109,112,107,0.18)',C.head,2)}
+    { // pairing grid: rows = A1..A6, cols = B1..B4, 6 x 4 = 24 cells
+      const cs=16,gx=14,gy=S.h-cs*7-26;g.font='11px '+css('--mono');
+      g.fillStyle=C.muted;g.fillText('A 6 个 × B 4 个 = 24 对',gx,gy-6);
+      for(let j=0;j<4;j++){g.fillStyle=C.b;g.fillText('B'+(j+1),gx+cs*(j+1)+1,gy+11)}
+      for(let i=0;i<6;i++){g.fillStyle=C.a;g.fillText('A'+(i+1),gx-2,gy+cs*(i+1)+12);
+        for(let j=0;j<4;j++){const k=i*4+j,x=gx+cs*(j+1)+4,y=gy+cs*(i+1)+2;
+          g.fillStyle=k===(hover>=0?hover:shown-1)?C.head:(k<shown?(hull&&!onHull(pairs[k])?'rgba(172,173,168,0.5)':C.ok):'rgba(232,232,228,0.08)');g.fillRect(x,y,cs-3,cs-3)}}
+    }
+    const k=hover>=0?hover:shown-1;
+    if(k>=0){const q=pairs[k],qa=toL(A[q.i]),qb=toL(B[q.j]),r=toR(q.d);
+      arrow(qb,qa,C.ok);arrow(o,r,hexA(C.ok,0.8),2);g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();g.arc(qa.x,qa.y,8,0,7);g.stroke();g.beginPath();g.arc(qb.x,qb.y,8,0,7);g.stroke();
+      out.textContent=`第 ${k+1} / (6 × 4 = 24) 对：A${q.i+1} − B${q.j+1} = (${A[q.i].x.toFixed(1)}, ${A[q.i].y.toFixed(1)}) − (${B[q.j].x.toFixed(1)}, ${B[q.j].y.toFixed(1)}) = (${q.d.x.toFixed(1)}, ${q.d.y.toFixed(1)})\n`+
+        '左边的箭头 B → A，平移到从原点出发，箭头尖就是右边这个点。'+(hull?(onHull(q)?' 这个点在轮廓上。':' 这个点在轮廓里面，套橡皮筋时不用它。'):'');
+    }else out.textContent='点“下一个顶点对”，一对一对地算。';
+    drawOrigin2D(g,o);
+    if(hull&&hover<0)out.textContent=`24 个点里，最外面的 ${H.length} 个被橡皮筋连起来，就是 A − B 的轮廓；剩下 ${24-H.length} 个灰点在里面，不影响形状。\n轮廓盖住了原点，所以 A 和 B 相交（左边两块确实重叠了一点）。`;
+  }
+  cv.addEventListener('pointermove',e=>{if(copies)return;const r=cv.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;let best=-1,bd=12;for(let k=0;k<shown;k++){const q=toR(pairs[k].d);const d=Math.hypot(q.x-x,q.y-y);if(d<bd){bd=d;best=k}}if(best!==hover){hover=best;draw()}});
+  cv.addEventListener('pointerleave',()=>{hover=-1;draw()});
+  document.getElementById('oPrev').onclick=()=>{
+    if(copies) copies=false;
+    else if(hull) hull=false;
+    else shown=Math.max(0,shown-1);
+    hover=-1;draw();
+  };
+  document.getElementById('oNext').onclick=()=>{copies=false;if(shown<24)shown++;draw()};
+  document.getElementById('oAll').onclick=()=>{copies=false;shown=24;draw()};
+  document.getElementById('oHull').onclick=()=>{copies=false;shown=24;hull=true;draw()};
+  document.getElementById('oCopies').onclick=()=>{copies=!copies;draw()};
+  document.getElementById('oReset').onclick=()=>{shown=0;hull=false;copies=false;hover=-1;draw()};
+  window.addEventListener('resize',()=>{S.fit();draw()});draw();
+})();
+
+// ---------- Figure 2a: 1D origin ----------
+(function(){
+  const cv=document.getElementById('cO1'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('o1Out');
+  const A=[2,5];let b0=5.5;const BL=3;
+  const view=()=>{const W=cv.width/S.dpr;return {W,x0:60,sc:(W-120)/22,orig:-9}};   // value range [-9, 13]
+  const X=v=>{const w=view();return w.x0+(v-w.orig)*w.sc};
+  function line(y,label){const w=view();g.strokeStyle=C.line;g.lineWidth=1;g.beginPath();g.moveTo(w.x0,y);g.lineTo(w.W-60,y);g.stroke();
+    g.fillStyle=C.muted;g.font='12px '+css('--mono');for(let v=-8;v<=12;v+=2){const x=X(v);g.fillRect(x,y-3,1,6);g.fillText((v<0?'−':'')+Math.abs(v),x-(v<0?8:3),y+18)}
+    g.font='13px '+css('--sans');g.fillStyle=C.text;g.fillText(label,8,y-10)}
+  function bar(lo,hi,y,col,h=10){g.fillStyle=col;g.fillRect(X(lo),y-h/2,X(hi)-X(lo),h)}
+  function draw(){
+    const w=view();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,w.W,S.h);
+    const B=[b0,b0+BL];
+    line(55,'物体');bar(A[0],A[1],48,hexA(C.a,0.9));bar(B[0],B[1],62,hexA(C.b,0.9));
+    g.fillStyle=C.a;g.fillText('A',X(A[0])-14,52);g.fillStyle=C.b;g.fillText('B（拖我）',X(B[1])+6,66);
+    const ov=Math.min(A[1],B[1])-Math.max(A[0],B[0]);
+    if(ov>0)bar(Math.max(A[0],B[0]),Math.min(A[1],B[1]),55,hexA(C.bad,0.9),4);
+    const D=[A[0]-B[1],A[1]-B[0]];const has=D[0]<=0&&D[1]>=0;
+    line(175,'A − B');bar(D[0],D[1],175,has?hexA(C.bad,0.8):'rgba(172,173,168,0.75)',14);
+    const x0=X(0);drawOrigin1D(g,x0,140,205);
+    if(!has){const near=D[1]<0?D[1]:D[0];g.strokeStyle=C.ok;g.lineWidth=3;g.beginPath();g.moveTo(X(near),190);g.lineTo(x0,190);g.stroke()}
+    out.textContent=`A = [${A[0]}, ${A[1]}]   B = [${B[0].toFixed(1)}, ${B[1].toFixed(1)}]\nA − B = [Amin − Bmax, Amax − Bmin] = [${D[0].toFixed(1)}, ${D[1].toFixed(1)}]  → `+
+      (has?`包含 0：有 a = b 的点，A 和 B 重叠（重叠长度 ${ov.toFixed(1)}）`:`不含 0：离 0 最近的是 ${(D[1]<0?D[1]:D[0]).toFixed(1)}，两段之间的缝 = ${(-ov).toFixed(1)}`);
+  }
+  let drag=null;
+  cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();const v=view();const val=v.orig+(e.clientX-r.left-v.x0)/v.sc;if(val>b0-1&&val<b0+BL+1&&e.clientY-r.top<110){drag=val-b0;cv.setPointerCapture(e.pointerId);cv.classList.add('drag')}});
+  cv.addEventListener('pointermove',e=>{if(drag===null)return;const r=cv.getBoundingClientRect();const v=view();b0=Math.max(-8,Math.min(9,v.orig+(e.clientX-r.left-v.x0)/v.sc-drag));draw()});
+  const up=()=>{drag=null;cv.classList.remove('drag')};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+  window.addEventListener('resize',()=>{S.fit();draw()});draw();
+})();
+
+// ---------- Figure 2b: 2D origin, with the witness pair ----------
+(function(){
+  const cv=document.getElementById('cO2'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('o2Out');
+  const view=()=>{const W=cv.width/S.dpr;const half=W/2;return {W,half,sc:Math.min(half/9.5,S.h/8)}};
+  const toL=p=>{const v=view();return V(v.half*0.5+p.x*v.sc,S.h*0.5-p.y*v.sc)};
+  const toR=p=>{const v=view();return V(v.half*1.5+p.x*v.sc*0.85,S.h*0.5-p.y*v.sc*0.85)};
+  const toWorld=(x,y,force)=>{const v=view();if(x>v.half&&!force)return null;return V((x-v.half*0.5)/v.sc,(S.h*0.5-y)/v.sc)};
+  const hull=pts=>{pts=pts.slice().sort((a,b)=>a.x-b.x||a.y-b.y);const cr=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);const lo=[],up=[];for(const p of pts){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}for(const p of pts.slice().reverse()){while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}return lo.slice(0,-1).concat(up.slice(0,-1))};
+  const ccw=P=>{let a=0;P.forEach((p,i)=>{const q=P[(i+1)%P.length];a+=p.x*q.y-q.x*p.y});return a>0?P:P.slice().reverse()};
+  function clip(subj,clipP){ // Sutherland-Hodgman, both convex CCW
+    let out=subj;const C2=ccw(clipP);
+    for(let i=0;i<C2.length&&out.length;i++){const a=C2[i],b=C2[(i+1)%C2.length];const inside=p=>(b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x)>=0;const inp=out;out=[];
+      for(let k=0;k<inp.length;k++){const p=inp[k],q=inp[(k+1)%inp.length];const pi=inside(p),qi=inside(q);
+        if(pi)out.push(p);if(pi!==qi){const d1=(b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x),d2=(b.x-a.x)*(q.y-a.y)-(b.y-a.y)*(q.x-a.x);const t=d1/(d1-d2);out.push(add(p,mul(sub(q,p),t)))}}}
+    return out}
+  function segClosest(p,a,b){const ab=sub(b,a);const t=Math.max(0,Math.min(1,dot(sub(p,a),ab)/Math.max(dot(ab,ab),1e-12)));return add(a,mul(ab,t))}
+  function closestPair(A,B){let best=null;const test=(P,Q,swap)=>{for(const p of P)for(let i=0;i<Q.length;i++){const q=segClosest(p,Q[i],Q[(i+1)%Q.length]);const d=len(sub(p,q));if(!best||d<best.d)best=swap?{a:q,b:p,d}:{a:p,b:q,d}}};test(A,B,false);test(B,A,true);return best}
+  function arrow(p0,p1,col){g.strokeStyle=col;g.fillStyle=col;g.lineWidth=2.5;g.beginPath();g.moveTo(p0.x,p0.y);g.lineTo(p1.x,p1.y);g.stroke();const d=nrm(sub(p1,p0)),n=V(-d.y,d.x);g.beginPath();g.moveTo(p1.x,p1.y);g.lineTo(p1.x-d.x*10+n.x*5,p1.y-d.y*10+n.y*5);g.lineTo(p1.x-d.x*10-n.x*5,p1.y-d.y*10-n.y*5);g.closePath();g.fill()}
+  function draw(){
+    const v=view(),A=polyA(),B=polyB();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,v.W,S.h);
+    g.strokeStyle=C.line;g.beginPath();g.moveTo(v.half,0);g.lineTo(v.half,S.h);g.stroke();
+    g.font='13px '+css('--sans');g.fillStyle=C.muted;g.fillText('物体（世界里）',14,22);g.fillText('A − B（差值的图，不在世界里）',v.half+14,22);
+    drawPoly(g,A,toL,hexA(C.a,0.18),C.a);drawPoly(g,B,toL,hexA(C.b,0.18),C.b);
+    const I=clip(ccw(A),B);const hit=I.length>=3;
+    const M=hull(A.flatMap(a=>B.map(b=>sub(a,b))));drawPoly(g,M,toR,hit?hexA(C.bad,0.22):'rgba(109,112,107,0.25)',hit?C.bad:C.mink);
+    const o=toR(V(0,0));
+    if(hit){
+      drawPoly(g,I,toL,hexA(C.bad,0.45),C.bad,1.5);
+      const p=mul(I.reduce((s,q)=>add(s,q),V(0,0)),1/I.length);const q=toL(p);
+      g.fillStyle=C.head;g.beginPath();g.arc(q.x,q.y,5,0,7);g.fill();g.fillText('p：同时在 A 和 B 里',q.x+8,q.y-8);
+      g.fillStyle=C.bad;g.beginPath();g.arc(o.x,o.y,6,0,7);g.fill();g.fillStyle=C.head;g.fillText('p − p = 0',o.x+10,o.y+20);
+      out.textContent='相交：红色区域里的每个点都同时属于 A 和 B。拿其中一点 p，a = p、b = p，差 a − b = 0，正好是原点，所以原点落在 A − B 里面。\n反过来，只要 A − B 盖住了原点，就一定有一对 a、b 相减为 0，也就是一个公共点。';
+    }else{
+      const cp=closestPair(A,B);const qa=toL(cp.a),qb=toL(cp.b);
+      arrow(qb,qa,C.ok);g.fillStyle=C.b;g.beginPath();g.arc(qb.x,qb.y,4.5,0,7);g.fill();g.fillStyle=C.a;g.beginPath();g.arc(qa.x,qa.y,4.5,0,7);g.fill();
+      g.fillStyle=C.text;g.fillText('b',qb.x+6,qb.y+16);g.fillText('a',qa.x-14,qa.y-6);
+      const d=sub(cp.a,cp.b);const qd=toR(d);arrow(o,qd,C.ok);g.fillStyle=C.ok;g.beginPath();g.arc(qd.x,qd.y,4.5,0,7);g.fill();g.fillText('a − b',qd.x+8,qd.y-6);
+      out.textContent=`分开：左边最近的一对点 a、b，b → a 的箭头长 ${cp.d.toFixed(3)}。\n右边 a − b 就是 A − B 上离原点最近的点，从原点到它的箭头方向、长度和左边一模一样。原点在 A − B 外面，差最少的一对也差 ${cp.d.toFixed(3)}，所以没碰。`;
+    }
+    drawOrigin2D(g,o);
+  }
+  dragB(cv,toWorld,()=>changed());
+  listeners.push(draw);window.addEventListener('resize',()=>{S.fit();draw()});draw();
+})();
+
+// Convex outline of a small set of 2D difference points, counterclockwise.
+function differenceHull(points) {
+  const sorted = points.slice().sort((a,b) => a.x-b.x || a.y-b.y);
+  const unique = sorted.filter((p,i) => !i || len(sub(p,sorted[i-1])) > 1e-10);
+  if (unique.length < 3) return unique;
+  function half(list) {
+    const side = [];
+    for (const p of list) {
+      while (side.length >= 2) {
+        const a = side[side.length-2], b = side[side.length-1];
+        if ((b.x-a.x)*(p.y-a.y) - (b.y-a.y)*(p.x-a.x) > 1e-12) break;
+        side.pop();
+      }
+      side.push(p);
+    }
+    return side.slice(0,-1);
+  }
+  return half(unique).concat(half(unique.slice().reverse()));
+}
+
+// Figure 2f uses the actual final GJK simplex from Figure 2.
+function epaWalk(A,B) {
+  const tolerance = 1e-8, result = gjk(A,B,null);
+  if (!result.inside) return {state:result.dist <= tolerance ? 'touch' : 'apart', distance:result.dist, closest:result.v, frames:[]};
+  function query(n) {
+    const ia = support(A,n), ib = support(B,mul(n,-1));
+    return {ia,ib,w:sub(A[ia],B[ib])};
+  }
+  const seed = result.ids.map(([i,j]) => sub(A[i],B[j]));
+  let poly = differenceHull(seed);
+  const supplemented = poly.length < 3;
+  if (supplemented) {
+    // A point or segment on the origin may also occur for touching shapes.
+    const axis = poly.length > 1 ? nrm(sub(poly[1],poly[0])) : V(1,0);
+    const side = V(-axis.y,axis.x);
+    poly = differenceHull(poly.concat([axis,mul(axis,-1),side,mul(side,-1)].map(n=>query(n).w)));
+  }
+  if (poly.length < 3) return {state:'touch',frames:[]};
+  const frames = [];
+  let upper = Infinity;
+  for (let round=1; round<=A.length*B.length+1; round++) {
+    let edge;
+    for (let i=0;i<poly.length;i++) {
+      const a=poly[i], b=poly[(i+1)%poly.length], e=sub(b,a);
+      const n=nrm(V(e.y,-e.x)), d=dot(n,a);
+      if (!edge || d<edge.d) edge={a,b,n,d};
+    }
+    const hit=query(edge.n), h=dot(edge.n,hit.w);
+    upper=Math.min(upper,h);
+    const frame={poly,edge,hit,h,round,upper};
+    frames.push({...frame,phase:'find'},{...frame,phase:'support'});
+    if (h-edge.d<=tolerance) {
+      if (edge.d<=tolerance) return {state:'touch',frames:[]};
+      frames.push({...frame,phase:'done'});
+      return {state:'overlap',frames,supplemented,gjkSteps:result.steps};
+    }
+    // Only previously queried support points enter this hull.
+    poly=differenceHull([...poly,hit.w]);
+    frames.push({...frame,poly,phase:'expand'});
+  }
+  return {state:'limit',frames};
+}
+
+(function(){
+  const byId=id=>document.getElementById(id);
+  const cv=byId('cEpa'), g=cv.getContext('2d'), S=setup(cv), out=byId('eOut');
+  const prev=byId('ePrev'), next=byId('eStep'), run=byId('eRun'), reset=byId('eReset'), push=byId('ePush');
+  let A,B,outline,walk,k;
+  const guideRows=[...byId('epa-how').children];
+  const pairSlots=[1,2,3].map(i=>byId('epaPair'+i));
+  let seedStep=-1, sampled=[];
+  function pairText(p){
+    return '<span class="epa-vertex-a">A'+(p.ia+1)+'</span> − <span class="epa-vertex-b">B'+(p.ib+1)+'</span>';
+  }
+  function syncGuide(){
+    const lastShown=seedStep<0?sampled.length-1:seedStep;
+    pairSlots.forEach((node,i)=>{
+      const p=sampled[i];
+      const shown=p&&i<=lastShown;
+      const text='P'+(i+1)+' = '+(shown?'A'+(p.ia+1)+' − B'+(p.ib+1):'·· − ··');
+      if(node.textContent!==text) node.innerHTML='P'+(i+1)+' = '+(shown?pairText(p):'·· − ··');
+    });
+    const active=seedStep<0?(walk.frames.length&&k===0?3:-1):Math.min(seedStep,3);
+    guideRows.forEach((row,i)=>row.classList.toggle('epa-current',i===active));
+  }
+  function drawSeed(left,right){
+    const step=walk.gjkSteps[seedStep], p=sampled[seedStep];
+    const name='P'+(seedStep+1), pair=name+' = '+pairText(p);
+    const points=step.simplex.map(v=>v.w);
+    if(points.length===2) segment(right(points[0]),right(points[1]),C.head,2);
+    if(points.length===3) drawPoly(g,points,right,hexA(C.head,0.07),C.head,2);
+    arrow(left(p.b),left(p.a),C.muted);
+    if(seedStep===0) arrow(right(origin),right(p.w),C.muted);
+    else arrow(right(walk.gjkSteps[seedStep-1].v),right(origin),C.muted);
+    step.simplex.forEach(v=>mark(right(v.w),C.head,'P'+(sampled.indexOf(v)+1)));
+    out.innerHTML='GJK · '+pair+'。';
+    if(seedStep===0) reading.innerHTML='左图箭头从橙点指向蓝点。把这根箭头的尾巴放在右图的原点，箭头尖就是 P1。';
+    else if(step.simplex.length===2) reading.textContent='两个白点连成一条线。看原点在白线的哪一侧，下一次朝原点所在的那一侧找。';
+    else if(step.inside) reading.textContent='三个白点连成的白三角形已经圈住原点。再点“下一步”，EPA 会在这个三角形上挑最近的边。';
+    else reading.textContent='这个三角形还没圈住原点。留下离原点最近的那一部分，沿着它到原点的方向继续找。';
+    if(!step.inside&&seedStep===walk.gjkSteps.length-1&&walk.supplemented) reading.textContent='原点恰好落在这个白点或这条线段上。下一步会向两侧再取点，先围出一块区域，再开始量边。';
+    bulletReading.textContent=boundsReading.textContent='现在图里在画 GJK 的白点，交给 EPA 后再量距离。';
+  }
+
+  const origin=V(0,0), fmt=x=>(Math.abs(x)<0.005?0:x).toFixed(2);
+  const reading=byId('epaReading'), bulletReading=byId('epaBulletReading'), boundsReading=byId('epaBoundsReading');
+  const ink={d:C.ok,h:C.b,gap:C.a};
+  // The canvas, walkthrough and source examples print the same formatted measurement.
+  function measure(key,value){
+    const text=(value>1e-8 && value<0.005?'＜0.01':fmt(Math.max(0,value)))+' cm';
+    return {text,color:ink[key],html:'<span class="epa-measure epa-'+key+'">'+text+'</span>'};
+  }
+  function placeLabel(label,color,anchor,side,bounds,occupied){
+    const width=g.measureText(label).width+10, height=21;
+    const overlaps=(a,b)=>a.x<b.x+b.w+3&&a.x+a.w+3>b.x&&a.y<b.y+b.h+3&&a.y+a.h+3>b.y;
+    // Try both sides of the measured segment, keeping the two labels and W distinct.
+    let best, score=Infinity;
+    for(const offset of [17,33,51,70]) for(const sign of [1,-1]) for(const dx of [0,35,-35]){
+      const cx=anchor.x+side.x*offset*sign+dx, cy=anchor.y+side.y*offset*sign;
+      const x=Math.max(bounds.x,Math.min(bounds.x+bounds.w-width,cx-width/2));
+      const y=Math.max(bounds.y,Math.min(bounds.y+bounds.h-height,cy-height/2));
+      const box={x,y,w:width,h:height};
+      const cost=occupied.filter(other=>overlaps(box,other)).length*1000+offset+Math.abs(dx)+
+        (sign<0?1:0)+Math.abs(cx-x-width/2)+Math.abs(cy-y-height/2);
+      if(cost<score){best=box;score=cost}
+    }
+    occupied.push(best);
+    const near=V(Math.max(best.x,Math.min(best.x+width,anchor.x)),Math.max(best.y,Math.min(best.y+height,anchor.y)));
+    segment(anchor,near,color,1);
+    g.fillStyle=css('--rail');g.fillRect(best.x,best.y,width,height);
+    g.fillStyle=color;g.fillText(label,best.x+5,best.y+15);
+  }
+  function drawVertexNumbers(left,v,selected){
+    const vertices=[];
+    for(const [poly,name,color,index] of [[A,'A',C.a,selected?.ia],[B,'B',C.b,selected?.ib]]){
+      const center=mul(poly.reduce((sum,p)=>add(sum,p),V(0,0)),1/poly.length);
+      poly.forEach((p,i)=>{
+        const anchor=left(p);
+        if(anchor.x<0||anchor.x>v.w||anchor.y<0||anchor.y>v.h) return;
+        const outward=nrm(sub(anchor,left(center)));
+        vertices.push({anchor,outward,label:name+(i+1),color,chosen:i===index});
+      });
+    }
+    const occupied=vertices.map(({anchor})=>({x:anchor.x-5,y:anchor.y-5,w:10,h:10}));
+    const bounds={x:3,y:27,w:v.w-6,h:v.h-30};
+    g.save();
+    g.beginPath();g.rect(0,0,v.w,v.h);g.clip();
+    for(const item of vertices){
+      mark(item.anchor,item.color);
+      if(item.chosen){
+        g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();
+        g.arc(item.anchor.x,item.anchor.y,7,0,2*Math.PI);g.stroke();
+      }
+    }
+    // Give the chosen pair first pick of the available label positions.
+    vertices.sort((a,b)=>Number(b.chosen)-Number(a.chosen));
+    for(const item of vertices){
+      placeLabel(item.label,item.color,item.anchor,item.outward,bounds,occupied);
+    }
+    g.restore();
+  }
+  function explain(frame,d,h,gap){
+    const prefix='EPA 第 '+frame.round+' 轮 · ', phase=frame.phase, {edge,hit}=frame;
+    const a='A'+(hit.ia+1), b='B'+(hit.ib+1);
+    if(phase==='find'){
+      out.innerHTML=prefix+'量最近边。绿尺 d = '+d.html+'。';
+      reading.innerHTML=(frame.round===1?(walk.supplemented?'先把 GJK 留下的点或线段补成白色多边形。':'接过图 2 的白三角形。'):'上一轮把 W 加进来了，现在重新找最近边。')+
+        '从原点垂直量到绿边是 '+d.html+'。白线在灰圈里面，真实边界至少有这么远。点“下一步”，看看这条边外头还有没有点。';
+      bulletReading.innerHTML='图中选的绿边对应 <code>best</code>，<code>best-&gt;d</code> 对应绿尺 '+d.html+'。下一步沿法线取 W，才能算 <code>wdist</code>。';
+      boundsReading.innerHTML='这一轮先量到下界 '+d.html+'。沿法线取了 W，再用支撑平面的距离更新上界。';
+      return;
+    }
+    const delta=frame.h-edge.d, converged=delta<=1e-8;
+    out.innerHTML=prefix+({support:'沿法线取 W。',expand:'把 W 加进白色多边形。',done:'最近边贴到灰圈。'}[phase])+
+      '绿尺 d = '+d.html+'，橙尺 h = '+h.html+'，相差 '+gap.html+'。';
+    const comparison='从原点量到绿边是 '+d.html+'，顺着同一方向量到过 W 的橙色虚线是 '+h.html+'。';
+    if(phase==='support') reading.innerHTML='左边亮起来的是 '+a+' 和 '+b+'，两点相减就是右边的 W。'+comparison+
+      (converged?'两把尺一样长，绿边已经贴到真正的边界。':'绿边外面还多出蓝色虚线那一截，长 '+gap.html+'。');
+    if(phase==='expand') reading.innerHTML='把 '+a+' − '+b+' 得到的 W 连进白线。图中保留了刚才量过的两把尺，旧绿边改画成虚线。'+comparison+'下一轮要在新的白线上重新挑最近边。';
+    if(phase==='done') reading.innerHTML='两把尺量到同一个地方，深度就是绿尺的 '+d.html+'。固定 A，沿 n = ('+fmt(edge.n.x)+', '+fmt(edge.n.y)+') 把 B 平移 '+d.html+'，它就到左边橙色虚线的位置。点“把 B 推到刚好接触”可以验算。两块都能动时，也可以各往相反方向挪半个绿尺。';
+    bulletReading.innerHTML='把图 2f 第 '+frame.round+' 轮的数代进去，<code>wdist = h − d</code>，用橙尺 '+h.html+' 减去绿尺 '+d.html+'，相差 '+gap.html+'（先相减，再保留两位小数）。'+
+      (converged?'两线重合，循环收工。':'这段差值大于演示容差，走扩展这条分支。');
+    const upper=measure('h',frame.upper);
+    boundsReading.innerHTML='看图 2f 的第 '+frame.round+' 轮。绿尺给出这一轮的下界 '+d.html+'；'+
+      (frame.upper===frame.h?'这次的橙尺也是目前最短的，所以上界是 '+h.html+'。':'这次橙尺是 '+h.html+'，前面量过更短的支撑距离，所以上界沿用 '+upper.html+'。');
+  }
+
+  function view(){
+    const width=cv.width/S.dpr, stacked=width<620;
+    const w=stacked?width:width/2, h=stacked?S.h/2:S.h;
+    const left=V(w*0.44,h*0.53), right=V((stacked?0:w)+w/2,(stacked?h:0)+h/2+13);
+    const sx=Math.max(2,...outline.map(p=>Math.abs(p.x))), sy=Math.max(2,...outline.map(p=>Math.abs(p.y)));
+    return {width,w,h,left,right,stacked,sl:Math.min(w/9.6,(h-50)/5.8),sr:Math.min((w-54)/(2*sx),(h-94)/(2*sy))};
+  }
+  function toWorld(x,y,force){
+    const v=view();
+    if(!force&&(x>v.w||y>v.h)) return null;
+    return V((x-v.left.x)/v.sl,(v.left.y-y)/v.sl);
+  }
+  function segment(a,b,color,width=1,dash=[]){
+    g.strokeStyle=color;g.lineWidth=width;g.setLineDash(dash);g.beginPath();
+    g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();g.setLineDash([]);
+  }
+  function arrow(a,b,color){
+    segment(a,b,color,2);
+    const delta=sub(b,a), size=Math.min(8,len(delta)*0.36), u=nrm(delta), side=V(-u.y,u.x);
+    const back=sub(b,mul(u,size));
+    segment(b,add(back,mul(side,size/2)),color,2);
+    segment(b,sub(back,mul(side,size/2)),color,2);
+  }
+  function mark(p,color,label){
+    g.fillStyle=color;g.beginPath();g.arc(p.x,p.y,4,0,2*Math.PI);g.fill();
+    if(label) g.fillText(label,p.x+7,p.y-7);
+  }
+  function draw(){
+    const v=view(), rightX=v.stacked?0:v.w, rightY=v.stacked?v.h:0;
+    const pos=(o,s,p)=>V(o.x+s*p.x,o.y-s*p.y);
+    const left=p=>pos(v.left,v.sl,p), right=p=>pos(v.right,v.sr,p);
+    g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,v.width,S.h);
+    g.font='13px '+css('--sans');g.fillStyle=C.muted;
+    g.fillText('A 和 B（拖橙色的 B）',12,22);g.fillText('A − B（差值的图）',rightX+12,rightY+22);
+    if(v.stacked) segment(V(0,v.h),V(v.width,v.h),C.line);
+    else segment(V(v.w,0),V(v.w,S.h),C.line);
+    drawPoly(g,A,left,hexA(C.a,0.18),C.a);drawPoly(g,B,left,hexA(C.b,0.18),C.b);
+    g.setLineDash([5,4]);drawPoly(g,outline,right,hexA(C.mink,0.14),C.mink);g.setLineDash([]);
+    const o=right(origin);
+    const frame=walk.frames[k];
+    const last=k===walk.frames.length-1;
+    const assembling=seedStep>=0;
+    prev.disabled=assembling?seedStep===0:(k===0&&!sampled.length);
+    next.disabled=run.disabled=!frame||(!assembling&&last);
+    reset.disabled=!sampled.length||seedStep===0;
+    push.disabled=assembling||!frame||frame.phase!=='done';
+    syncGuide();
+    const bounds={x:rightX+6,y:rightY+46,w:v.w-12,h:v.h-53};
+    const occupied=[{x:o.x-6,y:o.y-6,w:12,h:12}];
+    if(assembling) drawSeed(left,right);
+    else if(frame){
+      const {edge,hit,h,phase}=frame;
+      const foot=mul(edge.n,edge.d), tip=mul(edge.n,h), pf=right(foot), pt=right(tip);
+      const d=measure('d',edge.d), height=measure('h',h), gap=measure('gap',h-edge.d);
+      const side=V(edge.n.y,edge.n.x), offset=mul(side,10);
+      drawPoly(g,frame.poly,right,hexA(C.head,0.07),C.head);
+      frame.poly.forEach(p=>mark(right(p),C.head));
+      segment(right(edge.a),right(edge.b),C.ok,phase==='expand'?2:4,phase==='expand'?[3,4]:[]);
+      arrow(o,pf,d.color);
+      if(phase!=='find'){
+        const w=right(hit.w);
+        occupied.push({x:w.x-5,y:w.y-23,w:26,h:30});
+        const tangent=V(-edge.n.y,edge.n.x), along=dot(sub(hit.w,tip),tangent);
+        segment(right(add(tip,mul(tangent,Math.min(along,0)-0.35))),right(add(tip,mul(tangent,Math.max(along,0)+0.35))),height.color,1.5,[4,4]);
+        // Offset the full-length orange ruler sideways so both lengths remain visible when d = h.
+        const from=add(o,offset), to=add(pt,offset);
+        segment(o,from,height.color);segment(pt,to,height.color);arrow(from,to,height.color);
+        segment(pf,pt,gap.color,2,[3,3]);mark(w,C.b,'W');
+        g.fillStyle=gap.color;g.fillText('两尺相差 '+gap.text,rightX+12,rightY+42);
+      }
+      if(phase==='done'){
+        g.setLineDash([5,4]);drawPoly(g,B.map(p=>add(p,foot)),left,null,C.b,1.5);g.setLineDash([]);
+        const center=V(shared.bx,shared.by);arrow(left(center),left(add(center,foot)),d.color);
+      }
+      if(frame.round===1&&phase!=='expand'&&!walk.supplemented){
+        const center=mul(frame.poly.reduce((sum,p)=>add(sum,p),origin),1/frame.poly.length);
+        frame.poly.forEach(p=>{
+          const index=sampled.findIndex(s=>len(sub(s.w,p))<1e-9);
+          if(index>=0) placeLabel('P'+(index+1),C.head,right(p),nrm(sub(right(p),right(center))),bounds,occupied);
+        });
+      }
+      placeLabel('d = '+d.text,d.color,mul(add(o,pf),0.5),mul(side,-1),bounds,occupied);
+      if(phase!=='find') placeLabel('h = '+height.text,height.color,add(mul(add(o,pt),0.5),offset),side,bounds,occupied);
+      explain(frame,d,height,gap);
+    } else {
+      const touching=walk.state==='touch';
+      if(touching||walk.state==='apart'){
+        const m=measure(touching?'d':'gap',touching?0:walk.distance);
+        const end=touching?o:right(walk.closest);
+        if(!touching) arrow(o,end,m.color);
+        placeLabel((touching?'深度 ':'间距 ')+m.text,m.color,mul(add(o,end),0.5),V(0,-1),bounds,occupied);
+        const note=touching?'刚好接触，穿透深度是 '+m.html+'。':'两块还隔着 '+m.html+'。';
+        out.innerHTML=note;
+        reading.innerHTML=note+(touching?'灰圈刚好经过原点。':'原点在灰圈外，图上的箭头量的是间距。')+'点“摆成相交的例子”，或把橙色的 B 拖进 A，再看 EPA 怎样挑边。';
+      } else {
+        out.textContent='这次迭代没有收敛。';reading.textContent='试着拖动 B 换个位置。';
+      }
+      bulletReading.textContent='图中出现重叠时，这里会代入本轮的尺长。';
+      boundsReading.textContent='图中出现重叠时，这里会列出对应的上下界。';
+    }
+    const selected=assembling?sampled[seedStep]:(frame&&frame.phase!=='find'?frame.hit:null);
+    drawVertexNumbers(left,v,selected);
+    drawOrigin2D(g,o,occupied);
+  }
+  function recompute(reason){
+    const wasDone=walk?.frames[k]?.phase==='done';
+    A=polyA();B=polyB();walk=epaWalk(A,B);
+    sampled=(walk.gjkSteps||[]).map(step=>step.w||step.simplex[0]);
+    if(reason==='rotation' && walk.frames.length){
+      seedStep=Math.min(seedStep,sampled.length-1);
+      k=wasDone?walk.frames.length-1:Math.min(k,walk.frames.length-1);
+    }else{
+      k=0;seedStep=-1;
+    }
+    // Reference outline for the viewer only. EPA never reads this array.
+    outline=differenceHull(A.flatMap(a=>B.map(b=>sub(a,b))));
+    draw();
+  }
+  byId('eExample').onclick=()=>{
+    shared.bx=1.5;shared.by=0;setRotation(20);changed();
+    seedStep=0;draw();
+  };
+  prev.onclick=()=>{
+    if(seedStep>0) seedStep--;
+    else if(k>0) k--;
+    else seedStep=sampled.length-1;
+    draw();
+  };
+  next.onclick=()=>{
+    if(seedStep>=0) seedStep=seedStep+1<sampled.length?seedStep+1:-1;
+    else if(k+1<walk.frames.length) k++;
+    draw();
+  };
+  run.onclick=()=>{seedStep=-1;k=Math.max(0,walk.frames.length-1);draw()};
+  reset.onclick=()=>{seedStep=sampled.length?0:-1;k=0;draw()};
+  push.onclick=()=>{
+    const frame=walk.frames[k];
+    if(!frame||frame.phase!=='done') return;
+    const shift=mul(frame.edge.n,frame.edge.d);
+    shared.bx+=shift.x;shared.by+=shift.y;changed();
+  };
+  dragB(cv,toWorld,changed);
+  listeners.push(recompute);window.addEventListener('resize',()=>{S.fit();draw()});recompute();
+})();
+
+// ---------- Figure 2: GJK ----------
+(function(){
+  const cv=document.getElementById('cGjk'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('gjkOut');
+  let res=null, k=0;
+  const view=()=>{const W=cv.width/S.dpr;const half=W/2;const sc=Math.min(half/9.5,S.h/8);return {W,half,sc}};
+  const toL=p=>{const v=view();return V(v.half*0.5+p.x*v.sc,S.h*0.5-p.y*v.sc)};
+  const toR=p=>{const v=view();return V(v.half*1.5+p.x*v.sc*0.85,S.h*0.5-p.y*v.sc*0.85)};
+  const toWorld=(x,y,force)=>{const v=view();if(x>v.half&&!force)return null;return V((x-v.half*0.5)/v.sc,(S.h*0.5-y)/v.sc)};
+  function recompute(){res=gjk(polyA(),polyB(),null);k=0;draw()}
+  function draw(){
+    const v=view(),A=polyA(),B=polyB();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,v.W,S.h);
+    g.strokeStyle=C.line;g.beginPath();g.moveTo(v.half,0);g.lineTo(v.half,S.h);g.stroke();
+    g.font='13px '+css('--sans');g.fillStyle=C.muted;g.fillText('A 和 B',14,22);g.fillText('A − B（闵可夫斯基差）',v.half+14,22);
+    drawPoly(g,A,toL,hexA(C.a,0.18),C.a);drawPoly(g,B,toL,hexA(C.b,0.18),C.b);
+    const M=differenceHull(A.flatMap(a=>B.map(b=>sub(a,b))));drawPoly(g,M,toR,'rgba(109,112,107,0.25)',C.mink);
+    A.forEach(a=>B.forEach(b=>{const q=toR(sub(a,b));g.fillStyle='rgba(172,173,168,0.35)';g.fillRect(q.x-1.5,q.y-1.5,3,3)}));
+    const o=toR(V(0,0));
+    const st=res.steps[Math.min(k,res.steps.length-1)];
+    // simplex
+    const sp=st.simplex.map(p=>p.w);if(sp.length>1){drawPoly(g,sp,toR,'rgba(240,237,231,0.10)',C.head,2)}
+    sp.forEach(p=>{const q=toR(p);g.fillStyle=C.head;g.beginPath();g.arc(q.x,q.y,4.5,0,7);g.fill()});
+    // matching vertices on the left
+    st.simplex.forEach(p=>{const qa=toL(p.a),qb=toL(p.b);g.strokeStyle='rgba(240,237,231,0.35)';g.lineWidth=1;g.beginPath();g.moveTo(qa.x,qa.y);g.lineTo(qb.x,qb.y);g.stroke();
+      g.fillStyle=C.a;g.beginPath();g.arc(qa.x,qa.y,4,0,7);g.fill();g.fillStyle=C.b;g.beginPath();g.arc(qb.x,qb.y,4,0,7);g.fill()});
+    if(st.w){const q=toR(st.w.w);g.strokeStyle=C.b;g.lineWidth=2;g.beginPath();g.arc(q.x,q.y,8,0,7);g.stroke()}
+    if(!st.inside){const q=toR(st.v);g.strokeStyle=C.ok;g.lineWidth=2;g.beginPath();g.moveTo(o.x,o.y);g.lineTo(q.x,q.y);g.stroke();g.fillStyle=C.ok;g.beginPath();g.arc(q.x,q.y,5,0,7);g.fill();
+      const dq=toR(mul(nrm(st.v),-1.1));g.setLineDash([4,4]);g.strokeStyle=hexA(C.ok,0.7);g.beginPath();g.moveTo(o.x,o.y);g.lineTo(dq.x,dq.y);g.stroke();g.setLineDash([]);g.fillStyle=C.ok;g.fillText('−v（下一次取支撑点的方向）',dq.x+6,dq.y)}
+    drawOrigin2D(g,o);
+    const last=k>=res.steps.length-1;
+    document.getElementById('gPrev').disabled=k===0;
+    document.getElementById('gStep').disabled=last;
+    out.textContent=`第 ${Math.min(k,res.steps.length-1)+1} / ${res.steps.length} 步（共取了 ${res.iters} 次支撑点）：${st.note}\n`+
+      (st.inside?'单纯形包含原点 → A 与 B 相交。GJK 到这里只知道“相交”，图 2f 接着用 EPA 求深度和方向；我们的 GPU 版交给 SAT。':`当前 |v| = ${len(st.v).toFixed(3)}`)+
+      (last&&!res.inside?`\n结果：两物体最近距离 = ${res.dist.toFixed(3)}，方向 = (${nrm(res.v).x.toFixed(2)}, ${nrm(res.v).y.toFixed(2)})。`:'');
+  }
+  document.getElementById('gPrev').onclick=()=>{k=Math.max(0,k-1);draw()};
+  document.getElementById('gStep').onclick=()=>{k=Math.min(k+1,res.steps.length-1);draw()};
+  document.getElementById('gRun').onclick=()=>{k=res.steps.length-1;draw()};
+  document.getElementById('gReset').onclick=()=>{k=0;draw()};
+  dragB(cv,toWorld,()=>changed());
+  listeners.push(recompute);window.addEventListener('resize',()=>{S.fit();draw()});recompute();
+})();
+
+// ---------- Figure 3: GSK over frames ----------
+(function(){
+  const cv=document.getElementById('cGsk'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('gskOut');
+  const A2=[V(-1.2,-0.8),V(0.3,-1.3),V(1.3,-0.5),V(1.4,0.6),V(0.4,1.2),V(-0.9,1.0),V(-1.5,0.1)];
+  const B2=[V(-0.7,-0.5),V(0.8,-0.6),V(0.9,0.4),V(0.1,0.9),V(-0.8,0.5)];
+  const margin=0.05, hist=[], N=240;
+  const radiusB=Math.max(...B2.map(len));
+  let t=0, playing=!window.matchMedia("(prefers-reduced-motion: reduce)").matches, cache=null, tot={cold:0,warm:0,frames:0,skip:0};
+  const bState=tt=>({x:2.55+0.9*Math.sin(tt*0.9),y:0.45*Math.sin(tt*1.7),r:0.6*Math.sin(tt*0.5)});
+  let prev=bState(0);
+  function stepFrame(){
+    const sp=+document.getElementById('kSpeed').value/1000, warmOn=document.getElementById('kWarm').checked, timOn=document.getElementById('kTim').checked;
+    t+=sp*0.5; /* ~0.02 per frame at the default speed */ const b=bState(t); const B=world(B2,b.x,b.y,b.r), A=A2;
+    const cold=gjk(A,B,null);
+    let used=0, skipped=false;
+    if(timOn&&cache&&cache.dist>margin){
+      const dv=V(b.x-prev.x,b.y-prev.y), approach=Math.max(0,dot(dv,cache.n)), rotb=Math.abs(b.r-prev.r)*radiusB;
+      const d=cache.dist-approach-rotb;
+      if(d>margin){cache.dist=d;skipped=true;tot.skip++}
+    }
+    if(!skipped){const res=gjk(A,B,warmOn&&cache?cache.ids:null);used=res.iters;cache={ids:res.ids,n:res.inside?V(1,0):nrm(res.v),dist:res.dist}}
+    prev=b;hist.push({cold:cold.iters,used,skipped,dist:cold.dist});if(hist.length>N)hist.shift();
+    tot.cold+=cold.iters;tot.warm+=used;tot.frames++;
+    return {B,A,dist:cold.dist,skipped,used,cold:cold.iters};
+  }
+  let last=stepFrame();
+  function draw(){
+    const W=cv.width/S.dpr;g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,W,S.h);
+    const topH=230, sc=Math.min(W/12,topH/4.4), cx=W*0.42, cy=topH*0.52, toPx=p=>V(cx+p.x*sc,cy-p.y*sc);
+    drawPoly(g,last.A,toPx,hexA(C.a,0.18),C.a);drawPoly(g,last.B,toPx,hexA(C.b,0.18),C.b);
+    g.font='13px '+css('--mono');g.fillStyle=last.skipped?C.muted:C.ok;
+    g.fillText(last.skipped?'这一帧：TIM 判定不可能碰上，GJK 跳过':`这一帧：GJK 迭代 ${last.used} 次（冷启动要 ${last.cold} 次）`,14,22);
+    g.fillStyle=C.text;g.fillText(`真实距离 ${last.dist.toFixed(3)}`,14,42);
+    // chart
+    const y0=topH+20, ch=S.h-y0-28, bw=(W-28)/N, maxI=8;
+    g.strokeStyle=C.line;g.beginPath();g.moveTo(14,y0+ch);g.lineTo(W-14,y0+ch);g.stroke();
+    for(let i=1;i<=maxI;i+=1){const y=y0+ch-ch*i/maxI;if(i%2===0){g.fillStyle=C.muted;g.fillText(String(i),W-30,y+4);g.strokeStyle='rgba(232,232,228,0.05)';g.beginPath();g.moveTo(14,y);g.lineTo(W-36,y);g.stroke()}}
+    hist.forEach((h,i)=>{const x=14+i*bw;const hc=ch*Math.min(h.cold,maxI)/maxI;g.fillStyle=hexA(C.bad,0.45);g.fillRect(x,y0+ch-hc,Math.max(1,bw*0.9),hc);
+      if(h.skipped){g.fillStyle=C.mink;g.fillRect(x,y0+ch-4,Math.max(1,bw*0.9),4)}else{const hu=ch*Math.min(h.used,maxI)/maxI;g.fillStyle=C.ok;g.fillRect(x+bw*0.2,y0+ch-hu,Math.max(1,bw*0.5),hu)}});
+    g.fillStyle=C.muted;g.fillText('每帧 GJK 迭代次数（最近 240 帧）',14,y0-4);
+    const f=Math.max(1,tot.frames);
+    out.textContent=`累计 ${tot.frames} 帧：冷启动平均 ${(tot.cold/f).toFixed(2)} 次/帧，GSK 平均 ${(tot.warm/f).toFixed(2)} 次/帧（${tot.cold?(100*(1-tot.warm/tot.cold)).toFixed(0):0}% 省掉），其中 ${(100*tot.skip/f).toFixed(0)}% 的帧被 TIM 整个跳过。\n离得远时 TIM 几乎每帧都跳过；靠近、贴着的时候 TIM 失效，靠暖启动一两次就收敛。`;
+  }
+  const reset=()=>{
+    tot={cold:0,warm:0,frames:0,skip:0};hist.length=0;cache=null;t=0;prev=bState(0);
+    last=stepFrame();draw();
+  };
+  document.getElementById('kReset').onclick=reset;
+  document.getElementById('kWarm').onchange=reset;document.getElementById('kTim').onchange=reset;
+  const play=document.getElementById('kPlay');
+  let visible=false, animation=0;
+  function tick(){
+    animation=0;
+    if(!playing || !visible || document.hidden) return;
+    last=stepFrame();draw();
+    animation=requestAnimationFrame(tick);
+  }
+  function schedule(){
+    cancelAnimationFrame(animation);
+    if(playing && visible && !document.hidden) animation=requestAnimationFrame(tick);
+    play.textContent=playing?'暂停':'继续';
+  }
+  play.onclick=()=>{playing=!playing;schedule()};
+  new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;schedule()}).observe(cv);
+  document.addEventListener('visibilitychange',schedule);
+  draw();schedule();
+  window.addEventListener('resize',()=>{S.fit();draw()});
+})();
+
+// TOC highlight
+const links=[...document.querySelectorAll('nav.toc a')];
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id))}}),{rootMargin:'-20% 0px -70% 0px'});
+document.querySelectorAll('h2[id],h3[id],figure[id]').forEach(h=>io.observe(h));
+</script>
+</body>
+</html>
