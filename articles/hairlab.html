@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>GTA头发如何制作 · DOTAFS</title>
+<title>gta6 头发模拟 · DOTAFS</title>
 <meta name="description" content="沿一根披发引导丝，算发根蒙皮、Verlet 预测和 PBD 段长约束，再看 GPU 怎么插出细丝。"><meta name="theme-color" content="#1b1d1c">
-<meta property="og:title" content="GTA头发如何制作 · DOTAFS"><meta property="og:description" content="沿一根披发引导丝，算发根蒙皮、Verlet 预测和 PBD 段长约束，再看 GPU 怎么插出细丝。"><meta property="og:type" content="article"><meta property="article:published_time" content="2026-11-25">
+<meta property="og:title" content="gta6 头发模拟 · DOTAFS"><meta property="og:description" content="沿一根披发引导丝，算发根蒙皮、Verlet 预测和 PBD 段长约束，再看 GPU 怎么插出细丝。"><meta property="og:type" content="article"><meta property="article:published_time" content="2026-11-25">
 <link rel="canonical" href="https://dotafs.com/articles/hairlab.html"><link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
@@ -100,25 +100,36 @@ th { background: var(--next-card); font-weight: 500; }
   .note-mobile-contents a { padding: 4px 0; }
   .note-prose h2 { font-size: 1.28rem; }
 }
-</style><link rel="stylesheet" href="hairlab.css"><script src="hairlab.js" defer></script></head>
+</style><link rel="stylesheet" href="hairlab.css?v=be8460fac585">
+<script defer src="../assets/hairlab/samples.js"></script>
+<script defer src="../assets/hairlab/viewer.js?v=cf1a3bf905fa"></script></head>
 <body class="next-site next-article ai-note-page">
 <a class="skip-link" href="#content">跳到正文</a><div class="next-headband" aria-hidden="true"></div>
 <header class="next-header"><div class="next-header-inner"><div class="next-brand-column"><a class="next-brand" href="/home/">DOTAFS</a></div><nav class="next-menu" aria-label="网站导航"><a href="/home/">首页</a><a class="is-active" href="/home/#articles">归档</a><a href="/learn-ai.html">AI 学习</a><a href="/pbf.html">PBF Demo</a><a href="#lab">页内实验</a></nav></div></header>
 <div class="next-page-layout">
 <main id="content" class="next-main"><article class="ai-note">
-<header class="note-header"><p class="note-meta">图形学笔记 · <time datetime="2026-11-25">2026-11-25</time></p><h1>GTA头发如何制作</h1><details class="note-mobile-contents"><summary>目录</summary><nav aria-label="文章章节"><a href="#lab">披发 Demo</a>
+<header class="note-header"><p class="note-meta">图形学笔记 · <time datetime="2026-11-25">2026-11-25</time></p><h1>gta6 头发模拟</h1><details class="note-mobile-contents"><summary>目录</summary><nav aria-label="文章章节"><a href="#lab">披发 Demo</a>
 <a href="#guides">哪些点拿来算物理</a>
 <a href="#binding">发根怎么蒙皮</a>
 <a href="#motion">PBD 怎么把一段拉回原长</a>
 <a href="#stability">转头时为什么有时会炸开</a>
 <a href="#strands">一根细丝该跟哪几根引导丝</a>
 <a href="#timing">GPU 模拟一步花多久</a></nav></details></header>
-<div class="note-prose"><section class="hair-lab" id="lab" aria-label="HairLab 页内实验">
-  <div class="lab-console"><span class="lab-prompt">披发实验</span><a id="start-lab" href="../assets/hairlab/index.html?motion=2&amp;v=ebe42c39391c">运行披发 Demo</a><button type="button" id="stop-lab" hidden>关闭 Demo</button></div>
-  <div id="lab-poster"><img loading="lazy" src="../assets/hairlab-figures/guide-comparison.webp" width="1324" height="440" alt="附件里的发丝对照，疏密不同的引导线与最终渲染的披发并排展示。"></div>
-  <div id="lab-view"></div>
-  <p class="lab-caption">切换「游戏原始引导丝」和「动态模拟」，对照 192 根引导丝和插值后的披发。</p>
+<div class="note-prose"><section class="hair-lab" id="lab" aria-label="披发模拟">
+ <figure id="lab-fallback">
+  <img src="../assets/hairlab-figures/guide-comparison.webp" width="1324" height="440" alt="披发样本的引导丝与插值后的头发对照">
+  <figcaption id="lab-support">图中是引导丝和插值后的披发。互动演示需要 JavaScript 和 WebGL 2。</figcaption>
+ </figure>
+ <div id="lab-player" hidden>
+  <div class="bar"><label><select id="mode" aria-label="显示模式"><option id="recording-option" value="recording" disabled>动态模拟</option><option value="guides" selected>游戏原始引导丝</option></select></label><span id="name">发丝几何</span><button id="reset" disabled>重置视角</button></div>
+  <div id="stage"><canvas id="canvas" aria-label="发丝三维视图"></canvas><div id="empty"><strong>载入发型</strong><p>可拖动模型查看侧面和后脑。</p></div></div>
+  <div id="simulation" class="sim" hidden><button id="play">暂停</button><button id="shake">甩一下头</button><label><input id="auto-turn" type="checkbox" checked>自动转头</label><label>转头<input id="turn" type="range" min="-78" max="78" value="0"><output id="turn-value">0°</output></label><label>侧风<input id="wind" type="range" min="0" max="100" value="12"><output id="wind-value">12%</output></label><label><input id="collision" type="checkbox" checked>肩胸碰撞</label><label><input id="debug" type="checkbox">显示碰撞体</label><output id="contact-count" hidden></output></div>
+  <div class="panel"><span id="stats" role="status" aria-live="polite">正在载入头模和发型</span><label id="density-label" hidden><span id="density-name">渲染发丝</span><input id="density" type="range" min="6400" max="40960" step="128" value="32768"><output id="density-value">32,768 根</output></label><label><input type="checkbox" id="fill" disabled>插值加密（网页演示）</label><label><input type="checkbox" id="head" checked disabled><span id="head-label">对照露西亚头模</span></label><label><input type="checkbox" id="roots" disabled>显示发根</label></div>
+  <div class="sim" id="scatteringControls" hidden><label><input type="checkbox" id="scattering" checked>毛发散射</label><label>主光方位<input id="hairLight" type="range" min="-180" max="180" value="-30"><output id="hairLightValue" for="hairLight">−30°</output></label></div>
+  <p class="note">拖动旋转，滚轮缩放。<span id="legend">铜色为发根，浅色为发梢。头模和引导丝按游戏坐标叠放。</span><span id="association">露西亚的发型绑定尚待核实。</span></p>
+ </div>
 </section>
+
 <p>在上面的 Demo 里，把显示模式切到「游戏原始引导丝」。看耳朵后面那一束，画面里原本挤着一大片头发，切过去只剩几条线。转头时我们先算这些线怎么动，再用它们带动外面看得见的细丝。下面取披发样本里的第 0 根，顺着它从发根算到发梢。</p>
 <h2 id="guides">哪些点拿来算物理</h2>
 <p>打开这份 groom，已经有 192 根引导丝，每根 35 个位置，编号 0 到 34。第 <math><mi>g</mi></math> 根的第 <math><mi>k</mi></math> 个点就在位置数组的第 <math><mrow><mn>35</mn><mi>g</mi><mo>+</mo><mi>k</mi></mrow></math> 项。顺着编号把相邻两点连起来，一根就有 34 段。网页直接读取这批点。样本保留了选好的引导丝，美术制作时具体怎么选的，光看这个文件推不出来。</p>
@@ -150,7 +161,7 @@ th { background: var(--next-card); font-weight: 500; }
 <p>把 Demo 的「渲染发丝」往左拉，可以看到头发变稀，底下参与求解的始终是那 192 根。</p>
 <h2 id="timing">GPU 模拟一步花多久</h2>
 <p>我们另外测了一份 GPU 求解器。它把引导点排成一张 35 列、192 行的纹理，一行对应一根引导丝。第一趟并行算每个点的蒙皮目标、预测位置和碰撞，第二趟沿每根引导丝从根到梢恢复段长。单人披发，连续跑 32 步，用总时间除以 32，12 组的中位数是每步 <strong>0.04 毫秒出头</strong>。上面这个交互 Demo 的 PBD 跑在 CPU，解完的引导点交给 GPU 插细丝。</p>
-</div><footer class="note-end"><a href="/home/#articles">文章目录</a><a href="hairlab.md" download>Markdown 原稿</a></footer></article></main>
+</div><footer class="note-end"><a href="/home/#articles">文章目录</a><a href="https://github.com/dotafs2/dotafs-pbf-site/blob/main/THIRD_PARTY_NOTICES.md#hairlab-teaching-demo">素材与许可</a><a href="hairlab.md" download>Markdown 原稿</a></footer></article></main>
 <aside class="note-toc" aria-label="文章目录"><p>本文目录</p><nav><a href="#lab"><span>·</span><span>披发 Demo</span></a>
 <a href="#guides"><span>1.</span><span>哪些点拿来算物理</span></a>
 <a href="#binding"><span>2.</span><span>发根怎么蒙皮</span></a>
