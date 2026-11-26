@@ -114,7 +114,7 @@ th { background: var(--next-card); font-weight: 500; }
 <a href="#strands">一根细丝该跟哪几根引导丝</a>
 <a href="#timing">GPU 模拟一步花多久</a></nav></details></header>
 <div class="note-prose"><section class="hair-lab" id="lab" aria-label="HairLab 页内实验">
-  <div class="lab-console"><span class="lab-prompt">披发实验</span><a id="start-lab" href="../assets/hairlab/index.html?motion=2&amp;v=4026aa981c8d">运行披发 Demo</a><button type="button" id="stop-lab" hidden>关闭 Demo</button></div>
+  <div class="lab-console"><span class="lab-prompt">披发实验</span><a id="start-lab" href="../assets/hairlab/index.html?motion=2&amp;v=ebe42c39391c">运行披发 Demo</a><button type="button" id="stop-lab" hidden>关闭 Demo</button></div>
   <div id="lab-poster"><img loading="lazy" src="../assets/hairlab-figures/guide-comparison.webp" width="1324" height="440" alt="附件里的发丝对照，疏密不同的引导线与最终渲染的披发并排展示。"></div>
   <div id="lab-view"></div>
   <p class="lab-caption">切换「游戏原始引导丝」和「动态模拟」，对照 192 根引导丝和插值后的披发。</p>
@@ -140,7 +140,8 @@ th { background: var(--next-card); font-weight: 500; }
 <p>这次用上了资产里每簇三根引导丝的对应关系。取同簇三根的第 17 点，分别算它们偏离自己蒙皮目标的位移 <math><mrow><msub><mi>d</mi><mi>i</mi></msub><mo>=</mo><msub><mi>p</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">^</mo></mover><mi>i</mi></msub></mrow></math>。把三个位移取平均，每根向这个平均位移靠一半，再解各自的段长和碰撞。这样整簇仍然能甩出去，同一簇里的三根也能沿皮肤各自滑动。</p>
 <div class="hair-equation"><math display="block" class="tml-display" style="display:block math;"><mrow><mover><mi>d</mi><mo stretchy="false" class="chr-lrg wbk-lrg-acc" style="math-depth:0;">‾</mo></mover><mo>=</mo><mfrac><mrow><msub><mi>d</mi><mn>1</mn></msub><mo>+</mo><msub><mi>d</mi><mn>2</mn></msub><mo>+</mo><msub><mi>d</mi><mn>3</mn></msub></mrow><mn>3</mn></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>p</mi><mi>i</mi></msub><mo stretchy="false">←</mo><msub><mi>p</mi><mi>i</mi></msub><mo>+</mo><mn>0.5</mn><mo form="prefix" stretchy="false">(</mo><mover><mi>d</mi><mo stretchy="false" class="chr-lrg wbk-lrg-acc" style="math-depth:0;">‾</mo></mover><mo>−</mo><msub><mi>d</mi><mi>i</mi></msub><mo form="postfix" stretchy="false">)</mo><mi>.</mi></mrow></math></div>
 <p>头部接触也要看整段。两个点都在皮肤外面，连线仍可能穿过耳廓。网页把节点变回头部局部坐标，用头模的皮肤三角形检查这条线段。碰到耳缘时，把发段移回表面外，再检查相邻段的长度。把一点从皮肤里推出去，有时一步就要挪好几毫米。要是把这段位移原样留给下一步的 Verlet，它又会向外飞一次。求解器会同步修正它记录的上一位置，削掉这部分额外的弹出速度。</p>
-<p>我们把侧风拉满，在 −78° 和 +78° 之间反复换向，连续跑 10 秒。看一个物理步里跳得最远的那个引导丝发梢，旧版跳了 242.9 mm，改完是 26.4 mm。</p>
+<p>关掉风、把头停住，还能看到另一处问题。为了让披发保留原来的弯曲，每一轮还会把一小段往它原来的方向拉。之前只推靠发梢的那个点，一路推到最后，头已经停了，发梢还在抖。现在靠根处继续跟头走，越往下越让两个自由点分担这次修正，到了最后一段刚好各分一半。</p>
+<p>我们把侧风拉满，在 −78° 和 +78° 之间反复换向，连续跑 10 秒。看一个物理步里跳得最远的那个引导丝发梢，旧版跳了 242.9 mm，改完是 23.6 mm。</p>
 <h2 id="strands">一根细丝该跟哪几根引导丝</h2>
 <p>样本里还有 64 组发根索引，每组三根。读第一组拿到的是 72、73、74，它们是三条引导丝的编号。只在这种很窄的小簇里插，簇与簇之间容易留缝。网页先在静止姿态给每组算一条平均曲线，取它的点 0、5、15、34 和别组比较。根离得近、往同一侧长、下半段也挨得近的，排在前面。留下六组邻居，生成普通细丝时从本组挑一根，再从两个不同的邻组各挑一根。填发根空隙时也会只用两根。</p>
 <p>比如一根细丝跟三条引导丝 <math><mrow><mi>A</mi><mo separator="true">,</mo><mi>B</mi><mo separator="true">,</mo><mi>C</mi></mrow></math>，给它三个非负权重 <math><mrow><msub><mi>w</mi><mi>A</mi></msub><mo separator="true">,</mo><msub><mi>w</mi><mi>B</mi></msub><mo separator="true">,</mo><msub><mi>w</mi><mi>C</mi></msub></mrow></math>，加起来是 1。引导丝解完以后，GPU 要画这根细丝的第 17 个点，就去读三条引导丝各自的第 17 个点。往下画第 18 个点，还是这三根、这三个权重，只换节点编号。</p>
