@@ -261,10 +261,9 @@ The control-point diagram in the article was plotted from the rest positions
 of guide 0 and the other 191 guides in the supplied loose-hair sample.
 The bundled Three.js code is covered by its [MIT license](assets/hairlab/three-LICENSE.txt).
 
-## BFV farmhouse physics notes
+## Convex collision detection tutorial
 
 The collision tutorial quotes three lines from Bullet's GJK–EPA solver by
 Nathanael Presson (2008). The source file carries the Bullet copyright notice
-for Erwin Coumans (2003–2008) and the zlib license. The interactive 2D diagrams
-and the farmhouse measurements come from the supplied BFVDestructionUE5
-project notes. [Bullet source and license notice](https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp)
+for Erwin Coumans (2003–2008) and the zlib license. The interactive 2D diagrams come from the supplied
+BFVDestructionUE5 collision tutorial. [Bullet source and license notice](https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp)

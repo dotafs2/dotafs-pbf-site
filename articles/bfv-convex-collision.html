@@ -89,14 +89,56 @@ header.top a.site{font-family:var(--mono);font-weight:600;letter-spacing:.06em}
  .mobile-toc summary{cursor:pointer}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+.exercise-help,.problems,.case-switch,.engine-example,.worker-figure {max-width:54rem}
+.exercise-help{color:var(--muted)}
+.problems{margin:1.35rem 0 1.8rem;border-left:2px solid var(--accent);padding-left:clamp(.65rem,2vw,1.1rem)}
+.problem-label{font-size:.88rem;font-weight:550;color:var(--muted);margin:0 0 .32rem}
+.math-question{border-top:1px solid var(--line);padding:.12rem 0}
+.math-question summary,.engine-note summary{cursor:pointer;color:var(--heading);padding:.4rem 0;line-height:1.65;overflow-wrap:anywhere}
+.math-question summary::marker,.engine-note summary::marker{color:var(--accent)}
+summary:focus-visible,.case-radio:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
+.math-question[open] summary{color:var(--accent)}
+.math-question ol{margin:.35rem 0 .5rem;padding-left:1.55rem}
+.math-question .answer{margin:.35rem 0 .8rem}
+.engine-note{margin:.7rem 0;color:var(--muted);max-width:64rem}
+.engine-note summary{font-size:.92rem;color:var(--accent)}
+.case-switch,.worker-figure{min-inline-size:0;margin:1rem 0;padding:.7rem clamp(.65rem,2vw,1.2rem) 1rem;border:1px solid var(--line);background:var(--rail)}
+.case-switch legend,.worker-figure legend{padding:0 .35rem;color:var(--muted);font-size:.94rem}
+.case-radio{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+.case-radio+label{position:relative;display:inline-block;margin:.15rem .3rem .3rem 0;padding:.22rem .62rem;cursor:pointer;border:1px solid var(--line);color:var(--muted);border-radius:2px}
+.case-radio:checked+label{border-color:var(--accent);background:var(--tint);color:var(--heading)}
+.case-panel,.worker-panel{display:none}
+.case-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:44rem}
+.case-chart{min-width:0}.case-chart b{display:block;font-size:.88rem;color:var(--muted);font-weight:500}.case-chart svg{display:block;width:100%;height:auto}
+@media(max-width:540px){.case-charts{grid-template-columns:1fr}.case-chart svg{max-width:18rem}.case-panel>p,.worker-panel p{overflow-wrap:anywhere}}
+#case-0:checked ~ .case-panels .case-0{display:block}
+#case-1:checked ~ .case-panels .case-1{display:block}
+#case-2:checked ~ .case-panels .case-2{display:block}
+#case-3:checked ~ .case-panels .case-3{display:block}
+#island-separate:checked ~ .worker-panels .split-piles,#island-join:checked ~ .worker-panels .joined-piles{display:block}
+.worker-panel svg{display:block;width:min(100%,28rem);margin:.7rem auto;font:16px var(--mono)}
+.engine-example{margin:1rem 0}
+.engine-example pre{white-space:pre;tab-size:2}
+#engine-physics~pre{max-width:65rem}
+.math-question > :not(summary){overflow-wrap:anywhere}
+
+
+.call-tree{max-width:62rem;margin:1rem 0;padding:.8rem clamp(.6rem,2vw,1.3rem);border:1px solid var(--line);background:var(--rail)}
+.call-tree figcaption{margin:0 0 .7rem}.call-tree ul{list-style:none;padding-left:.85rem;margin:.25rem 0}
+.call-tree>ul{padding-left:0}.call-tree li{position:relative;border-left:1px solid var(--line);padding-left:.8rem;margin:.3rem 0;line-height:1.6;overflow-wrap:anywhere}
+.call-tree li::before{content:"";position:absolute;left:0;top:.8rem;width:.55rem;border-bottom:1px solid var(--line)}
+.call-tree span{color:var(--muted);font-size:.9em}.call-tree code{color:var(--heading);background:transparent}
+@media(max-width:540px){.call-tree ul{padding-left:.35rem}.call-tree li{padding-left:.45rem}.call-tree li::before{width:.3rem}.call-tree span{display:block}article p code,article li code{overflow-wrap:anywhere}}
+
 </style>
 </head>
 <body>
-<header class="top"><a class="site" href="../home/">DOTAFS</a><a href="bfv-physics.html">BFV 刚体物理笔记</a></header>
+<header class="top"><a class="site" href="../home/">DOTAFS</a><a href="../home/#articles">学习笔记</a></header>
 <div class="layout">
 <details class="mobile-toc"><summary>本篇目录</summary>
 <a href="#sat">SAT 与分离轴</a><a href="#gjk">GJK 与最近距离</a><a href="#epa">EPA 与穿透深度</a>
-<a href="#chaos">Chaos 的接触点</a><a href="#gsk">GSK 与跨帧缓存</a><a href="#ours">GPU 后端的实验记录</a>
+<a href="#chaos">Chaos 的接触点</a><a href="#gsk">GSK 与跨帧缓存</a><a href="#ours">GPU 后端的实验记录</a><a href="#engine-physics">Havok、Chaos 与 worker</a><a href="#summary">总结与自测</a>
 </details>
 <nav class="toc" aria-label="目录">
   <a href="#q">要回答的问题</a>
@@ -111,25 +153,31 @@ header.top a.site{font-family:var(--mono);font-weight:600;letter-spacing:.06em}
   <a href="#outline" class="h3">A − B 的轮廓怎么来的</a>
   <a href="#gjk-demo" class="h3">图 2：一步一步走单纯形</a>
   <a href="#epa">EPA：相交后求深度</a>
-  <a href="#epa-demo" class="h3">图 2f：从白三角形往外找</a>
+  <a href="#epa-demo" class="h3">图 2d：从白三角形往外找</a>
   <a href="#epa-bullet" class="h3">拿图里的数读 Bullet</a>
   <a href="#epa-chaos" class="h3">对照 Chaos 和 Havok</a>
   <a href="#cmp">两者放在一起</a>
   <a href="#mink">Minkowski difference 和边界</a>
-  <a href="#gauss" class="h3">Gauss map 剔除 edge 对</a>
+  <a href="#gauss" class="h3">Gauss map 与单位圆</a>
   <a href="#chaos">Chaos 遇到全部重叠怎么做</a>
-  <a href="#chaos-sat" class="h3">SATPenetration 三轮</a>
+  <a href="#chaos-sat" class="h3">SATPenetration 的符号</a>
   <a href="#gsk">GSK：给 GJK 加上记忆</a>
   <a href="#gsk-demo" class="h3">图 3：逐帧看省了多少</a>
   <a href="#ours">我们的 GPU 版怎么组合</a>
   <a href="#glossary">术语表 Glossary</a>
+  <a href="#engine-physics">一帧物理与 CPU worker</a>
+  <a class="h3" href="#havok-jobs">Havok 调用树与任务队列</a>
+  <a class="h3" href="#chaos-jobs">Chaos CPU 与岛组</a>
+  <a class="h3" href="#chaos-gpu">Chaos 的 GPU 路径</a>
+  <a href="#summary">总结：同一对方块的四种状态</a>
 </nav>
 <main>
 <article>
 <h1>SAT、GJK 和 GSK</h1>
-<div class="date">DOTAFS · 2026-11-24 · 约 30 分钟</div>
-<p>这篇讲 GPU 凸包后端窄相用到的三样东西。图都是二维的，三维的道理一样，只是候选轴和单纯形多一维。图里蓝色是 A，橙色是 B，<b>拖动橙色的 B</b>，用滑条转它。图 1、图 2 和图 2f 共用同一个 B 的位置。在这几张图里，也可以用 Tab 选中画布，用方向键移动 B，用 Home 恢复初始姿态。</p>
+<div class="date">DOTAFS · 2026-11-24 · 2026-11-27 更新 · 正文约 40 分钟 · 练习另计</div>
+<p>这篇讲 GPU 凸包后端窄相用到的三样东西。我们把凸包画成平面上的多边形，坐标、距离和推出方向都可以在图上量。图里蓝色是 A，橙色是 B，<b>拖动橙色的 B</b>，用滑条转它。图 1、图 2 和图 2d 共用同一个 B 的位置。在这几张图里，也可以用 Tab 选中画布，用方向键移动 B，用 Home 恢复初始姿态。</p>
 
+<p class="exercise-help">每节末尾有两道二维题。先在纸上算，再点题目看解析。<a href="#summary">文末用同一对正方形把四种算法连起来。</a> 想直接看引擎，可跳到<a href="#engine-physics">Havok 和 Chaos 的任务分发图</a>。</p>
 <h2 id="q">要回答的问题</h2>
 <p>两个凸包，窄相要回答三件事：</p>
 <ol>
@@ -138,16 +186,35 @@ header.top a.site{font-family:var(--mono);font-weight:600;letter-spacing:.06em}
 <li>碰了的话，陷进去多深，往哪个方向推开最省。这就是接触法线和深度，求解器拿它去算冲量。</li>
 </ol>
 <p>SAT 和 GJK 是两种思路。SAT 擅长第 3 件，GJK 擅长第 2 件。两件都要，所以我们两个都用。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="q">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>画两个边与坐标轴平行的矩形。A 的对角是 (0,0)、(2,1)，B 的对角是 (5,5)、(7,6)。找出最近的一对点，给出从 A 指向 B 的单位方向和距离。</summary>
+<ol>
+<li>从 A 到 B，横向至少差 5−2=3，纵向至少差 5−1=4。</li>
+<li>A 的右上角 (2,1) 和 B 的左下角 (5,5) 同时取到这两个最小值。连线向量为 (3,4)，长度为 √(3²+4²)=5。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　最近点为 (2,1) 和 (5,5)，方向为 (3/5,4/5)，距离为 5。</p>
+</details>
+<details class="math-question">
+<summary>固定矩形 A，其对角为 (0,0)、(4,3)。矩形 B 的对角为 (3,2.5)、(6,5)，两矩形的边都平行于坐标轴。只平移 B，最短要移动多远，才刚好消除重叠？</summary>
+<ol>
+<li>画出两矩形，向右推出时，B 的左边要从 x=3 到 x=4，需走 1。向上推出时，B 的下边只需从 y=2.5 到 y=3，走 0.5。</li>
+<li>向左或向下推出分别需走 6 或 5。斜移也得先让某个轴的投影刚好分开，长度至少等于该轴所需的位移。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　把 B 向上平移 (0,0.5)。两矩形在 y=3 上刚好接触。</p>
+</details>
+</section>
 
 <h2 id="sat">SAT：找一条能分开它们的轴</h2>
 <p>分离轴定理说的是：两个凸体不相交，当且仅当存在一条轴，把两个物体投影到这条轴上，得到的两段区间不重叠。</p>
-<p>听起来要试无数条轴，其实凸多边形只需要试有限几条：二维是两个多边形每条边的法线；三维是两个凸包所有的面法线，再加上“A 的每条边方向 × B 的每条边方向”。</p>
+<p>平面上只需试两个凸多边形各条边的法线。边向量是 (x, y)，把它转九十度就得到法线 (−y, x)。比较距离前先把法线归一化。</p>
 <p>做法就是挨个轴投影：</p>
 <ul>
 <li>只要有一条轴上两段不重叠，就是没碰，可以提前结束。</li>
-<li>所有轴都重叠，就是碰了。重叠量最小的那条轴就是接触法线，那个重叠量就是穿透深度。</li>
+<li>所有轴上都有公共投影，两块就有公共点。在每条单位轴上分别量一量，B 往正向和反向各要挪多远才刚好接触。取所有这些位移中最短的一个，它的方向是推出 B 的法线，长度是穿透深度。这个算法也适用于一块完全包住另一块的情形。</li>
 </ul>
-<p>代价是“轴数 × 顶点数”。三维的边×边那一项是平方级的：农舍碎块一般 10 个顶点、10 个边方向，就是 100 条边轴，每条都要把两边所有顶点投影一遍。我们 GPU 窄相的时间大部分花在这里。</p>
+<p>试一条轴，就把两边的顶点投影一遍。比如两个任意朝向的三角形，各有 3 条边，最多试 6 个轴方向；一旦找到间隙就可以停。</p>
 
 <figure id="sat-demo">
 <div class="stage">
@@ -160,6 +227,25 @@ header.top a.site{font-family:var(--mono);font-weight:600;letter-spacing:.06em}
 </div>
 <figcaption>图 1：画面中的长虚线是当前选中的轴，A 和 B 投影到它上面变成两段色条。轴列表给出全部候选轴：条形往右是重叠量，往左是间隙。点列表里的某一行，就把那条轴画出来。默认画的是“结论轴”：没碰时是分离轴，碰了是重叠最小的轴。</figcaption>
 </figure>
+<section class="problems" aria-label="本节的二维计算题" data-topic="sat">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>A 的顶点为 (0,0)、(2,0)、(0,2)，B 的顶点为 (2,2)、(4,2)、(2,4)。在单位轴 n=(1,1)/√2 上求两三角形的投影，图上有多宽的斜缝？</summary>
+<ol>
+<li>点 (x,y) 沿 n 的投影为 (x+y)/√2。A 三个顶点的 x+y 为 0、2、2，B 的为 4、6、6。</li>
+<li>最近的两条支撑线为 x+y=2 与 x+y=4。垂足 (1,1) 在 A 的斜边上，B 在 (2,2) 碰到另一条线。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　投影分别为 [0,√2]、[2√2,3√2]，斜缝宽 √2。</p>
+</details>
+<details class="math-question">
+<summary>两块菱形由 |x|+|y|≤2 和 |x−2|+|y−1|≤2 给出。画出两条候选轴 (1,1)/√2、(1,−1)/√2。固定第一块，沿哪条轴移动第二块最省？</summary>
+<ol>
+<li>两块菱形的中心差为 (2,1)。每块沿任一候选轴的投影半宽都是 2/√2。</li>
+<li>中心差在两轴上的投影分别为 3/√2、1/√2。沿正方向推出所需长度分别为 (4−3)/√2、(4−1)/√2，沿负方向走会更远。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　沿 (1,1)/√2 平移 1/√2，换成平面位移是 (0.5,0.5)。</p>
+</details>
+</section>
 
 <h3 id="sat-why-b">为什么只循环 A 的边不够</h3>
 <p>下面是一个具体例子。A 是正方形 (0,0)–(2,0)–(2,2)–(0,2)；B 是三角形 (1.6,3.0)、(3.0,1.6)、(3.5,3.5)，它的斜边正对着 A 的右上角，两者<b>没有碰到</b>，中间有一条斜着的缝。</p>
@@ -170,12 +256,32 @@ header.top a.site{font-family:var(--mono);font-weight:600;letter-spacing:.06em}
 </div>
 <figcaption>图 1b：每个小格是一条候选轴。先画 A 的 4 条边，再画 B 的 3 条边。小格里加粗的是产生这条轴的那条边，虚线是轴，下面两条色条是 A、B 投影到轴上的区间。红色表示重叠，绿色表示有间隙。只有 B 的斜边那一格是绿的。</figcaption>
 </figure>
-<p>直观上可以这么想：一个物体的面法线，只能看出“对方是不是在我这个面的外面”。B 是从 A 的<b>角</b>这边靠过来的，缝是斜的，A 的哪个面都对不上这道缝，只有 B 自己那条斜边对得上。所以两边的面都得试一遍：真正的分界线可能贴着 A 的面，也可能贴着 B 的面。三维还要再加边×边，因为分界线还可能夹在两条边之间。</p>
+<p>直观上可以这么想：一个物体的面法线，只能看出“对方是不是在我这个面的外面”。B 是从 A 的<b>角</b>这边靠过来的，缝是斜的，A 的哪个面都对不上这道缝，只有 B 自己那条斜边对得上。所以两边的面都得试一遍：真正的分界线可能贴着 A 的面，也可能贴着 B 的面。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="sat-why-b">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>A 是中心在原点、边长为 2 的轴对齐正方形。B 的顶点为 (0,3)、(3,0)、(3,3)。先试 A 的边法线，再找一条 B 的边法线。你能从哪里看见缝？</summary>
+<ol>
+<li>A 在横轴和纵轴上都投影为 [−1,1]，B 在两轴上都投影为 [0,3]，两次都重叠。</li>
+<li>B 的斜边连接 (0,3) 和 (3,0)，法线可取 n=(1,1)/√2。A 上最大的 x+y 是 2，B 上最小的是 3。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　沿 B 的斜边法线有 1/√2 宽的间隙。只试正方形的两种法线会误判。</p>
+</details>
+<details class="math-question">
+<summary>A 是从 (0,0) 到 (2,2) 的轴对齐正方形。B 是顶点 (1,3)、(5,1)、(5,4) 的三角形。固定 A，沿 B 第一条边的法线朝 A 移动，求第一次接触时的平移向量和接触点。</summary>
+<ol>
+<li>前两个顶点所在直线是 x+2y=7，法线为 (1,2)。A 最大的 x+2y 为 6，取在 (2,2)。</li>
+<li>向 A 的位移可写成 −t(1,2)。它让 B 斜边上的 x+2y 减少 5t，因此 7−5t=6，得 t=1/5。</li>
+<li>原斜边上的点 (2.2,2.4) 在两端点之间，移动后刚好到 (2,2)。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　平移 (−0.2,−0.4)，第一次接触在 A 的右上角 (2,2)。</p>
+</details>
+</section>
 
 <h3 id="sat-loop">把 SAT 写成循环</h3>
 <p>两点容易写错：候选轴是边的<b>法线</b>（normal），不是边本身；A 和 B 的边都要循环。“至少有一条轴分开”只在两者<b>没碰</b>时成立；碰了的话一条都找不到，这正是判断碰撞的依据。</p>
 <pre><code>minOverlap = +inf
-for each candidate axis n            // A 每条边的 normal + B 每条边的 normal；3D 再加 edge × edge；都要 normalize
+for each candidate axis n            // A 每条边的 normal + B 每条边的 normal，取单位向量
     [Amin, Amax] = project all vertices of A onto n
     [Bmin, Bmax] = project all vertices of B onto n
     overlap = min(Amax - Bmin, Bmax - Amin)
@@ -185,6 +291,25 @@ for each candidate axis n            // A 每条边的 normal + B 每条边的 n
         normal = n if Amax - Bmin &lt;= Bmax - Amin else -n    // 平移 B 的方向
 return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 <p>我们 GPU 代码里的 <code>bfvSat</code> 是三维版，没有 early out：调用它时 GJK 已经确定相交了，它只负责找重叠最小的那条轴。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="sat-loop">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>SAT 按 x 轴、y 轴、各斜边法线的顺序检查。A 的顶点为 (0,0)、(2,0)、(0,2)，B 的顶点为 (1,3)、(3,3)、(1,5)。执行到第几项就能返回？</summary>
+<ol>
+<li>横轴投影为 [0,2] 与 [1,3]，两段有交集，必须继续。</li>
+<li>纵轴投影为 [0,2] 与 [3,5]。按循环公式取 min(2−3,5−0)=−1，负号表示中间有缝。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　检查到第二项就能返回“分离”，其余轴可以跳过。</p>
+</details>
+<details class="math-question">
+<summary>A 的对角为 (−4,−3)、(4,3)，B 的对角为 (2,0)、(3,1)，都是轴对齐矩形。B 完全藏在 A 内部，SAT 应返回哪个推出向量？</summary>
+<ol>
+<li>沿 +x 推出时，B 的左边要走到 A 的右边，需 4−2=2。沿 −x 则需 3−(−4)=7。</li>
+<li>沿 +y 和 −y 分别需 3−0=3 和 1−(−3)=4。若只量投影的公共部分，两轴都得到 1，会低估穿透。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　四个长度中 2 最小，B 应平移 (2,0)，直到它的左边落到 x=4。</p>
+</details>
+</section>
 
 <h2 id="gjk">GJK：问原点离差集多远</h2>
 <p>GJK 换了个角度看。把 A 的每个点减去 B 的每个点，得到一个新的凸形状，叫闵可夫斯基差 A−B。它有个好性质：</p>
@@ -192,6 +317,25 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 <li>A 和 B 相交 ⇔ A−B 包含原点。</li>
 <li>A 和 B 的最近距离 = 原点到 A−B 的距离。</li>
 </ul>
+<section class="problems" aria-label="本节的二维计算题" data-topic="gjk">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>A 的三个顶点为 (0,0)、(3,0)、(0,2)，B 的为 (4,1)、(5,3)、(2,3)。GJK 沿 d=(1,2) 查询 A−B 的支撑点，会取到哪一对顶点？</summary>
+<ol>
+<li>A 的三个顶点与 d 点积为 0、3、4，取最大值对应的 (0,2)。</li>
+<li>B 要沿 −d 取支撑点，等价于取与 d 点积最小的顶点。三项为 6、11、8，故取 (4,1)。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　支撑点 w=(0,2)−(4,1)=(−4,1)。w·d=−2，整个差集都在直线 x+2y=0 的负侧。</p>
+</details>
+<details class="math-question">
+<summary>在差集图上，当前单纯形是 P=(2,0)、Q=(0,2) 之间的线段。这一轮朝哪个方向查支撑点？若返回 R=(−1,−1)，新的三角形能否判定原图上的两个凸包相交？</summary>
+<ol>
+<li>PQ 位于 x+y=2。原点在线上的垂足是中点 v=(1,1)，搜索方向可取 −v=(−1,−1)。</li>
+<li>从 R 连到 v，线段中点正是 (0,0)。也可以写成 ¼P+¼Q+½R=(0,0)，三个权重都是正数。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　沿 (−1,−1) 搜索。原点在三角形 PQR 内部，所以两个凸包相交。</p>
+</details>
+</section>
 
 <h3 id="origin">“原点”到底是什么</h3>
 <p>这里的原点<b>不是世界坐标的原点</b>，跟物体摆在哪无关。A − B 不是摆在场景里的形状，而是一张“差值”的图：A 上任取一点 a，B 上任取一点 b，算出 a − b，这是一个从 b 指向 a 的箭头，把它当成一个点画出来。A 和 B 所有点两两相减，画出来的点合起来就是 A − B。</p>
@@ -200,23 +344,30 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 <li>A − B 里有原点 ⇔ 能找到一个点同时在 A 里又在 B 里 ⇔ A 和 B 相交。</li>
 <li>A − B 里没有原点 ⇔ 任何一对点都差一点 ⇔ 没相交。A − B 离原点最近的那个点，就是“差得最少的那一对点”的差向量，它的长度就是两个物体的最近距离。</li>
 </ul>
+<section class="problems" aria-label="本节的二维计算题" data-topic="origin">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>A 是对角为 (10,10)、(12,12) 的轴对齐正方形，B 的顶点为 (11,11)、(14,11)、(11,14)。场景的 (0,0) 离它们很远。请在差集图上标出原点的一组来源。</summary>
+<ol>
+<li>取 p=(11.5,11.5)。它的 x、y 都在 10 和 12 之间，所以在 A 内。</li>
+<li>B 的内部满足 x≥11、y≥11、x+y≤25，p 的两坐标之和为 23，也在 B 内。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　取 a=b=p，得到 a−b=(0,0)。差集图上的原点来自这个公共点。</p>
+</details>
+<details class="math-question">
+<summary>两多边形的一对最近点为 a=(1,2)、b=(4,6)。把两块一起平移 (7,−3)，求新的最近点坐标，并在差集图上标出它们的差。</summary>
+<ol>
+<li>整块一起平移，新坐标为 a′=(8,−1)、b′=(11,3)。</li>
+<li>相减得到 (8−11,−1−3)=(−3,−4)，与原来的 a−b 相同。任一对点相减时，同一份平移都会消掉。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　差集上的最近点仍在 (−3,−4)，到差集原点的距离仍为 5。</p>
+</details>
+</section>
 
 <h3 id="pairs">a 和 b 是哪些点？是全部的点</h3>
 <p>a 和 b 不是随便挑的某一个点，也不只是顶点。A 里的<b>每一个点</b>（顶点、边上、内部都算）和 B 里的<b>每一个点</b>，两两配对，每一对都算一次 a − b。所有结果放在一起，才是 A − B。</p>
-<p>先用一维、只取整数点来数一遍。A 是 {2, 3, 4, 5}（4 个点），B 是 {4, 5, 6, 7}（4 个点），A 里挑一个 × B 里挑一个，一共 4 × 4 = 16 对：</p>
-<figure id="pairs-1d">
-<div class="stage">
-  <canvas aria-label="离散顶点配对与差值" id="cP1" height="430"></canvas>
-  <div class="bar">
-    <button id="p1All">全部配对一遍</button><button id="p1Clear">清空</button>
-    <span>鼠标移到表格里的某一格，看这一对 a、b 和它们的差</span>
-  </div>
-  <div class="readout" id="p1Out"></div>
-</div>
-<figcaption>图 2c：左边表格的每一格是一对 (a, b)，格子里写的是 a − b。右上是物体：蓝点是 A，橙点是 B。右下数轴是“差值的图”，每算一对就在上面落一个点。红格子是 a − b = 0 的那几对：a 和 b 是<b>同一个位置</b>（这里是 4 和 5，正好是两段重叠的地方）。</figcaption>
-</figure>
-<p>所以“a − b = 0”的意思就是：找到了一对点，它们其实是同一个点，也就是一个公共点。只要有一个公共点，两个物体就相交。</p>
-<p>二维也一样，只是点多到数不过来。下面可以自己拖一对 a、b，也可以让它随机撒很多对：</p>
+<p>再看<a href="#sat-thumbs">图 1b 的正方形和三角形</a>。正方形的右上角 a = (2, 2)，三角形斜边的中点 b = (2.3, 2.3)。从 b 到 a，向左、向下各走 0.3，所以差集里有一个点 a − b = (−0.3, −0.3)。这对点刚好是两块之间最近的一对，箭头长约 0.42。把三角形向左、向下各移 0.3，斜边中点就碰到方角，差点也正好移到 (0, 0)。</p>
+<p>下面换一对互相重叠的多边形。拖动左边的 a、b，右边会画出它们的差。试着把两个点拖进同一个位置，再点“随机撒 2000 对”看差点还能落在哪里。</p>
 <figure id="pairs-2d">
 <div class="stage">
   <canvas aria-label="连续点对和差集" id="cP2" height="500"></canvas>
@@ -226,30 +377,67 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
   </div>
   <div class="readout" id="p2Out"></div>
 </div>
-<figcaption>图 2d：左边拖 a 和 b，右边的点就是 a − b。两边网格刻度一样大：左边从 b 到 a 横走 Δx、竖走 Δy；右边从原点出发走同样的 Δx、Δy，落到的点就是 a − b，箭头长度的数值也一样。淡色虚线把两根箭头的尾和尾、头和头对应起来。把 a、b 拖到同一个位置（只有两块重叠的地方才可能做到），右边的点就正好落在原点上。点“随机撒”会在 A、B 里各随机取一个点、算一次差，撒很多次之后，右边的点云就把整个 A − B 填满了。</figcaption>
+<figcaption>图 2a：左边拖 a 和 b，右边的点就是 a − b。两边网格刻度一样大：左边从 b 到 a 横走 Δx、竖走 Δy；右边从原点出发走同样的 Δx、Δy，落到的点就是 a − b，箭头长度的数值也一样。淡色虚线把两根箭头的尾和尾、头和头对应起来。把 a、b 拖到同一个位置（只有两块重叠的地方才可能做到），右边的点就正好落在原点上。点“随机撒”会在 A、B 里各随机取一个点、算一次差，撒很多次之后，右边的点云就把整个 A − B 填满了。</figcaption>
 </figure>
-
+<section class="problems" aria-label="本节的二维计算题" data-topic="pairs">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>A 的一条边从 (0,0) 到 (4,2)，B 的一条边从 (3,4) 到 (5,6)。分别取两条边的中点 a、b，在差集图上画出这对点对应的箭头。</summary>
+<ol>
+<li>端点坐标取平均，得 a=(2,1)、b=(4,5)。</li>
+<li>原图中从 b 到 a 要向左走 2、向下走 4。从差集图的原点出发，依次走同样的两步。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　箭头从 (0,0) 指向 (−2,−4)。这对边中点也会给差集贡献一个点。</p>
+</details>
+<details class="math-question">
+<summary>A 是三角形 (0,0)、(4,0)、(0,4)，B 是三角形 (3,−1)、(3,3)、(5,1)。两图没有重合的顶点。能否各取一个边上的点，让差恰好落在原点？</summary>
+<ol>
+<li>A 的斜边在 x+y=4 上。B 的竖边在 x=3 上，两直线相交于 (3,1)。</li>
+<li>交点落在 A 的斜边两端之间，y=1 也落在 B 的竖边范围 [−1,3] 内，所以两条线段都经过它。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　取 a=b=(3,1) 即可。仅比较两组顶点是否相等会漏掉这个公共点。</p>
+</details>
+</section>
 
 <h3 id="count">一共有多少对：m × n，不是组合数 C</h3>
 <p>配对是“A 里挑一个 × B 里挑一个”，用的是<b>乘法原理</b>：A 有 m 个点、B 有 n 个点，就有 <b>m × n</b> 对，每一对算一次 a − b。</p>
 <div class="table-wrap"><table>
 <tr><th>情况</th><th>A 的点数 m</th><th>B 的点数 n</th><th>配对数 m × n</th></tr>
-<tr><td>图 2c（一维整数点）</td><td>4</td><td>4</td><td>4 × 4 = 16</td></tr>
-<tr><td>图 2e（多边形顶点）</td><td>6</td><td>4</td><td>6 × 4 = 24</td></tr>
-<tr><td>两个立方体</td><td>8</td><td>8</td><td>8 × 8 = 64</td></tr>
-<tr><td>两块农舍碎块（约 10 个顶点）</td><td>10</td><td>10</td><td>10 × 10 = 100</td></tr>
+<tr><td>图 1b（正方形与三角形的顶点）</td><td>4</td><td>3</td><td>4 × 3 = 12</td></tr>
+<tr><td>图 2b（多边形顶点）</td><td>6</td><td>4</td><td>6 × 4 = 24</td></tr>
+<tr><td>两个凸八边形</td><td>8</td><td>8</td><td>8 × 8 = 64</td></tr>
+<tr><td>两个凸十边形</td><td>10</td><td>10</td><td>10 × 10 = 100</td></tr>
 </table></div>
 <p>这<b>不是</b>组合数 C(n, k)。C(n, k) 是“从<b>同一堆</b>里挑 k 个、不分先后”，比如 C(5, 4) = 5 是从 5 个点里挑 4 个的挑法数。这里是从<b>两堆</b>里各挑一个，而且有顺序（a 一定来自 A，b 一定来自 B，a − b 和 b − a 是相反的两个点），所以是 m × n。</p>
-<p>点数是有限的只是因为只取了顶点；如果把内部的点也算上，就是无穷多对（图 2d 只是随机撒了 2000 对）。GJK 连 m × n 都不算：它每一步只取一个 support point（扫一遍 A 的 m 个顶点 + 扫一遍 B 的 n 个顶点，是 m + n 次而不是 m × n 次），几步就停。</p>
+<p>点数是有限的只是因为只取了顶点；如果把内部的点也算上，就是无穷多对（图 2a 只是随机撒了 2000 对）。GJK 连 m × n 都不算：它每一步只取一个 support point（扫一遍 A 的 m 个顶点 + 扫一遍 B 的 n 个顶点，是 m + n 次而不是 m × n 次），几步就停。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="count">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>在纸上画一个凸五边形 A 和一个三角形 B。要把所有顶点差画出来，共要算几对？如果只查向量 (2,1) 的一个支撑点，逐顶点扫描共需几次点积？</summary>
+<ol>
+<li>对 A 的每一个顶点都能从 B 选 3 个顶点，五组各有 3 对。</li>
+<li>一次支撑查询只要对 A 的 5 点各算一次与 (2,1) 的点积，再对 B 的 3 点各算一次与 (−2,−1) 的点积。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　画全部顶点差要算 15 对，查这一个方向需要 8 次顶点与方向的点积。</p>
+</details>
+<details class="math-question">
+<summary>A 的顶点依次为 (0,0)、(2,0)、(0,1)。把 A 整体平移 (4,−1) 得到 B，顶点编号不变。九组顶点配对能在差集图上标出多少个不同位置？</summary>
+<ol>
+<li>相同编号相减都得到 (−4,1)，三组配对叠在同一位置。</li>
+<li>其余六组是 (−4,1) 分别加上 A 的六个有向边向量，即 ±(2,0)、±(0,1)、±(−2,1)。这六个向量互不相同且都不为零。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　九对顶点落在 7 个不同位置，其中 (−4,1) 被标了三次。</p>
+</details>
+</section>
 
 <h3 id="outline">右边那圈虚线轮廓是怎么来的</h3>
 <p>轮廓只用顶点就能画出来，分三步：</p>
 <ol>
 <li><b>顶点两两相减</b>：A 有 6 个顶点，B 有 4 个，算出 6 × 4 = 24 个差 a<sub>i</sub> − b<sub>j</sub>，每个画成右边的一个点。</li>
 <li><b>套一根橡皮筋</b>（convex hull，凸包）：把这 24 个点最外面的那些用线连起来，里面的点不管。</li>
-<li>这圈线就是 A − B 的边界。A、B 内部的点相减，结果一定落在这圈里面，所以不用算，图 2d 撒的 2000 个点就是证明。</li>
+<li>这圈线就是 A − B 的边界。A、B 内部的点相减，结果一定落在这圈里面，所以不用算，图 2a 可以用 2000 个差点观察这件事。</li>
 </ol>
-<p>还有一个更直观的看法：A − B = A + (−B)。先把 B <b>绕原点翻转</b>（每个点取负，得到 −B），再把 −B 的一个副本贴到 A 的每个顶点上。所有副本合起来，外面那圈正好就是同一个轮廓，相当于让 −B 沿着 A 的边“扫”一圈。</p>
+<p>还有一个更直观的看法：A − B = A + (−B)。先把 B <b>绕原点翻转</b>（每个点取负，得到 −B），再把 −B 的一个副本贴到 A 的每个顶点上。给这些副本的所有顶点一起取凸包，外面那圈正好就是同一个轮廓，相当于让 −B 沿着 A 的边“扫”一圈。</p>
 <figure id="outline-demo">
 <div class="stage">
   <canvas aria-label="顶点差与凸包边界" id="cOut" height="460"></canvas>
@@ -258,33 +446,42 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
   </div>
   <div class="readout" id="oOut"></div>
 </div>
-<figcaption>图 2e：左边是物体，顶点编了号（A1–A6、B1–B4）。“下一个顶点对”每次取一对顶点，左边画出 b → a 的箭头，右边落下 a − b 这个点。24 个点都出来后，“套橡皮筋”把最外面的点连起来，就是图 2d 里的那圈虚线。鼠标移到右边任意一个点上，可以看它是哪两个顶点相减来的。</figcaption>
+<figcaption>图 2b：左边是物体，顶点编了号（A1–A6、B1–B4）。“下一个顶点对”每次取一对顶点，左边画出 b → a 的箭头，右边落下 a − b 这个点。24 个点都出来后，“套橡皮筋”把最外面的点连起来，就是图 2a 里的那圈虚线。鼠标移到右边任意一个点上，可以看它是哪两个顶点相减来的。</figcaption>
 </figure>
 
 <p>为什么实际计算只用顶点？因为 A − B 是凸的，它的外轮廓只由“A 的顶点 − B 的顶点”决定，内部的点只是把中间填满。所以 GJK、图 2 里只用顶点相减，就够描出 A − B 的边界了。</p>
 
-<p>先看一维，最好理解。两段区间 A = [Amin, Amax]、B = [Bmin, Bmax]，所有 a − b 组成的还是一段区间：</p>
-<pre><code>A − B = [Amin − Bmax, Amax − Bmin]
-例 1：A = [2, 5]，B = [4, 7] → A − B = [2−7, 5−4] = [−5, 1]，包含 0 → 重叠（4 到 5 那段，a = b 时差为 0）
-例 2：A = [2, 3]，B = [4, 7] → A − B = [−5, −1]，不含 0 → 分开，离 0 最近的是 −1，距离 = 1（3 和 4 之间的缝）</code></pre>
-<figure id="origin-1d">
-<div class="stage">
-  <canvas aria-label="一维差集和原点" id="cO1" height="250"></canvas>
-  <div class="readout" id="o1Out"></div>
-</div>
-<figcaption>图 2a：一维。用鼠标左右拖橙色的 B。下面那条数轴是 A − B，白色竖线是 0（原点）。B 和 A 一重叠，A − B 就盖住 0；分开时，A − B 离 0 的距离正好是两段之间的缝。</figcaption>
-</figure>
-<p>二维也一样，只是区间变成了多边形。下面左边是物体本身，右边是 A − B。图里特意标出了“那一对点”：</p>
+<p>现在把左边的两个多边形拖开。看它们之间最短的那根箭头，再看右边从原点指向差集边界的箭头，两根箭头给出同一个差向量。</p>
 <figure id="origin-2d">
 <div class="stage">
   <canvas aria-label="二维差集和原点" id="cO2" height="440"></canvas>
   <div class="readout" id="o2Out"></div>
 </div>
-<figcaption>图 2b：拖动橙色的 B（和图 1、图 2 共用位置）。相交时，左边标出一个 A、B 共有的点 p，它在右边对应 p − p = 原点，所以原点落在 A − B 里面（变红）。分开时，左边标出两物体最近的一对点 a、b，箭头 b → a 在右边就是从原点到 A − B 最近点的箭头，长度一样。</figcaption>
+<figcaption>图 2c：拖动橙色的 B（和图 1、图 2 共用位置）。相交时，左边标出一个 A、B 共有的点 p，它在右边对应 p − p = 原点，所以原点落在 A − B 里面（变红）。分开时，左边标出两物体最近的一对点 a、b，箭头 b → a 在右边就是从原点到 A − B 最近点的箭头，长度一样。</figcaption>
 </figure>
+<section class="problems" aria-label="本节的二维计算题" data-topic="outline">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>A、B 都是顶点 (0,0)、(2,0)、(0,2) 的三角形。把九组顶点差画在方格纸上，套一圈橡皮筋，哪些点会成为外轮廓顶点？</summary>
+<ol>
+<li>同编号相减都落在原点。其余六个点是 (2,0)、(0,2)、(−2,2)、(−2,0)、(0,−2)、(2,−2)。</li>
+<li>按上面的次序连线并收口，得到凸六边形。取任意一对互为相反数的顶点，它们的中点都是原点，原点留在六边形内。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　外轮廓由这六个非零差点组成，(0,0) 在内部。</p>
+</details>
+<details class="math-question">
+<summary>A 是对角为 (0,0)、(2,1) 的轴对齐矩形。B 是三角形 (0,0)、(1,0)、(0,1)。在 A−B 的图上，找出 x+y 最小的那条边，并求边长。</summary>
+<ol>
+<li>要让 a−b 的两坐标之和最小，在 A 取 x+y 最小的角 (0,0)，在 B 取 x+y 最大的点。</li>
+<li>B 的整条斜边都满足 x+y=1。用 (0,0) 减去这条边的两个端点，得 (−1,0)、(0,−1)。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　外轮廓的这条边位于 x+y=−1，两端的位移为 (1,−1)，边长 √2。</p>
+</details>
+</section>
 
-<p>问题就变成了：原点离一个凸形状多远。但 A−B 有 A 的顶点数 × B 的顶点数那么多个点，不能真的把它算出来。GJK 的办法是只用“支撑点”：给一个方向 d，A−B 在 d 方向最远的点，就是“A 在 d 方向最远的顶点”减“B 在 −d 方向最远的顶点”。每次只要扫一遍两个凸包的顶点。</p>
-<p>然后用最多 3 个点（三维是 4 个）组成的“单纯形”，一步步往原点逼：</p>
+<h3 id="gjk-search">GJK 下一步要往哪边找？</h3>
+<p>现在问的是原点离一个凸形状多远。把两边所有顶点两两相减会得到 m × n 个候选点，GJK 只算其中要用的几个。GJK 的办法是只用“支撑点”：给一个方向 d，A−B 在 d 方向最远的点，就是“A 在 d 方向最远的顶点”减“B 在 −d 方向最远的顶点”。每次只要扫一遍两个凸包的顶点。</p>
+<p>然后用最多 3 个点组成的“单纯形”，一步步往原点逼：</p>
 <ol>
 <li>求单纯形上离原点最近的点 v。</li>
 <li>朝 −v 方向取一个新支撑点 w，加进单纯形。</li>
@@ -305,8 +502,48 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 </div>
 <figcaption>图 2：左半边是 A、B 本身，右半边是它们的差集 A−B，图中的 + 标出原点 (0, 0)。“下一步”每次取一个支撑点。拖动 B 时，右边的差集会跟着变，GJK 自动从头开始。</figcaption>
 </figure>
+<section class="problems" aria-label="本节的二维计算题" data-topic="gjk-search">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>差集里当前单纯形是一条线段，P=(2,0)、Q=(0,2)。原点在这段上的最近点 v 在哪里？下一次向哪个方向查询支撑点？</summary>
+<ol>
+<li>设点为 P+t(Q−P)=(2−2t,2t)。让它到原点的连线垂直于方向 (−2,2)，得到 −4+8t=0。</li>
+<li>t=1/2 落在边上，故 v=(1,1)。下一轮朝 −v 搜索。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　查询方向可取 (−1,−1)，当前距离为 √2。</p>
+</details>
+<details class="math-question">
+<summary>一次 GJK 的最近点是 v=(2,1)。沿 d=−v 查询，拿到支撑点 w=(1,3)。若用精确算术，本轮还能沿 d 向原点推进吗？</summary>
+<ol>
+<li>d=(−2,−1)，算 d·v=−5，d·w=−5。</li>
+<li>w 已经是整个差集沿 d 最远的点。这个最大投影也没有超过 v 的投影，所以与 d 垂直、经过 v 的支撑线挡住了进一步逼近。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　停止，最近距离为 |v|=√5。</p>
+</details>
+</section>
 
 <h2 id="epa">EPA：已经相交了，B 要往哪边推，多远才刚好碰着？</h2>
+<p>把 B 稍稍推入 A。两块的最近距离已经是零，但要让它们刚好贴住，还得挪一段。现在到差集图里，从原点往各条边量，找最短的出口。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="epa">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>平面差集的四个角是 (−2,−1)、(3,−1)、(3,2)、(−2,2)。原点要往哪个方向走，才能最快走到边界？</summary>
+<ol>
+<li>原点在矩形内。到左、右、下、上四条边的垂距依次为 2、3、1、2。</li>
+<li>在下边上的垂足是 (0,−1)，落在线段内部。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　最近出口是 (0,−1)，距离为 1。</p>
+</details>
+<details class="math-question">
+<summary>已知凸多边形 A−B 的唯一最近边经过 (1,0) 和 (0,1)，其余各边距原点都更远，原点在内部。固定 A，B 应沿哪个向量移动到刚好接触？</summary>
+<ol>
+<li>边的方程是 x+y=1，朝外的单位法线为 (1,1)/√2。</li>
+<li>边到原点的距离为 1/√2。用这个距离乘单位法线，得到最近边界点。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　B 应平移 (0.5,0.5)，此时差集向相反方向移，原点落在边上。</p>
+</details>
+</section>
+
 <h3 id="epa-goal">右边的白三角形是怎么画出来的？</h3>
 <p>先看左图。沿着蓝色多边形走一圈，六个角依次叫 <span class="epa-vertex-a">A1 到 A6</span>；橙色的四个角依次叫 <span class="epa-vertex-b">B1 到 B4</span>。比如 A4 就是蓝色的第 4 个角。拖动或转动 B，编号跟着原来的角走。点“摆成相交的例子”，看这一轮用白圈标出了哪两个角。</p>
 <ol id="epa-how">
@@ -324,16 +561,59 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
   </div>
   <div class="readout" id="eOut" aria-live="polite"></div>
 </div>
-<figcaption>图 2f 和图 2 用的是同一对物体。右边的灰圈是 24 个差点套上橡皮筋后的轮廓。白点 P1、P2、P3 是 GJK 从这些差点里挑出来的。图上 1 个坐标单位按 1 cm 读数。</figcaption>
+<figcaption>图 2d 和图 2 用的是同一对物体。右边的灰圈是 24 个差点套上橡皮筋后的轮廓。白点 P1、P2、P3 是 GJK 从这些差点里挑出来的。图上 1 个坐标单位按 1 cm 读数。</figcaption>
 </figure>
 <p id="epaReading"></p>
-<h3>拿到白三角形以后，EPA 做哪四步？</h3>
+<section class="problems" aria-label="本节的二维计算题" data-topic="epa-goal">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>在方格纸上画出三角形 A，顶点为 (0,0)、(3,0)、(0,2)。三角形 B 的顶点为 (0,1)、(2,0)、(2,2)。搜索方向 d=(2,1)，差集 A−B 的第一个支撑点画在哪里？</summary>
+<ol>
+<li>A 的三个顶点与 d 点乘，依次得到 0、6、2，最靠前的是 (3,0)。</li>
+<li>B 的三个点与 d 点乘得到 1、4、6。沿 −d 最靠前的是点积最小的 (0,1)。</li>
+<li>取这对顶点的差，横坐标是 3−0，纵坐标是 0−1。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　在差集图上标出 P=(3,−1)。</p>
+</details>
+<details class="math-question">
+<summary>GJK 找到三个差点 P=(2,0)、Q=(0,2)、R=(−1,−1)。能否找到三个和为 1 的正权重，使加权后的点恰好在原点？这个三角形可以交给 EPA 吗？</summary>
+<ol>
+<li>设三个权重为 a、b、c。要让横纵坐标同时为 0，需要 2a−c=0 且 2b−c=0。</li>
+<li>代入 a+b+c=1，得到 a=b=1/4，c=1/2。三个点不共线，三个权重也都大于零，所以原点严格位于三角形内部。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　可以。P/4+Q/4+R/2=(0,0)，这三个点能作为二维 EPA 的起始多边形。</p>
+</details>
+</section>
+
+<h3 id="epa-steps">拿到白三角形以后，EPA 做哪四步？</h3>
 <ol>
 <li><b>挑一条边。</b> 从原点往三条白边分别垂直量一下，挑最近的那条。图里把它涂成绿色。</li>
 <li><b>朝边外面找一个点。</b> 顺着绿尺指的方向，再拿一个蓝顶点减一个橙顶点，得到 W。过 W 画一条和绿边平行的橙线。</li>
 <li><b>比两把尺。</b> 从原点量到绿边是绿尺，量到橙线是橙尺。橙尺更长，说明绿边外面还有点。把 W 连进白线，回到第 1 步。</li>
 <li><b>两把尺一样长，就知道怎么推了。</b> 固定蓝色 A，把橙色 B 沿绿尺的方向挪一个绿尺的长度。左边两块刚好碰着，右边灰圈的边也刚好经过原点。</li>
 </ol>
+<section class="problems" aria-label="本节的二维计算题" data-topic="epa-steps">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>EPA 的起始三角形有三个角 (−2,−1)、(2,−1)、(0,3)。哪条边离原点最近？若沿它的外法线查到支撑点 W=(1,−2)，这一轮该不该把 W 插进去？</summary>
+<ol>
+<li>底边在 y=−1 上，距原点 1。两条斜边所在直线为 2x+y=3、−2x+y=3，到原点的垂距都是 3/√5，约 1.34。</li>
+<li>底边的外法线是 n=(0,−1)。底边离原点 1，过 W 的支撑线离原点 n·W=2。</li>
+<li>两把尺相差 1。把 W 连到底边的两端，用两条新边替换底边后，才重新比较最近边。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　选底边，插入 W。这一轮量到的 1 还不能当成最终穿透深度。</p>
+</details>
+<details class="math-question">
+<summary>差集 A−B 的当前最近边连接 P=(−1,2) 与 Q=(3,−1)，外法线朝右上。沿这个方向查支撑时又返回 P。固定 A，B 要平移多少才能刚好接触？</summary>
+<ol>
+<li>边方向 Q−P=(4,−3)，朝右上的单位法线是 n=(3/5,4/5)。</li>
+<li>n·P=n·Q=1。支撑查询也落在这条边上，当前边和真正的支撑线重合。</li>
+<li>把 B 沿 n 平移 1，整个差集会反向平移 n，边上的最近点随之来到原点。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　B 的位移为 (3/5,4/5)，长度为 1。</p>
+</details>
+</section>
+
 <h3 id="epa-relative">为什么图里只推 B？两块都能动呢？</h3>
 <ol>
 <li><b>绿尺量的是两块之间要错开多少。</b> EPA 只看形状和位置。图里固定 A，让 B 沿绿尺走完整段，是为了让你看见它们刚好碰着的那一刻。</li>
@@ -341,6 +621,26 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 <li><b>质量不同时，轻的那块可以多挪一点。</b> 假设要一次消除这段重叠，不考虑转动，按质量的倒数来分。如果 A 比 B 重三倍，A 向左挪四分之一，B 向右挪四分之三。A 是固定墙时，就全由 B 挪。</li>
 <li><b>碰撞时的冲量先改速度。</b> 同一个接触点上，A 和 B 受到的冲量一样大、方向相反。质量小的那块，速度改得更多；撞偏了还会转。我们工程的 <code>SolveOne</code> 给 A 用 +P、给 B 用 −P，<code>PositionOne</code> 另外处理已经压进去的部分，每步可以只纠正一部分。两个函数都在工程的 <code>BFVGpuSimStep.usf</code> 里。</li>
 </ol>
+<section class="problems" aria-label="本节的二维计算题" data-topic="epa-relative">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>在平面里，固定 A 时要把 B 沿 n=(3/5,4/5) 推 2.5 cm 才刚好接触。现在 A、B 质量相等，沿法线平分位移。两块各挪多少？</summary>
+<ol>
+<li>先求完整的相对位移，2.5n=(1.5,2) cm。</li>
+<li>B 沿 n 挪一半，A 往相反方向挪一半。验算时用 B 的位移减 A 的位移。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　A 挪 (−0.75,−1) cm，B 挪 (0.75,1) cm。两者的相对位移是 (1.5,2) cm。</p>
+</details>
+<details class="math-question">
+<summary>两块拼图只允许平移。要消除重叠，B 相对 A 需挪 (−1.2,1.6) cm。A 重 3 kg，B 重 1 kg，按质量倒数分摊修正。两块的新位置分别偏移多少？</summary>
+<ol>
+<li>逆质量比是 (1/3):1，所以 A 分到总量的 1/4，B 分到 3/4。</li>
+<li>A 沿给定向量的反方向，B 沿正方向。再验算质心，3ΔA+ΔB=(0,0)。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　ΔA=(0.3,−0.4) cm，ΔB=(−0.9,1.2) cm。相减正好得到所需的相对位移。</p>
+</details>
+</section>
+
 <h3 id="epa-contact">都是朝右推 B，为什么有时还会转？</h3>
 <p>看左图里的真实物体。蓝球 A 碰到橙块 B 的左侧面，白色接触点就是施力的位置。先把摩擦关掉：这个面是竖的，接触力就垂直于它。于是 A 朝右推 B，B 同时朝左推 A。两块都能自由运动，B 起初静止。</p>
 <figure>
@@ -375,12 +675,55 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 <figcaption>白点标出接触点和 B 的质心。两次给 B 同样大的向右冲量，质心的速度变化一样。把箭头沿直线延长，经过质心时，这一下给 B 的转动力矩为零；从质心上方经过时，这一下还会带着 B 顺时针转。</figcaption>
 </figure>
 <p>有摩擦时，接触点还可能沿着表面受到摩擦冲量。工程里的 <code>ApplyImpulse</code> 把同一个冲量 <code>P</code> 用了两次：第 776 行用它改线速度，第 777 行用 <code>cross(r, P)</code> 改角速度。<code>r</code> 是从质心指到接触点的箭头。前面 EPA 的绿尺只演示把两块沿法线平移到刚好接触；真正碰撞后转多少，由接触求解器算。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="epa-contact">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>俯视一块静止的方砖，x 向右、y 向上。接触点相对质心的位置是 r=(−0.5,0.25) m，冲量 J=(4,0) N·s。若质量为 2 kg、绕质心的转动惯量为 0.5 kg·m²，速度和角速度各增加多少？</summary>
+<ol>
+<li>质心速度的变化是 J/m=(2,0) m/s。</li>
+<li>平面里的角冲量取 rₓJᵧ−rᵧJₓ，代入得到 0−0.25×4=−1 N·m·s。</li>
+<li>角冲量除以转动惯量得到 −1/0.5=−2 rad/s。此处取逆时针为正。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　质心向右加速到 2 m/s，方砖同时以 2 rad/s 顺时针转动。</p>
+</details>
+<details class="math-question">
+<summary>一块板的质心在原点，上端 (0,1) m 受向右的冲量 (2,0) N·s，下端 (0,−1) m 同时受向左的冲量 (−2,0) N·s。绕质心的转动惯量为 2 kg·m²。板的质心速度和角速度怎么变？</summary>
+<ol>
+<li>两股冲量相加为 (0,0)，所以质心速度不变。</li>
+<li>上端角冲量为 0×0−1×2=−2，下端为 0×0−(−1)×(−2)=−2，二者都让板顺时针转。</li>
+<li>总角冲量 −4 除以转动惯量 2，得到角速度变化 −2 rad/s。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　质心速度变化为零，角速度增加一个顺时针的 2 rad/s。</p>
+</details>
+</section>
+
 <h3 id="epa-bullet">拿刚才的数读 Bullet 源码</h3>
-<p><code>btGjkEpaSolver2::Penetration</code> 里，GJK 返回 <code>Inside</code> 就把它交给 <code>epa.Evaluate</code>。Bullet 做三维，开头用 <code>EncloseOrigin()</code> 把起点补成包住原点的四面体。二维刚才量一条边，三维换成量一个三角面。看循环里这三行就能认出图 2f 的动作。<a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L982-L991">GJK 交给 EPA</a> · <a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L651-L735">找面、取 W、扩展的循环</a></p>
+<p><code>btGjkEpaSolver2::Penetration</code> 里，GJK 返回 <code>Inside</code> 就把它交给 <code>epa.Evaluate</code>。对着二维图读下面三行即可：把当前白边的外法线当作 <code>best-&gt;n</code>，看新支撑点能把这条边再往外撑多少。看循环里这三行就能认出图 2d 的动作。<a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L982-L991">GJK 交给 EPA</a> · <a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L651-L735">找面、取 W、扩展的循环</a></p>
 <pre><code>gjk.getsupport(best-&gt;n, *w);
 const btScalar wdist = btDot(best-&gt;n, w-&gt;w) - best-&gt;d;
 if (wdist &gt; EPA_ACCURACY)</code></pre>
 <p><code>best</code> 是这一轮选中的面，<code>best-&gt;n</code> 是朝外的单位法线。<span id="epaBulletReading"></span>你在调试器里看，EPA 内部把深度放在 <code>m_depth</code>，外层接口把它取负写进 <code>results.distance</code>，负值表示有穿透。<a href="https://github.com/bulletphysics/bullet3/blob/ad74cfe6c88eba340a33938670b8143e1a87afe7/src/BulletCollision/NarrowPhaseCollision/btGjkEpa2.cpp#L994-L1003">结果写回的位置</a></p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="epa-bullet">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>把 Bullet 的 EPA 推进量公式套到二维图上。最近边的外法线 n=(3/5,4/5)，边距 d=1.9 cm，支撑点 W=(2,1) cm。本题容差取 0.05 cm，这一轮会继续扩展吗？</summary>
+<ol>
+<li>支撑线到原点的距离是 n·W=(3/5)×2+(4/5)×1=2 cm。</li>
+<li>代码中的 wdist 是两条平行线的间距，等于 2−1.9=0.1 cm。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　会继续扩展。此次推进量 0.10 cm 超过题设容差 0.05 cm。</p>
+</details>
+<details class="math-question">
+<summary>二维示例中 n=(−4/5,3/5)，最近边距为 1.68 cm，支撑点为 (−1,1.5) cm。容差取 0.025 cm。按文中 Bullet 的约定，若停在这条边并用其距离报告深度，results.distance 应填多少？</summary>
+<ol>
+<li>过支撑点的直线离原点 (−4/5)×(−1)+(3/5)×1.5=1.70 cm。</li>
+<li>两条线之间还差 0.02 cm，已小于本题的 0.025 cm，因此在这条边停止。</li>
+<li>边距 1.68 cm 是这次近似的正深度。接口写回有符号距离时，穿透取负号。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　results.distance = −1.68 cm。</p>
+</details>
+</section>
+
 <h3 id="epa-chaos">本机的 Chaos 和 Havok 怎么对上这张图</h3>
 <p>打开 UE 5.8 的 <code>Chaos/EPA.h</code>，搜 <code>DistanceToSupportPlane</code>（第 538–555 行）。<code>SupportA(n)</code>、<code>SupportB(−n)</code> 得到左图的两个顶点；<code>W = ASupport - BSupport</code> 得到右图的橙点。接下来 Chaos 记着两个数：</p>
 <ul>
@@ -389,6 +732,25 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 </ul>
 <p><span id="epaBoundsReading"></span>Chaos 看上下界差到相对容差以内就停。在三维里，从新点 W 看过去，可能同时看见好几个旧面。第 582 行的 <code>EPAComputeVisibilityBorder</code> 找出这片旧面外围的一圈边，再拿每条边的两个端点和 W 连成新三角面。</p>
 <p>工程用于 CPU 对照的 Havok 2013 也有相应的接口。<code>hkpGsk.h</code> 第 290 行声明了 <code>hkCalculatePenetrationDepth</code>。本工程的链接映射第 1053–1056 行能查到 <code>builtTetrahedron</code>、<code>tryToExpandPolytope</code> 和 <code>calculatePenetrationDepth</code>。这几个函数的函数体在 <code>hkpInternal</code> 静态库里；上面能逐行对照的是 Bullet 和 Chaos。我们自己的 GPU 凸包后端走到图 2 的“相交”以后，交给 <code>bfvSat</code> 求深度和方向，见后面的<a href="#ours">“我们的 GPU 版怎么组合”</a>。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="epa-chaos">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>用二维线段练习 Chaos 的上下界。单位法线 n=(0.6,0.8)，当前最近边满足 n·p=1.06 cm，新的支撑点 W=(0,1.5) cm。前几轮已把上界降到 1.10 cm，这一轮能把真实穿透深度夹在哪个范围？</summary>
+<ol>
+<li>当前最近边给出下界 1.06 cm。沿 n 的支撑线给出上界候选 n·W=1.20 cm。</li>
+<li>前几轮的 1.10 cm 仍是有效上界，保留两个上界中较小的一个。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　深度在 [1.06,1.10] cm 内，区间宽 0.04 cm。</p>
+</details>
+<details class="math-question">
+<summary>把 EPA 的可见边界画在平面上。旧多边形是角点为 (±1,±1) 的正方形，新支撑点 W=(2,3)。从 W 看过去，哪些边要移掉？两条新边各连到哪个旧顶点？</summary>
+<ol>
+<li>对右边 x=1，W 在直线外侧，因为 2&gt;1。对上边 y=1，同样有 3&gt;1。W 落在左边和下边的内侧。</li>
+<li>可见折线从 (1,−1) 经 (1,1) 到 (−1,1)。替换整段时只保留折线两端，中间的 (1,1) 退到新多边形内部。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　移掉右边和上边，新轮廓从 (1,−1) 连到 W，再连到 (−1,1)。</p>
+</details>
+</section>
 
 <h2 id="cmp">两者放在一起</h2>
 <div class="table-wrap"><table>
@@ -396,19 +758,62 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 <tr><td>回答什么</td><td>碰没碰；碰了的话深度和法线</td><td>碰没碰；没碰的话最近距离、最近点、方向</td></tr>
 <tr><td>穿透时</td><td>直接给出最小重叠轴和深度</td><td>只知道“相交”，要另外求深度（EPA 或 SAT）</td></tr>
 <tr><td>分开时</td><td>知道有一条分离轴，但轴上的间隙不一定是真实最近距离</td><td>给出真实最近距离</td></tr>
-<tr><td>代价</td><td>轴数 × 顶点数；三维边×边是平方级</td><td>迭代次数 × 顶点数；一般 2–6 次迭代</td></tr>
-<tr><td>形状要求</td><td>要有面法线和边方向（多面体）</td><td>只要能求支撑点（球、胶囊、凸包都行）</td></tr>
+<tr><td>代价</td><td>候选边法线数 × 两块的顶点总数</td><td>迭代次数 × 顶点数；一般 2–6 次迭代</td></tr>
+<tr><td>形状要求</td><td>要能列出两边的候选轴（凸多边形的边法线）</td><td>只要能求支撑点（圆、平面胶囊形、凸多边形都行）</td></tr>
 <tr><td>能不能利用上一帧</td><td>能：记住上次那条轴，先试它</td><td>能：记住上次单纯形的顶点 id，从那里开始（这就是 GSK）</td></tr>
 </table></div>
+<section class="problems" aria-label="本节的二维计算题" data-topic="cmp">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>两个轴对齐的正方形 A=[0,1]×[0,1]、B=[4,5]×[5,6]，坐标单位为 cm。SAT 在 x 轴上就能结束。它量到的间隙是多少？距离版 GJK 应给出哪对最近点和多长的距离？</summary>
+<ol>
+<li>x 轴上 B 的左端是 4，A 的右端是 1，间隙为 3 cm。</li>
+<li>两块在 y 方向也相隔 5−1=4 cm。取 A 的右上角 (1,1) 和 B 的左下角 (4,5)，两方向的间距同时最小。</li>
+<li>角点之间的向量为 (3,4)，长度为 √(3²+4²)=5 cm。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　SAT 用 3 cm 的投影间隙判定分离。GJK 的最近点为 (1,1)、(4,5)，距离为 5 cm。</p>
+</details>
+<details class="math-question">
+<summary>固定三角形 A，其顶点为 (0,0)、(4,0)、(0,4)。正方形 B=[2,3]×[2,3]，坐标单位为 cm。沿 A 斜边朝外的单位法线 n=(1,1)/√2 投影，两段投影在哪个值相接？两块的距离与穿透深度各是多少？</summary>
+<ol>
+<li>A 上 x+y 的最大值是 4，所以 A 的最大投影为 4/√2。B 上 x+y 的最小值也是 4，只在 (2,2) 取得。</li>
+<li>点 (2,2) 在 A 的斜边 x+y=4 上。两块有公共点，而它们的内部位于这条斜边的两侧。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　投影在 2√2 cm 处相接，真实距离和穿透深度都为 0 cm。</p>
+</details>
+</section>
 
 <h2 id="mink">Minkowski difference 和它的边界</h2>
 <p>A 的每个点减去 B 的每个点，所有结果组成的新形状就是 <b>Minkowski difference</b>，记作 A − B，也叫 <b>CSO</b>（Configuration Space Obstacle）。图 2 右半边那个灰色多边形就是它。因为 A − B = A + (−B)，有的代码（比如 Chaos）把它叫 <b>Minkowski sum</b>，说的是同一个东西。</p>
 <ul>
 <li>A、B 相交 ⇔ A − B 包含原点。</li>
 <li>A、B 的最近距离 = 原点到 A − B 的距离（GJK 求的就是这个）。</li>
-<li><b>penetration depth</b> = 原点到 A − B 边界（surface）最近那个面的距离，那个面的法线就是 <b>contact normal</b>（EPA 和 SAT 求的都是这个）。</li>
+<li><b>penetration depth</b> = 两块重叠时，原点到 A − B 边界最近那条边的距离。那条边的外法线就是 <b>contact normal</b>（EPA 和 SAT 求的都是这个）。</li>
 </ul>
-<h3 id="mink-faces">边界上的面从哪来</h3>
+<section class="problems" aria-label="本节的二维计算题" data-topic="mink">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>矩形 A=[−1,2]×[0,2]，矩形 B=[3,4]×[−2,−1]，单位为 m。写出 A−B 的四个坐标边界，并在差集上找离原点最近的点。</summary>
+<ol>
+<li>差点的 x 从 −1−4=−5 到 2−3=−1，y 从 0−(−1)=1 到 2−(−2)=4。原图是轴对齐矩形，这两个坐标可独立取值。</li>
+<li>在 [−5,−1] 中取离 0 最近的 −1，在 [1,4] 中取 1。该差点来自 A 的 (2,0) 减去 B 的 (3,−1)。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　A−B=[−5,−1]×[1,4]。最近差点为 (−1,1)，两块相距 √2 m。</p>
+</details>
+<details class="math-question">
+<summary>两块平面凸形的差集 C=A−B 是三角形，顶点为 (−1,−1)、(3,−1)、(−1,3)，单位为 cm。把 B 平移 t=(2,1)。新差集的顶点在哪？这次平移后，原点与斜边之间的距离是多少？</summary>
+<ol>
+<li>每个差点变为 a−(b+t)=(a−b)−t，三个顶点各减 (2,1)。</li>
+<li>新斜边连接 (1,−2) 与 (−3,2)，方程为 x+y=−1。原点在三角形外，垂足 (−½,−½) 落在斜边上。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　新顶点为 (−3,−2)、(1,−2)、(−3,2)。原点到斜边的距离为 1/√2 cm。</p>
+</details>
+</section>
+
+<h3 id="mink-faces">差集边界上的边从哪来</h3>
+<p>沿 (1, 0) 往右看。假设 A 的整条竖边都伸得最右，B 只有一个顶点伸得最左。拿竖边上的每一个点减去这个顶点，差集上就得到一条等长的竖边。反过来，若 A 只有一个最右顶点，B 有一整条最左边，得到的就是 B 那条边翻转后平移的结果。</p>
+<p>要是两边都贡献一条平行边，就把它们的切向跨度加起来。例如右边长 2、左边长 3，差集那条竖边便长 5。转动观察方向，只有 A 或 B 的支撑点整段并列时，凸包的边界上才会出现一条边。</p>
+<details class="engine-note"><summary>工程对照：空间凸包的候选面</summary>
 <p>三维时，A − B 边界上的每个面只可能来自三种组合。SAT 的候选轴正好就是这些面的法线，所以只需要试这三类轴：</p>
 <div class="table-wrap"><table>
 <tr><th>组合</th><th>面的形状</th><th>面的 normal（= SAT 候选轴）</th></tr>
@@ -416,7 +821,31 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 <tr><td>vertex–face：A 的顶点 + B 的面</td><td>B 那个面翻转后平移过去</td><td>B 的 face normal</td></tr>
 <tr><td>edge–edge：A 的边 + B 的边</td><td>一个平行四边形</td><td>edgeA × edgeB</td></tr>
 </table></div>
-<h3 id="gauss">不是每一对 edge 都是真的面：Gauss map</h3>
+</details>
+<section class="problems" aria-label="本节的二维计算题" data-topic="mink-faces">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>沿单位圆上的方向 n=(0,1) 观察 A−B。A 的顶边端点为 (−1,2)、(2,2)，B 最低的点只有 (1,−1)，单位为 cm。差集朝正上的支撑特征是什么？写出两个端点。</summary>
+<ol>
+<li>要让 (a−b)·n 最大，a 可沿 A 的整条顶边取值，b 只能取最低点 (1,−1)。</li>
+<li>从 A 的两个端点各减 (1,−1)，得到 (−2,3) 和 (1,3)。两点之间的任意点都有相同投影 3。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　它是一条位于 y=3 cm 的边，从 (−2,3) 到 (1,3)，外法线为 (0,1)。</p>
+</details>
+<details class="math-question">
+<summary>单位方向 n=(3/5,4/5)。A 沿 n 只有一个最远点 (3,2)。B 沿 −n 的支撑特征是一条边，端点为 (0,1)、(4,−2)。坐标单位为 m。求 A−B 沿 n 的支撑边及其在 n 上的投影值。</summary>
+<ol>
+<li>固定 a=(3,2)，分别减去 B 的两个端点，得到 (3,1)、(−1,4)。</li>
+<li>两个端点的投影分别为 (9+4)/5 与 (−3+16)/5。边上各点共享这个最大投影。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　支撑边连接 (3,1) 和 (−1,4)，投影值为 13/5 m。</p>
+</details>
+</section>
+
+<h3 id="gauss">Gauss map：转动方向，哪个顶点最远？</h3>
+<p>把单位方向画成圆上的一个点，绕原点转一圈。对一个轴对齐的正方形，只要方向朝右上，点积最大的总是右上角。转到正右的一瞬间，右侧整条边的点积都相同。再往右下转，最远点跳到右下角。</p>
+<p>这样，每个顶点都在单位圆上占了一段角度，边则对应一个外法线方向。对 A − B，要在 A 上沿 n 找最远点，在 B 上沿 −n 找。两个指定的顶点能否一起成为支撑点，取决于有没有方向同时满足这两条要求。</p>
+<details class="engine-note"><summary>工程对照：Chaos 怎样筛选空间里的边对</summary>
 <p>大部分 edge 对算出来的叉积根本不是 A − B 的面法线，拿它当轴一定不会是最小那条，白算。判断用 <b>Gauss map</b>：把每个特征“负责”的方向画到单位球上。</p>
 <ul>
 <li>一个 face 对应球上一个点，就是它的 normal。</li>
@@ -424,12 +853,75 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 <li><b>两段 arc 相交 ⇔ 两条 edge 在 A − B 上真的形成一个面。</b>不相交就跳过。</li>
 </ul>
 <p>Chaos 的 <code>IsMinkowskiSumFace</code> 就是用几个叉积、点积的符号做这个判断。农舍碎块大约 100 个 edge 对里通常只有少数几对通过，所以它能砍掉 SAT 里最贵的那部分。我们的 GPU SAT 现在还是全部 edge 对都试，要加这个剔除，需要在烘焙时给每条边记下它两侧的面。</p>
+</details>
+<section class="problems" aria-label="本节的二维计算题" data-topic="gauss">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>在平面的单位圆上，从 +x 逆时针量角。A 的某顶点负责 30° 到 110° 的支撑方向，B 的某顶点负责 200° 到 245°。计算 A−B 时，哪些方向可以同时选中这两个顶点？角区间两端均包含。</summary>
+<ol>
+<li>求 A−B 沿 n 的支撑点时，A 沿 n 选点，B 沿 −n 选点。把 B 的角区间转过 180°，化到 0°–360° 后得到 [20°,65°]。</li>
+<li>这个区间与 A 的 [30°,110°] 取交集；在交集的端点，顶点可能与相邻边同时达到最大投影。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　可用方向是 [30°,65°]，覆盖 35°。</p>
+</details>
+<details class="math-question">
+<summary>正方形 A 的右边外法线是 n=(1,0)。B 的顶点 b₁ 的两条邻边外法线分别指向 135°、225°，顶点 b₂ 的外法线分别指向 45°、135°。各顶点负责两方向之间较短的圆弧，角度从 +x 逆时针量。A 的右边能和哪个顶点组成 A−B 的右支撑边？</summary>
+<ol>
+<li>A 的整条右边只在 0° 上共同取得最大投影。B 要在反向 −n 即 180° 上取得最大投影。</li>
+<li>180° 在 b₁ 的 [135°,225°] 内，在 b₂ 的 [45°,135°] 外。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　选 b₁。差集的这条支撑边是 A 的右边整体减去 b₁，b₂ 可剔除。</p>
+</details>
+</section>
 
 <h2 id="chaos">Chaos 遇到“全都重叠”时怎么做</h2>
 <p>读的是 UE 5.8 引擎源码 <code>Chaos/SAT.h</code> 和 <code>CollisionOneShotManifolds.cpp</code>。先说结论：<b>convex vs convex，Chaos 默认不用 SAT</b>，用的是 GJK + EPA；这里核对的另一条 SAT 路径用于 convex vs triangle（地形、三角网格），开关是 <code>p.Chaos.Collision.UseConvexTriangleGJKSAT</code>，默认打开。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="chaos">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>两块凸多边形的差集最近点是 (−0.3,0.4) cm，且原点在差集外。该用距离结果还是进入穿透求解？间隙是多少？</summary>
+<ol>
+<li>原点在外，说明形状分开。</li>
+<li>最近点向量的长度为 √(0.3²+0.4²)=0.5 cm。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　用距离结果，间隙为 0.5 cm。</p>
+</details>
+<details class="math-question">
+<summary>GJK 找到三个差点 (−2,−1)、(2,−1)、(0,2)。原点是否在这个单纯形内部？引擎再求什么量才能把 B 推到刚好接触？</summary>
+<ol>
+<li>三个点的平均值为 (0,0)，且它们不共线。每个点权重都是 1/3，因此原点严格在内部。</li>
+<li>几何距离此时为零。当前单纯形只是差集的一部分，不能把它任意一条边的距离直接作为最终深度。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　还要在完整差集上求最近边界点，读出推出的长度与方向。</p>
+</details>
+</section>
+
 <h3 id="chaos-cc">convex vs convex：GJK → EPA</h3>
 <p>分开时 GJK 求最近点和距离（带 warm start）。重叠时交给 <b>EPA</b>（Expanding Polytope Algorithm）：从 GJK 包住原点的 simplex 出发，把 A − B 的边界一点点向外“吹”出来，找到离原点最近的面，它的 normal 就是推出方向，距离就是 depth。</p>
-<h3 id="chaos-sat">Chaos 的 SATPenetration：三轮，最后挑最浅的</h3>
+<section class="problems" aria-label="本节的二维计算题" data-topic="chaos-cc">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>A、B 是边长均为 2 的正方形，边平行于坐标轴。A 的中心为 (0,0)，B 的中心为 (4,3)。画出两块之间的最短线段，算它的长度。这种状态需要进入 EPA 吗？</summary>
+<ol>
+<li>A 的右上角是 (1,1)，B 的左下角是 (3,2)。A 中任一点到 B 的横向间隔至少为 2，纵向间隔至少为 1，这两个角同时取到最小值。</li>
+<li>连接它们的向量是 (2,1)，长度为 √(2²+1²)=√5。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　最近距离是 √5，约 2.24。两块仍分开，GJK 的距离结果已足够。</p>
+</details>
+<details class="math-question">
+<summary>A 是菱形 |x|+|y|≤2，B 是同样的菱形，中心在 (2,1)。它们的差集为 |x+2|+|y+1|≤4。原点位于哪里？用 EPA 的几何意义求 B 最短的推出向量。</summary>
+<ol>
+<li>代入原点得到 3&lt;4，所以原点严格在差集内部。</li>
+<li>差集右上边满足 x+y=1，离原点 1/√2。其余三条边所在直线离原点分别是 3/√2、5/√2、7/√2，因此右上边最近。</li>
+<li>右上边外法线为 (1,1)/√2，乘以深度 1/√2。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　B 平移 (0.5,0.5) 后刚好接触，最短推出距离为 1/√2。</p>
+</details>
+</section>
+
+<h3 id="chaos-sat">用二维边法线读 SATPenetration 的符号</h3>
+<p>先测 A 的边法线，再测 B 的边法线。给每条轴保留带符号的距离：正数表示有缝，零表示刚贴住，负数表示沿这条轴还要移开一段。若所有值都为负，−0.2 和 −0.8 之间要选 −0.2，因为沿它只需挪 0.2。轴必须都是单位向量，这两个数才能直接比较。</p>
+<details class="engine-note"><summary>工程对照：原记录里的三轮筛选与轴偏好</summary>
 <ol>
 <li><b>B 的每个面 vs A 的顶点</b>：对 B 的每个面，找 A 里离它最近（最靠里）的顶点，算 signed distance。</li>
 <li><b>A 的每个面 vs B 的顶点</b>：反过来再做一遍。这就是上面图 1b 那个“为什么也要循环 B”。</li>
@@ -440,7 +932,31 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 <li><b>PlaneBias</b>：偏好 face，不偏好 edge。edge–edge 那条要比最好的 face 轴明显更浅才用，因为 face 接触能出多个接触点，edge 只有一个。</li>
 <li><b>ObjectBias</b>：两边的 face 差不多时固定偏向一边，防止逐帧来回跳（feature flipping），否则接触点会抖。</li>
 </ul>
+</details>
+<section class="problems" aria-label="本节的二维计算题" data-topic="chaos-sat">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>平面里 A 是 [0,3]×[0,2] 的矩形，B 是 [2.25,4.25]×[1.5,3.5] 的矩形。把穿透记成负值，不加特征偏好时，哪条候选轴的有符号距离最大？B 要怎样移动？</summary>
+<ol>
+<li>两块的边分别平行于 x、y 轴，平面的候选法线只有这两个方向。</li>
+<li>向右错开需要 3−2.25=0.75，向上错开需要 2−1.5=0.5。反方向推出所需的位移都更长。</li>
+<li>两个有符号距离是 −0.75 与 −0.5，较大的是 −0.5。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　选择 y 轴，B 向上移动 (0,0.5) 后刚好接触。</p>
+</details>
+<details class="math-question">
+<summary>A 是 [0,1]×[0,1] 的正方形。B 的三个顶点是 (0.8,1.5)、(1.5,0.8)、(1.5,1.5)。用 B 的斜边法线检查两者，若剔除门槛取 0.2，能否提前退出？</summary>
+<ol>
+<li>B 的斜边满足 x+y=2.3，取朝右上的单位法线 n=(1,1)/√2。B 在这根轴上的最小投影是 2.3/√2。</li>
+<li>A 最靠右上的是 (1,1)，其投影为 2/√2。轴上间隙为 (2.3−2)/√2，约 0.212。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　可以。斜边轴上的间隙超过 0.2，已经找到一条能提前退出的分离轴。</p>
+</details>
+</section>
+
 <h3 id="chaos-manifold">选出轴之后：生成 manifold</h3>
+<p>在二维图里选定一条参考边，再用穿过它两个端点、垂直于参考边的两条直线，裁剪另一块的入射边。把裁完后还在接触容差内的端点留下。方块平放在地面上通常留下左右两个点；方块斜着用一个角碰地时，通常只留下角上那一个点。</p>
+<details class="engine-note"><summary>工程对照：Chaos 与 GPU 后端的接触生成</summary>
 <ul>
 <li>沿 contact normal 在两个物体上各找一个最正对它的面（<code>SelectContactPlane</code>），更正对的那个当 <b>reference face</b>，另一个是 <b>incident face</b>。这里也有 0.002 的偏好防抖。</li>
 <li>两个面都不正对 normal：是 edge–edge 接触，只出 1 个点。</li>
@@ -453,6 +969,26 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 <tr><td>edge × edge 剔除</td><td>只试 Minkowski 面上的 edge 对</td><td>全部 edge 方向两两试（SAT 慢的主要原因）</td></tr>
 <tr><td>生成接触点</td><td>reference / incident face 裁剪，≤ 4 点；edge–edge 1 点</td><td>一样</td></tr>
 </table></div>
+</details>
+<section class="problems" aria-label="本节的二维计算题" data-topic="chaos-manifold">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>参考边从 (0,0) 连到 (2,0)，实体在 y≤0 一侧。入射边从 (−1,−0.6) 连到 (3,−0.2)。先用参考边两端的侧平面裁剪，留下哪两个端点？各压进参考面多深？</summary>
+<ol>
+<li>入射边的斜率为 0.4/4=0.1，写成 y=0.1x−0.5。</li>
+<li>两端侧边界是 x=0 与 x=2。在这两处分别得到 y=−0.5 与 y=−0.3，均在参考面内侧。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　保留 (0,−0.5) 与 (2,−0.3)，穿透深度分别是 0.5 与 0.3。</p>
+</details>
+<details class="math-question">
+<summary>斜着的参考边从 (0,0) 到 (2,2)，单位外法线为 n=(−1,1)/√2。侧边界裁完后还剩候选点 P=(1,0)、Q=(1,2)。按有符号距离≤0 保留接触，哪个点留下？它在参考边上的垂足在哪？</summary>
+<ol>
+<li>参考边经过原点，所以有符号距离就是点与 n 的点积。P 的结果为 −1/√2，Q 为 +1/√2。</li>
+<li>P 在面内侧。把它向外移到参考边上，垂足为 P−(n·P)n=(1,0)+(−1/2,1/2)。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　只保留 P。深度为 1/√2，垂足在 (0.5,0.5)。</p>
+</details>
+</section>
 
 <h2 id="gsk">GSK：给 GJK 加上记忆</h2>
 <p>GSK 是 Havok 对它这套窄相的叫法。核心还是 GJK，不同的是每对物体有一份跨帧的缓存，利用的是“物体一帧只动一点点”这个事实。缓存里记三样东西，分别带来两种省法：</p>
@@ -476,6 +1012,25 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 </div>
 <figcaption>图 3：上面是 B 绕着 A 来回慢慢移动；下面是最近 240 帧每帧的 GJK 迭代次数，红色是每帧从零开始的冷启动，绿色是带缓存的实际次数，灰色是那一帧被 TIM 整个跳过。关掉复选框可以分别看两种省法各省了多少。</figcaption>
 </figure>
+<section class="problems" aria-label="本节的二维计算题" data-topic="gsk">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>上一帧 A、B 沿 A 指向 B 的单位法线 n=(3/5,4/5) 有 7 cm 间隙。本帧 B 相对 A 的平移是 (−2,−1) cm，两块转动导致的额外接近量合计至多 1 cm。接触容差为 3 cm。TIM 能跳过本帧吗？</summary>
+<ol>
+<li>相对平移在 n 上的投影为 (−6−4)/5=−2 cm，沿缓存轴接近了 2 cm。</li>
+<li>保守间隙至少为 7−2−1=4 cm，大于容差。旋转界只给出下限，实际距离可以更大。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　能跳过。沿这条轴至少还隔 4 cm，已足够排除 3 cm 容差内的接触。</p>
+</details>
+<details class="math-question">
+<summary>GJK 缓存了一对局部顶点 a=(2,0)、b=(1,0)，单位为 cm。本帧 A 的原点在 (0,0)，旋转 90°；B 的原点在 (3,1)，旋转 0°，正角为逆时针。用这对编号重建暖启动的差点。仅凭这个点能判定两块分开吗？</summary>
+<ol>
+<li>先旋转，再平移。a 的世界坐标是 (0,2)，b 的世界坐标是 (4,1)。</li>
+<li>相减得到 (−4,1)。这只是差集中的一个点；它与原点不重合，其他差点的凸包仍可能包含原点。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　暖启动点为 (−4,1) cm。还要继续查询支撑方向或验证单纯形，才能判定是否分离。</p>
+</details>
+</section>
 
 <h2 id="ours">我们的 GPU 版怎么组合</h2>
 <p>每个凸包对一个 GPU 线程，流程是：</p>
@@ -490,6 +1045,25 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 <li>SAT 轴缓存：CPU 镜像测试里，每帧 6.3 ms 降到 2.6 ms，记录的落地结果相同。</li>
 </ul>
 <p>相关代码在 <code>Plugins/BFVGpuSim/Shaders/Private/BfvConvexCore.ush</code>：<code>bfvGjk</code>、<code>bfvSat</code>、<code>bfvSatCached</code>，TIM 在 <code>BFVGpuSimStep.usf</code> 的 <code>NarrowCS</code> 开头。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="ours">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>项目用 3 cm 的预测接触容差。取 A=[0,4]×[0,3]、B=[6,8]×[1,4]，单位为 cm。本帧 TIM 未早出。距离版 GJK 将给出多大间距和什么方向（从 A 到 B）？按 A 的右边裁剪，预测接触覆盖哪段 y？</summary>
+<ol>
+<li>两矩形在 y 上重叠，而 x 上相隔 6−4=2 cm。最近点可取 (4,2) 与 (6,2)，方向为 (1,0)。</li>
+<li>2 cm 小于容差，可进入预测接触。沿 y 裁剪得到 [0,3] 与 [1,4] 的交集 [1,3]。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　间距 2 cm，法线 (1,0)，裁剪后 y 从 1 到 3 cm。此刻仍有间隙，走预测接触分支。</p>
+</details>
+<details class="math-question">
+<summary>一次完整 SAT 复查中，A=[0,5]×[0,3]、B=[4,6]×[2.75,4]，单位为 cm，GJK 已确认相交。上次缓存轴为 +x。沿缓存轴把 B 推出要多远？再检查 y 轴，最短推出向量是多少？</summary>
+<ol>
+<li>向 +x 把 B 的左边推到 A 的右边，需 5−4=1 cm。反向要推 6 cm。</li>
+<li>向 +y 把 B 的下边推到 A 的上边，需 3−2.75=0.25 cm，反向需 4 cm。矩形的独立候选轴只有 x、y。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　缓存轴给出 1 cm；完整复查选中 +y，最短推出向量为 (0,0.25) cm。</p>
+</details>
+</section>
 
 <h2 id="glossary">术语表 Glossary</h2>
 <div class="table-wrap"><table>
@@ -497,20 +1071,208 @@ if (wdist &gt; EPA_ACCURACY)</code></pre>
 <tr><td>Minkowski difference / sum</td><td>A − B，等价于 A + (−B)</td></tr>
 <tr><td>CSO（Configuration Space Obstacle）</td><td>A − B 的另一个名字</td></tr>
 <tr><td>support mapping / support point</td><td>给一个方向，返回形状上那个方向最远的点</td></tr>
-<tr><td>simplex</td><td>GJK 用的 1–4 个点（点、线段、三角形、四面体）</td></tr>
+<tr><td>simplex</td><td>二维 GJK 本轮保留的点、线段或三角形，最多 3 个顶点</td></tr>
 <tr><td>separating axis</td><td>能把两个形状投影分开的轴</td></tr>
 <tr><td>early out</td><td>找到一条 separating axis 就提前结束</td></tr>
-<tr><td>penetration depth</td><td>原点到 A − B 边界的最短距离</td></tr>
+<tr><td>penetration depth</td><td>两块重叠时，原点到 A − B 边界的最短距离</td></tr>
 <tr><td>contact normal</td><td>推出方向</td></tr>
 <tr><td>EPA（Expanding Polytope Algorithm）</td><td>从 GJK 的 simplex 出发，向外扩展 A − B 的边界，求 penetration depth</td></tr>
-<tr><td>Gauss map</td><td>把 face、edge 映射到单位球上的点和 arc</td></tr>
-<tr><td>reference face / incident face</td><td>生成接触点时，用来裁剪的面 / 被裁剪的面</td></tr>
-<tr><td>manifold</td><td>一组接触点（最多 4 个）</td></tr>
+<tr><td>Gauss map</td><td>在单位圆上按方向记录支撑特征。多边形的边对应外法线方向，顶点对应一段方向角</td></tr>
+<tr><td>reference face / incident face</td><td>这里是用来裁剪的参考边 / 被裁剪的入射边</td></tr>
+<tr><td>manifold</td><td>一组接触点；本文二维直边裁剪最多留下两个端点</td></tr>
 <tr><td>feature flipping</td><td>同一对物体逐帧在不同的 face 之间来回切换，接触点会抖</td></tr>
 <tr><td>warm start</td><td>用上一帧的结果作为这一帧的起点</td></tr>
 <tr><td>TIM（运动界限检查）</td><td>上一帧距离减去这一帧最大接近量，仍大于容差就跳过 GJK</td></tr>
 </table></div>
-<p><a href="bfv-physics.html">返回 BFV 刚体物理笔记</a></p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="glossary">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>平面凸多边形顶点依次为 (0,0)、(3,0)、(2,2)、(0,1)，单位为 cm。沿 d=(1,2) 求 support point。再把方向改成单位向量 d/√5，支撑点和标量投影各有什么变化？</summary>
+<ol>
+<li>各顶点与 d 的点积依次为 0、3、6、2，最大值 6 在 (2,2) 取得。</li>
+<li>除以 √5 把每个点积乘上同一个正数 1/√5，最大值仍由同一顶点取得。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　支撑点始终是 (2,2)。点积从 6 变成 6/√5，沿单位方向的投影长度为 6/√5 cm。</p>
+</details>
+<details class="math-question">
+<summary>GJK 在差集里暂时保留两点 P=(−2,1)、Q=(2,1)，单位为 m。这个 simplex 是什么形状？求单纯形上离原点最近的点 v，写出下一次支撑查询的方向。</summary>
+<ol>
+<li>两个不同点张成线段。PQ 平行于 x 轴，原点到所在直线 y=1 的垂足是 (0,1)，在 P、Q 之间。</li>
+<li>从 v 看向原点的向量为 (0,0)−(0,1)=(0,−1)。1 m 是原点到当前线段的距离，整个差集还可能有更近的点。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　单纯形为线段 PQ，最近点 v=(0,1) m，下一次沿 (0,−1) 查询。</p>
+</details>
+</section>
+
+<h2 id="engine-physics">从一对凸包到一帧物理：Havok 和 Chaos 在哪一层分工？</h2>
+<p>刚才的二维图停在“找到接触点”。引擎还得把这个接触变成一条约束，改写两块的运动，再把结果交回游戏。一个 <em>job</em> 是可以入队的工作，<em>worker</em> 是从队列取工作的 CPU 线程。读源码时，先分清眼下看到的是一个数学函数、一个求解阶段，还是一次真的任务派发。</p>
+<div class="engine-example"><p><b>顺着一个接触点算到新速度。</b> 两个方块沿斜法线 n=(0.6,0.8) 正碰，法线从 A 指向 B。A 重 2 kg，以 (1.8,2.4) m/s 运动。B 重 1 kg，起初静止。接触线穿过两块的质心，令摩擦和恢复系数都为零。下面是一次孤立接触的手算，便于认出引擎里“求解”这步在改什么。</p>
+<pre><code>vn = dot(vB − vA, n)              = −3 m/s
+j  = −vn / (1/mA + 1/mB)          = 2 N·s
+P  = j n                          = (1.2, 1.6) N·s
+vA_new = vA − P/mA                = (1.2, 1.6) m/s
+vB_new = vB + P/mB                = (1.2, 1.6) m/s</code></pre>
+<p>现在法向相对速度是零。若让 B 同时压在 C 身上，下一条 B–C 约束读到的 B 速度已被这一步改过。这就是一堆接触不能随意摊给几个线程、同时写回的原因。下面的图可以切换连接关系。</p></div>
+<fieldset class="worker-figure"><legend>同一块地面上的两个方块堆</legend>
+<input class="case-radio" id="island-separate" type="radio" name="joint" checked><label for="island-separate">两堆分开</label>
+<input class="case-radio" id="island-join" type="radio" name="joint"><label for="island-join">给 B、D 加关节</label>
+<div class="worker-panels">
+<div class="worker-panel split-piles"><svg role="img" aria-label="两堆各自接触同一个固定地面" viewBox="0 32 280 112"><title>两堆各自接触同一个固定地面</title><rect x="50" y="85" width="35" height="35" rx="2" fill="var(--a)" fill-opacity=".23" stroke="var(--a)" stroke-width="2"/><text x="67.5" y="109" text-anchor="middle" fill="var(--heading)">A</text><rect x="50" y="50" width="35" height="35" rx="2" fill="var(--a)" fill-opacity=".23" stroke="var(--a)" stroke-width="2"/><text x="67.5" y="74" text-anchor="middle" fill="var(--heading)">B</text><rect x="195" y="85" width="35" height="35" rx="2" fill="var(--b)" fill-opacity=".23" stroke="var(--b)" stroke-width="2"/><text x="212.5" y="109" text-anchor="middle" fill="var(--heading)">C</text><rect x="195" y="50" width="35" height="35" rx="2" fill="var(--b)" fill-opacity=".23" stroke="var(--b)" stroke-width="2"/><text x="212.5" y="74" text-anchor="middle" fill="var(--heading)">D</text><path d="M20 121H260" stroke="var(--muted)" stroke-width="3"/><text x="140" y="139" fill="var(--muted)" text-anchor="middle" font-size="12">静态地面</text></svg><p><b>两个活动岛。</b> 左堆的约束会写 A、B，右堆会写 C、D。它们都能读固定地面的形状。若拆到不同任务，两名空闲 worker 可以同时开始；任务粒度也允许它们被装进同一组。</p></div>
+<div class="worker-panel joined-piles"><svg role="img" aria-label="上方两块用关节连起来" viewBox="0 32 280 112"><title>上方两块用关节连起来</title><rect x="50" y="85" width="35" height="35" rx="2" fill="var(--a)" fill-opacity=".23" stroke="var(--a)" stroke-width="2"/><text x="67.5" y="109" text-anchor="middle" fill="var(--heading)">A</text><rect x="50" y="50" width="35" height="35" rx="2" fill="var(--a)" fill-opacity=".23" stroke="var(--a)" stroke-width="2"/><text x="67.5" y="74" text-anchor="middle" fill="var(--heading)">B</text><rect x="195" y="85" width="35" height="35" rx="2" fill="var(--a)" fill-opacity=".23" stroke="var(--a)" stroke-width="2"/><text x="212.5" y="109" text-anchor="middle" fill="var(--heading)">C</text><rect x="195" y="50" width="35" height="35" rx="2" fill="var(--a)" fill-opacity=".23" stroke="var(--a)" stroke-width="2"/><text x="212.5" y="74" text-anchor="middle" fill="var(--heading)">D</text><path d="M85 68H195" stroke="var(--ok)" stroke-width="3" stroke-dasharray="6 4"/><text x="140" y="59" text-anchor="middle" fill="var(--ok)">关节</text><path d="M20 121H260" stroke="var(--muted)" stroke-width="3"/><text x="140" y="139" fill="var(--muted)" text-anchor="middle" font-size="12">静态地面</text></svg><p><b>一个活动岛。</b> 新关节同时约束 B 和 D，左右两堆之间可以传力。刚才按两个独立岛分工的办法失效了。求解器仍可按依赖拆分一部分内部工作，能否并行取决于接触关系、配置和任务大小。</p></div>
+</div></fieldset>
+<section class="problems" aria-label="本节的二维计算题" data-topic="engine-physics">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>令 A、B 各重 1 kg，法线 n=(0.6,0.8)。A 以 (3,4) m/s 撞向静止的 B，接触线穿过质心，摩擦和恢复系数为零。B 的新速度是多少？</summary>
+<ol>
+<li>vn=(vB−vA)·n=−5 m/s，总逆质量为 2 kg⁻¹。</li>
+<li>冲量大小 j=5/2 N·s，乘 n 后得到 P=(1.5,2) N·s。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　B 的新速度是 (1.5,2) m/s。</p>
+</details>
+<details class="math-question">
+<summary>平面上的四个活动块形成接触 A–B、B–C、C–D。假设一项工作只更新自己那对方块的速度，哪两项可以在同一批并行，哪项要等？</summary>
+<ol>
+<li>A–B 写 A、B，C–D 写 C、D，二者没有共同刚体。</li>
+<li>B–C 同时需要 B 和 C 的速度，与另外两项都有写冲突。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　可先并行 A–B 和 C–D，再执行 B–C。这是无写冲突的一种分批方式。</p>
+</details>
+</section>
+
+<h3 id="havok-jobs">Havok 2013.2：一个世界里的两堆碎块，谁来算？</h3>
+<p>取一个 1/60 秒的教学步长。地板左边的 A、B 正在碰撞，右边的 C、D 也在碰撞。假设这一步开始时它们恰好组成两个活跃的 <em>simulation island</em>（模拟岛），两个岛之间没有接触或其他约束。左边求冲量要同时读写 A、B 的速度；右边求冲量只涉及 C、D。两块工作能否同时进行，取决于这个世界走哪一个步进入口。</p>
+<figure class="call-tree"><figcaption>沿农舍默认路径读源码，缩进一层表示进入下一层调用。求解器的三个子节点发生在有约束的岛上。</figcaption>
+ <ul><li><code>ABFVFarmActor::HavokTick</code> <span>农舍 Actor 收到本次步长</span>
+ <ul><li><code>bfvStep → hkpWorld::stepDeltaTime</code> <span>从工程包装层进入刚体世界</span>
+ <ul><li><code>hkpSimulation::stepDeltaTime</code> <span>组织这一帧的三个阶段</span>
+ <ul><li><code>integrate → integrateIsland</code> <span>逐个处理活动岛</span>
+ <ul><li><code>hkpConstraintSolverSetup::solve</code>
+ <ul><li><code>_buildAccumulators</code> <span>收集刚体速度</span></li>
+ <li><code>_buildJacobianElements</code> <span>把接触和关节写成约束</span></li>
+ <li><code>hkSolveConstraints</code> <span>迭代求解，再写回运动结果</span></li></ul></li></ul></li>
+ <li><code>collide</code> <span>宽相找候选，窄相更新接触</span></li>
+ <li><code>advanceTime</code> <span>推进模拟时间</span></li>
+ </ul></li></ul></li></ul></li></ul></figure>
+ <p>例如 A、B 已经贴住，上一步留下的接触会进入这一步的约束求解。一条法向约束会读取两块沿接触法线的相对速度，按逆质量和接触力臂求修正，再改写速度。若岛里没有待求的约束，<code>integrateIsland</code> 可以直接施力、积分和更新包围盒。上图中的函数名和调用顺序可在 <code>hkpSimulation.cpp</code> 与 <code>hkpConstraintSolverSetup.cpp</code> 核对。</p>
+ <p><b>先跟项目实际调用的那条线。</b> 农舍的 <code>ABFVFarmActor::HavokTick</code> 在游戏线程上依次做步前同步、调用 <code>bfvStep</code>、做步后处理。创建世界时 <code>bfvCreateWorld</code> 选的是离散模拟 <code>SIMULATION_TYPE_DISCRETE</code>。进入 <code>hkpSimulation</code> 后，正常的一步是先积分，再碰撞，再推进模拟时间。积分阶段的循环取出一个活跃岛，调用 <code>integrateIsland</code>，返回后才取下一个岛。在这条路径中，两个岛都是当前调用线程算的。农舍把 Tick 收到的 <code>DeltaSeconds</code> 向下传递。</p>
+<p><b>SDK 还提供世界内部的任务队列。</b> 在支持该模式的 CPU 构建中，世界选用 <code>SIMULATION_TYPE_MULTITHREADED</code>，并用 <code>registerWithJobQueue</code> 登记动力学和碰撞的任务处理函数。下面沿 <code>hkpWorld::stepMultithreaded</code> 的调用顺序，看同样两个活跃岛怎么走：</p>
+<ol>
+  <li><b>准备任务。</b> 调用线程从 <code>initMtStep</code> 进入 <code>stepBeginSt</code>。这里取得活跃岛数，向 <code>hkJobQueue</code> 放进一个覆盖这批岛的 <code>hkpIntegrateJob</code>。有两个岛时，队列起初也只需一条记录。</li>
+  <li><b>让线程来取。</b> <code>hkCpuJobThreadPool::processAllJobs</code> 把这条队列交给线程池。worker 的入口 <code>workerFunction</code> 调用队列的 <code>processAllJobs</code>。发起步进的线程也会调用同一个队列的 <code>processAllJobs</code>，可以亲自做一部分工作。</li>
+  <li><b>一次领出一个岛。</b> 出队时 <code>hkpIntegrateJob::popJobTask</code> 先交出一个岛，把剩余岛的索引留在队列里。某个线程可以领到 A、B，另一个线程可以领到 C、D。<code>hkJobQueue</code> 按任务类型与子类型派发；动力学处理函数把积分任务交给 <code>integrateJob</code>。其中有针对小岛的直接求解分支，也有继续派发准备速度数据、构建约束等子任务的分支。一座岛可以衍生多个任务，线程和岛没有固定对应关系。</li>
+  <li><b>收尾。</b> 调用线程处理完自己能取的工作，再调用线程池的 <code>waitForCompletion</code>，随后进入 <code>finishMtStep</code> 做本步的收尾。这样，调用者在整个步进返回后才能使用步后的世界状态。</li>
+</ol>
+<pre aria-label="同一世界的离散与多线程步进"><code>教学伪码 · 按源码调用顺序简化
+农舍默认步进（游戏线程）
+  对每个活跃岛：在当前线程完成该岛的积分
+  处理碰撞，推进世界时间
+
+SDK 世界内多线程步进
+  调用线程：初始化本步，把活跃岛范围入队
+  CPU 线程池：worker 从队列领取可运行的工作
+  调用线程：也从队列取工作 → 等待 worker → 完成本步</code></pre>
+<p>工程里还有一个容易混淆的开关 <code>-bfvparallelstep</code>。开启后，<code>ABFVStepCoordinator</code> 收集每栋农舍自己的 world，调用 <code>bfvStepMany</code>。自建 <code>StepPool</code> 的 worker 按索引领取一整个 world，再对它调用同一个离散 <code>bfvStep</code>。两栋农舍可以同时步进；如果上述两堆碎块都在同一栋农舍里，它们仍落在同一次 world 调用里。只有一个 world 或只用一个线程时，包装层直接循环。这里追到的是项目 CPU 对照与随包 Physics2012 源码，零售游戏运行时的线程分配没有包含在这些记录里。</p>
+<p><small>代码定位：工程 <code>BFVFarmActor.cpp</code>、<code>BFVStepCoordinator.cpp</code>、<code>BFVHavok.cpp</code>；SDK 的 <code>hkpWorld.cpp</code>、<code>hkpSimulation.cpp</code>、<code>hkpMultithreadedSimulation.cpp</code>、<code>hkpDynamicsJobs.inl</code>、<code>hkJobQueue.cpp</code> 与 <code>hkCpuJobThreadPool.cpp</code>。</small></p>
+<section class="problems" aria-label="Havok 的二维练习" data-topic="havok-jobs"><p class="problem-label">二维练习</p>
+<details class="math-question"><summary>平面上有四个半径均为 0.5 m 的动态圆片，圆心依次为 A(0,0)、B(0.8,0.6)、C(4,3)、D(4.8,3.6)。圆片恰好接触就连一条边，除此之外没有约束。按接触连通性分组，哪些刚体必须在同一组求解？</summary><p>A 到 B 的距离为 √(0.8²+0.6²)=1 m，C 到 D 也是 1 m，都等于两半径之和。两组间最近的是 B、C，距离 √(3.2²+2.4²)=4 m。接触图有 {A,B}、{C,D} 两个连通组，可以分别处理。组数本身不能推出实际用了几个 worker；引擎也可能把小组并到同一个调度单元。</p></details>
+<details class="math-question"><summary>沿用两个独立岛。把速度看成本步接触求解后的给定值，各岛内两片的速度分别相同。A、B 为 (3,−6) m/s，C、D 为 (−1.5,3) m/s，接下来 1/60 s 忽略加速度。即使 C、D 先完成积分，A 和 C 的步后圆心应各在哪？</summary><p>A 的位移是 (3,−6)/60=(0.05,−0.10) m，圆心到 (0.05,−0.10) m。C 的位移是 (−1.5,3)/60=(−0.025,0.05) m，圆心到 (3.975,3.05) m。每组只写自己的刚体，交换积分次序不影响这两个答案。读取整个 world 的步后结果时要等本次步进完成。</p></details>
+</section>
+
+<h3 id="chaos-jobs">Chaos 的 CPU 把哪一段分给别的核？</h3>
+<p>把两摞方块摆在同一块固定地面上。左边的 A 托着 B，B 托着 C。算 A–B 的接触时，求解器会改 B 的状态，随后算 B–C 就要读这个状态。右边 D、E、F 的位置和速度都用不着左边的结果。下面沿 UE 5.8 的刚体路径，看它在哪一步认出这两份独立的工作。</p>
+<figure>
+<svg viewBox="0 0 552 181" role="img" aria-label="左摞从下至上是 A、B、C，右摞是 D、E、F，各自压在同一固定地面。每摞的相邻方块接触，两摞之间没有活动刚体相连。" style="display:block;width:100%;max-width:38rem;height:auto;margin-inline:auto">
+  <g fill="none" stroke-width="2">
+    <path d="M22 150H530" stroke="var(--muted)"/>
+    <g fill="var(--tint)" stroke="var(--a)"><rect x="121" y="114" width="36" height="36"/><rect x="121" y="78" width="36" height="36"/><rect x="121" y="42" width="36" height="36"/></g>
+    <g fill="var(--tint)" stroke="var(--b)"><rect x="395" y="114" width="36" height="36"/><rect x="395" y="78" width="36" height="36"/><rect x="395" y="42" width="36" height="36"/></g>
+  </g>
+  <g fill="var(--heading)" text-anchor="middle" font-size="18">
+    <text x="139" y="138">A</text><text x="139" y="102">B</text><text x="139" y="66">C</text>
+    <text x="413" y="138">D</text><text x="413" y="102">E</text><text x="413" y="66">F</text>
+  </g>
+  <g fill="var(--muted)" text-anchor="middle" font-size="16"><text x="139" y="26">左堆</text><text x="413" y="26">右堆</text><text x="276" y="173">固定地面</text></g>
+</svg>
+<figcaption>把每一摞的三块都设为清醒的动态刚体。接触力会改变方块，固定地面的位姿由场景给定。左右两摞因此可以各自构成一个约束岛。</figcaption>
+</figure>
+<ol>
+<li><b>游戏线程交出时间和输入。</b> 从 <code>FPhysicsSolverBase::AdvanceAndDispatch_External</code> 进。单线程调度分支当场推进；任务分支用 <code>TGraphTask</code> 串起输入处理和 <code>FPhysicsSolverAdvanceTask</code> 等任务。上一次推进若仍在执行，下一次挂上它的完成事件。后者进 <code>FPBDRigidsSolver::AdvanceSolverBy</code>，再由 <code>AdvanceOneTimeStepTask::DoWork</code> 推进每个实际物理子步。这里 <code>DoWork</code> 是直接调用，名字带 Task 并不额外创建一条线程。</li>
+<li><b>先找碰撞，再建图。</b> <code>FPBDRigidsEvolutionGBF::AdvanceOneTimeStepImpl</code> 积分预测位姿，更新空间加速结构。宽相先筛出可能相撞的刚体对。任务路径把候选分到若干工作批次，每个批次里的 <code>ProcessMidPhases</code> 逐对生成碰撞约束；不同批次可以同时做窄相。一个多边形对的 GJK 每一轮要接着上一轮的单纯形往下算。接触出来以后，<code>CreateConstraintGraph</code> 让接触、关节等容器更新图上的边，<code>CreateIslands</code> 更新岛。</li>
+<li><b>把岛装进求解组。</b> <code>FPBDIslandGroupManager::BuildGroups</code> 挑出清醒且有约束的岛，按约束数从多到少装组，同时考虑可用 worker 和每批目标工作量。一组能装下多个小岛。图里这两个岛可以独立求解，实际完全可能装进同一组，省去派发小任务的开销。</li>
+<li><b>组里先准备数据，再迭代，最后写回。</b> 岛组调度 <code>ParallelMode</code> 的源码初值为 2，走 <code>UE::Tasks::Launch</code>；模式 1 走 <code>PhysicsParallelFor</code>，模式 0 顺序处理各组。任务模式给每组建立下面这条依赖链。数据量允许时，读入和写回都能分段；位置、速度、投影阶段各按配置次数执行，后一轮读取前一轮的结果。</li>
+</ol>
+<pre aria-label="Chaos 调用层级示意"><code>AdvanceAndDispatch_External           游戏线程交出输入和步长
+  └─ AdvanceSolverBy                  进入这次推进
+      └─ AdvanceOneTimeStepImpl       每个实际子步
+          ├─ RunBroadPhase / RunNarrowPhase
+          ├─ CreateConstraintGraph / CreateIslands
+          └─ IslandGroupManager       把清醒岛装组，派发可运行的任务</code></pre>
+ <p>位置迭代里也能手算一个简化接触。取同样的 A（2 kg）和 B（1 kg），法线为 (0.6,0.8)。假设两块的预测位置沿这根法线压入了 3 cm，只考虑平移，做一次完整的位置修正。按逆质量 1:2 分摊，A 沿反向挪 1 cm，即 (−0.6,−0.8) cm；B 沿正向挪 2 cm，即 (1.2,1.6) cm。两者相对分开了 3 cm。真实求解还会处理角运动、摩擦和迭代设置。</p>
+<pre><code>对每个活动组，可并行开始
+  读入刚体 → 读入接触与关节
+  → 位置迭代 → 速度迭代 → 投影迭代
+  → 写回约束 → 写回刚体
+等待所有组完成，再使用本步的结果</code></pre>
+<p><b>颜色是组内另一层选择。</b> 允许分区的求解器可以把不共用可写动态刚体的约束涂成同一色。同色任务能并行，不同色依次执行。比如左摞的“地面–A”和“B–C”能用同一色，“A–B”必须另排一色。在这份源码中，<code>PartitionManager.Partitioning</code> 初值是 0，组内贪心着色默认关闭。开启后还会检查求解器是否支持，以及这一组该类约束的数量是否达到门槛（初值 1,000）。标量碰撞容器支持这条分区路径，SIMD 碰撞容器在这处返回不支持。不要从三块方块的配色推算引擎为它派了几个任务。</p>
+<p><b>异步物理和步内并行可以分别观察。</b> 前者关系到游戏线程何时等待或消费物理结果；后者关系到这一物理步里有哪些工作可以摊给 worker。源码里的 <code>p.PhysicsRunsOnGT</code> 就能把顶层推进任务安排回游戏线程，碰撞批次仍可分发。<code>p.Chaos.SingleWorkerPhysics</code> 则能收窄宽窄相与岛组的 worker 路径。实际用了几核、左右两堆是否同时执行，要看该次运行的配置和任务轨迹。</p>
+<p>可按这几个文件回查：顶层派发在 <code>PhysicsSolverBase.cpp</code>，子步在 <code>PBDRigidsSolver.cpp</code>、<code>PBDRigidsEvolutionGBF.cpp</code>，碰撞批次在 <code>SpatialAccelerationBroadPhase.cpp</code>，分组与组内配色分别在 <code>IslandGroupManager.cpp</code>、<code>SolverPartitionManager.cpp</code> 和 <code>ConstraintGroupSolver.cpp</code>。<a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Chaos/FPhysicsSolverBase">Epic 的 solver API</a> · <a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Chaos/FPBDIslandManager">Epic 的岛管理器 API</a> · <a href="https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/Chaos/FConstraintContainerSolver?application_version=5.8">Epic 对岛组并行求解的说明</a></p>
+<section class="problems" aria-label="Chaos CPU 的二维练习" data-topic="chaos-jobs"><p class="problem-label">二维练习</p>
+<details class="math-question"><summary>方格纸上，左右两摞的底面都压在固定地面。现在给最上层 C、F 之间加一根距离关节。加之前和之后，各有几个动态约束岛？</summary><p>先从 C 沿动态约束往下走，只能到 B 和 A。D、E、F 组成另一个连通分量。固定地面提供接触边界，两堆都不会改写它的运动状态。加 C–F 关节后，可以沿 A–B–C–F–E–D 走遍六块。</p><p><b>答案：</b>岛数从 2 变成 1。还可以把碰撞检测拆批，但整摞左边和整摞右边已经不能独立求解。</p></details>
+<details class="math-question"><summary>看左摞的三个接触。假设“地面–A”“A–B”“B–C”分别要 2、3、4 个时间单位。两名 worker 按颜色逐批做一轮，忽略派发开销，最短多久？</summary><p>“地面–A”和“B–C”修改的动态刚体不重合，可放到第一色。这一批用时 max(2,4)=4。“A–B”与前两项各共享一个刚体，单独一色，要 3。反过来先做“A–B”也一样。</p><p><b>答案：</b>两色共 7 个时间单位，逐项执行共 9 个。这是假设已经启用分色的排程算例。</p></details>
+</section>
+
+<h3 id="chaos-gpu">Chaos 的哪一步在 CPU 上？GPU 又算什么？</h3>
+<p>沿用文末那对边长 2 cm 的正方形。A 的左下角在 (0,0)，B 的左下角在 (1.5,1)。固定 A，B 向右移 0.5 cm 就刚好贴住。这个几何答案在纸上已经能算出来。放进引擎，还要追一层：<strong>哪段代码生成接触，又是哪段代码写回刚体的速度和位姿？</strong></p>
+<div class="table-wrap"><table>
+<caption>同一帧里，物理线程、GPU 场查询和刚体计算着色器各自交付什么</caption>
+<thead><tr><th scope="col">代码路径</th><th scope="col">输入和输出</th><th scope="col">执行位置</th></tr></thead>
+<tbody>
+<tr><th scope="row">UE 5.8 的 Chaos 世界刚体</th><td>由形状对生成接触，再把接触等约束分组求解，更新刚体状态。</td><td>本次核对的 C++ 路径在 CPU 上。可把各岛组分配给工作线程。</td></tr>
+<tr><th scope="row">UE 的世界物理场</th><td>在给定位置读取力、速度等配置的场数据。Niagara 或材质可从分级网格（clip map）取样，得到该位置的场值。</td><td>这种取样可以在 GPU 上运行。它的输出是场值；两方块之间的接触仍由各自的刚体后端处理。</td></tr>
+<tr><th scope="row">本项目的 BFVGpuSim</th><td>提交候选凸包对，生成接触，运行约束迭代，再从 GPU 回读位姿和事件。</td><td>CPU 通过 UE 渲染依赖图（RDG）提交计算任务，GPU 执行项目自己的计算着色器。</td></tr>
+</tbody></table></div>
+<p>看 Chaos 的 <code>PBDRigidsEvolutionGBF.cpp</code>，一个物理步里先调用 <code>RunBroadPhase</code>、<code>RunNarrowPhase</code>，再交给 <code>IslandGroupManager.Solve</code>。跟进 <code>IslandGroupManager.cpp</code>，能看到工作由 <code>PhysicsParallelFor</code> 或 <code>UE::Tasks::Launch</code> 分发。这里开并行，是让多个 CPU 任务分担约束。<a href="https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/Chaos/FPBDIslandGroupManager?application_version=5.8">Epic 的岛组求解 API</a></p>
+<p>对于本文追踪的 UE 5.8 世界刚体求解，没有找到把这两块的通用碰撞与约束迭代直接切到 GPU 的入口。另一个能确认的 GPU 用例是 Chaos Flesh 的轮胎演示：它把轮胎表面采样结果写入纹理，GPU 用这些数据移动可见轮胎的网格顶点。这个 pass 写的是渲染顶点；要判断是否把默认世界刚体移到 GPU，还得找到写刚体位姿与速度的求解 pass。<a href="https://dev.epicgames.com/documentation/unreal-engine/chaos-flesh-quickstart?application_version=5.8">Epic 的轮胎形变示例</a></p>
+<p>再看项目的 <code>BFVGpuWorld.cpp</code> 和 <code>BFVGpuSimStep.usf</code>。前者登记并派发 compute pass，后者实际读写 GPU 缓冲区。下面取把窄相拆成两个 pass 的 GPU 变体 5。教学伪代码省略缓存、休眠和容量检查。</p>
+<pre><code>候选对 = GPU宽相找邻居(各刚体的包围体)
+可能接触的对 = NarrowCS(候选对)          // 用 GJK 距离与接触容差筛选
+接触 = ManifoldCS(可能接触的对)          // 穿透时沿 SAT 轴生成接触
+GPU求解(接触, 刚体状态缓冲)             // 按所选变体更新速度和位姿
+排入回读队列(位姿, 事件)</code></pre>
+<p>因此，看到 GPU 给粒子采样风场，只能定位到表中第二行。要确认当前方块的碰撞由 GPU 计算，可以在捕获中找自研插件的 <code>BFV.Narrow</code>、<code>BFV.Manifold</code> 及求解 pass。Epic 对场数据的 CPU 与 GPU 消费者分别有说明。<a href="https://dev.epicgames.com/community/learning/tutorials/Y5p7/unreal-engine-world-physics-fields">Epic 的 World Physics Fields 教程</a> · <a href="https://dev.epicgames.com/documentation/unreal-engine/API/Plugins/ChaosNiagara/UNiagaraDataInterfacePhysicsFiel-?application_version=5.8">ChaosNiagara 场查询接口</a></p>
+<div class="problems" data-topic="chaos-gpu">
+<p class="problem-label">二维练习</p>
+<details class="math-question"><summary>固定 A，将 B 从 (1.5,1) 平移 (+0.25,−0.5) cm。新的最短推出向量是多少？改由 GPU 计算会改变这项几何结果吗？</summary><ol><li>B 的新左下角在 (1.75,0.5)。向右推到 A 的右边，需要 2−1.75=0.25 cm；向上需 2−0.5=1.5 cm。</li><li>向左、向下分别需 3.75、2.5 cm。沿坐标轴推出最短的是向右。</li></ol><p class="answer">平移 (+0.25,0) cm。对相同形状、姿态和几何定义，这个理想值与执行设备无关。实际程序还要考虑浮点误差与接触容差。</p></details>
+<details class="math-question"><summary>平面场网格的一格宽、高各为 2。左下、右下、左上、右上角的场向量依次是 (0,0)、(4,0)、(0,2)、(4,6)。在距左下角 (0.5,1.5) 处双线性采样，会读到哪个向量？</summary><ol><li>横向权重是 0.5/2=¼。先沿下边和上边分别插值，得到 (1,0) 和 (1,3)。</li><li>纵向权重是 1.5/2=¾。在这两个向量之间取四分之三，得到 (1,2.25)。</li></ol><p class="answer">GPU 场查询可以返回 (1,2.25)。要得到方块的接触法线，还需要输入两个方块的几何和位姿。</p></details>
+</div>
+
+<p>回到开头那笔冲量：几何查询给出方向和接触点，求解器用它们改刚体状态，调度器处理哪些计算可以同时做。看性能时也应分别找到这三段。</p>
+<h2 id="summary">总结：同一对方块的四种状态</h2>
+<p>画两个边长 2 cm 的正方形，边都平行于坐标轴。A 的左下角钉在 (0,0)，只移动 B。先看两块之间的缝，再看右图的原点落在灰色差集的哪里。两幅图中每一格都表示 1 cm。</p>
+<fieldset class="case-switch"><legend>换一个 B 的位置</legend><input class="case-radio" id="case-0" type="radio" name="pose" checked><label for="case-0">分开</label><input class="case-radio" id="case-1" type="radio" name="pose"><label for="case-1">刚好接触</label><input class="case-radio" id="case-2" type="radio" name="pose"><label for="case-2">重叠</label><input class="case-radio" id="case-3" type="radio" name="pose"><label for="case-3">分开后的下一帧</label><div class="case-panels"><div class="case-panel case-0"><p><b>B 的左下角 (4, 3) cm</b></p><div class="case-charts"><div class="case-chart"><b>场景里的 A、B</b><svg role="img" aria-label="分开：场景里的 A、B的平面图" viewBox="0 0 270 213"><title>场景里的 A、B（分开），每格一厘米</title><line x1="18" y1="189" x2="18" y2="27" stroke="var(--line)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--line)"/><line x1="72" y1="189" x2="72" y2="27" stroke="var(--line)"/><line x1="99" y1="189" x2="99" y2="27" stroke="var(--line)"/><line x1="126" y1="189" x2="126" y2="27" stroke="var(--line)"/><line x1="153" y1="189" x2="153" y2="27" stroke="var(--line)"/><line x1="180" y1="189" x2="180" y2="27" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="27" stroke="var(--line)"/><line x1="234" y1="189" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="189" x2="234" y2="189" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--line)"/><line x1="18" y1="135" x2="234" y2="135" stroke="var(--line)"/><line x1="18" y1="108" x2="234" y2="108" stroke="var(--line)"/><line x1="18" y1="81" x2="234" y2="81" stroke="var(--line)"/><line x1="18" y1="54" x2="234" y2="54" stroke="var(--line)"/><line x1="18" y1="27" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--muted)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--muted)"/><text x="236.7" y="166.32" fill="var(--text)" font-size="13">x</text><text x="48.51" y="27" fill="var(--text)" font-size="13">y</text><text x="47.16" y="177.39" fill="var(--text)" font-size="13">O</text><rect x="45" y="108" width="54" height="54" fill="var(--a)" fill-opacity=".19" stroke="var(--a)" stroke-width="2" /><rect x="153" y="27" width="54" height="54" fill="var(--b)" fill-opacity=".19" stroke="var(--b)" stroke-width="2" /><text x="52.56" y="151.74" fill="var(--a)" font-size="13">A</text><text x="183.51" y="50.49" fill="var(--b)" font-size="13">B</text><line x1="99" y1="108" x2="153" y2="81" stroke="var(--ok)" stroke-width="3"/><circle cx="99" cy="108" r="3.4" fill="var(--ok)"/><circle cx="153" cy="81" r="3.4" fill="var(--ok)"/></svg></div><div class="case-chart"><b>差集 A − B</b><svg role="img" aria-label="分开：差集 A − B的平面图" viewBox="0 0 270 213"><title>差集 A − B（分开），每格一厘米</title><line x1="18" y1="189" x2="18" y2="21" stroke="var(--line)"/><line x1="39" y1="189" x2="39" y2="21" stroke="var(--line)"/><line x1="60" y1="189" x2="60" y2="21" stroke="var(--line)"/><line x1="81" y1="189" x2="81" y2="21" stroke="var(--line)"/><line x1="102" y1="189" x2="102" y2="21" stroke="var(--line)"/><line x1="123" y1="189" x2="123" y2="21" stroke="var(--line)"/><line x1="144" y1="189" x2="144" y2="21" stroke="var(--line)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--line)"/><line x1="186" y1="189" x2="186" y2="21" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="21" stroke="var(--line)"/><line x1="228" y1="189" x2="228" y2="21" stroke="var(--line)"/><line x1="249" y1="189" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="189" x2="249" y2="189" stroke="var(--line)"/><line x1="18" y1="168" x2="249" y2="168" stroke="var(--line)"/><line x1="18" y1="147" x2="249" y2="147" stroke="var(--line)"/><line x1="18" y1="126" x2="249" y2="126" stroke="var(--line)"/><line x1="18" y1="105" x2="249" y2="105" stroke="var(--line)"/><line x1="18" y1="84" x2="249" y2="84" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--line)"/><line x1="18" y1="42" x2="249" y2="42" stroke="var(--line)"/><line x1="18" y1="21" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--muted)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--muted)"/><text x="251.1" y="66.36" fill="var(--text)" font-size="13">x</text><text x="167.73" y="21" fill="var(--text)" font-size="13">y</text><text x="166.68" y="74.97" fill="var(--text)" font-size="13">O</text><rect x="39" y="84" width="84" height="84" fill="var(--accent)" fill-opacity=".19" stroke="var(--accent)" stroke-width="2" /><circle cx="165" cy="63" r="3.4" fill="var(--heading)"/><line x1="165" y1="63" x2="123" y2="84" stroke="var(--ok)" stroke-width="3"/><circle cx="123" cy="84" r="3.4" fill="var(--ok)"/></svg></div></div><p>SAT 能找到横向 2 cm、纵向 1 cm 的间隙。场景中真正最近的一对是 a=(2,2)、b=(4,3)。差集最近点 a−b=(−2,−1)，GJK 量到的距离是 √5 ≈ 2.24 cm。</p></div><div class="case-panel case-1"><p><b>B 的左下角 (2, 1) cm</b></p><div class="case-charts"><div class="case-chart"><b>场景里的 A、B</b><svg role="img" aria-label="刚好接触：场景里的 A、B的平面图" viewBox="0 0 270 213"><title>场景里的 A、B（刚好接触），每格一厘米</title><line x1="18" y1="189" x2="18" y2="27" stroke="var(--line)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--line)"/><line x1="72" y1="189" x2="72" y2="27" stroke="var(--line)"/><line x1="99" y1="189" x2="99" y2="27" stroke="var(--line)"/><line x1="126" y1="189" x2="126" y2="27" stroke="var(--line)"/><line x1="153" y1="189" x2="153" y2="27" stroke="var(--line)"/><line x1="180" y1="189" x2="180" y2="27" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="27" stroke="var(--line)"/><line x1="234" y1="189" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="189" x2="234" y2="189" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--line)"/><line x1="18" y1="135" x2="234" y2="135" stroke="var(--line)"/><line x1="18" y1="108" x2="234" y2="108" stroke="var(--line)"/><line x1="18" y1="81" x2="234" y2="81" stroke="var(--line)"/><line x1="18" y1="54" x2="234" y2="54" stroke="var(--line)"/><line x1="18" y1="27" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--muted)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--muted)"/><text x="236.7" y="166.32" fill="var(--text)" font-size="13">x</text><text x="48.51" y="27" fill="var(--text)" font-size="13">y</text><text x="47.16" y="177.39" fill="var(--text)" font-size="13">O</text><rect x="45" y="108" width="54" height="54" fill="var(--a)" fill-opacity=".19" stroke="var(--a)" stroke-width="2" /><rect x="99" y="81" width="54" height="54" fill="var(--b)" fill-opacity=".19" stroke="var(--b)" stroke-width="2" /><text x="52.56" y="151.74" fill="var(--a)" font-size="13">A</text><text x="129.51" y="104.49" fill="var(--b)" font-size="13">B</text><line x1="99" y1="135" x2="99" y2="108" stroke="var(--ok)" stroke-width="4"/></svg></div><div class="case-chart"><b>差集 A − B</b><svg role="img" aria-label="刚好接触：差集 A − B的平面图" viewBox="0 0 270 213"><title>差集 A − B（刚好接触），每格一厘米</title><line x1="18" y1="189" x2="18" y2="21" stroke="var(--line)"/><line x1="39" y1="189" x2="39" y2="21" stroke="var(--line)"/><line x1="60" y1="189" x2="60" y2="21" stroke="var(--line)"/><line x1="81" y1="189" x2="81" y2="21" stroke="var(--line)"/><line x1="102" y1="189" x2="102" y2="21" stroke="var(--line)"/><line x1="123" y1="189" x2="123" y2="21" stroke="var(--line)"/><line x1="144" y1="189" x2="144" y2="21" stroke="var(--line)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--line)"/><line x1="186" y1="189" x2="186" y2="21" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="21" stroke="var(--line)"/><line x1="228" y1="189" x2="228" y2="21" stroke="var(--line)"/><line x1="249" y1="189" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="189" x2="249" y2="189" stroke="var(--line)"/><line x1="18" y1="168" x2="249" y2="168" stroke="var(--line)"/><line x1="18" y1="147" x2="249" y2="147" stroke="var(--line)"/><line x1="18" y1="126" x2="249" y2="126" stroke="var(--line)"/><line x1="18" y1="105" x2="249" y2="105" stroke="var(--line)"/><line x1="18" y1="84" x2="249" y2="84" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--line)"/><line x1="18" y1="42" x2="249" y2="42" stroke="var(--line)"/><line x1="18" y1="21" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--muted)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--muted)"/><text x="251.1" y="66.36" fill="var(--text)" font-size="13">x</text><text x="167.73" y="21" fill="var(--text)" font-size="13">y</text><text x="166.68" y="74.97" fill="var(--text)" font-size="13">O</text><rect x="81" y="42" width="84" height="84" fill="var(--accent)" fill-opacity=".19" stroke="var(--accent)" stroke-width="2" /><circle cx="165" cy="63" r="3.4" fill="var(--heading)"/><line x1="165" y1="63" x2="165" y2="63" stroke="var(--ok)" stroke-width="3"/><circle cx="165" cy="63" r="3.4" fill="var(--ok)"/></svg></div></div><p>A 的右边和 B 的左边在 x=2 重合，从 y=1 一直贴到 y=2。差集的右边落在 x=0，原点就在边上。最近距离和穿透深度都等于零。</p></div><div class="case-panel case-2"><p><b>B 的左下角 (1.5, 1) cm</b></p><div class="case-charts"><div class="case-chart"><b>场景里的 A、B</b><svg role="img" aria-label="重叠：场景里的 A、B的平面图" viewBox="0 0 270 213"><title>场景里的 A、B（重叠），每格一厘米</title><line x1="18" y1="189" x2="18" y2="27" stroke="var(--line)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--line)"/><line x1="72" y1="189" x2="72" y2="27" stroke="var(--line)"/><line x1="99" y1="189" x2="99" y2="27" stroke="var(--line)"/><line x1="126" y1="189" x2="126" y2="27" stroke="var(--line)"/><line x1="153" y1="189" x2="153" y2="27" stroke="var(--line)"/><line x1="180" y1="189" x2="180" y2="27" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="27" stroke="var(--line)"/><line x1="234" y1="189" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="189" x2="234" y2="189" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--line)"/><line x1="18" y1="135" x2="234" y2="135" stroke="var(--line)"/><line x1="18" y1="108" x2="234" y2="108" stroke="var(--line)"/><line x1="18" y1="81" x2="234" y2="81" stroke="var(--line)"/><line x1="18" y1="54" x2="234" y2="54" stroke="var(--line)"/><line x1="18" y1="27" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--muted)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--muted)"/><text x="236.7" y="166.32" fill="var(--text)" font-size="13">x</text><text x="48.51" y="27" fill="var(--text)" font-size="13">y</text><text x="47.16" y="177.39" fill="var(--text)" font-size="13">O</text><rect x="45" y="108" width="54" height="54" fill="var(--a)" fill-opacity=".19" stroke="var(--a)" stroke-width="2" /><rect x="85.5" y="81" width="54" height="54" fill="var(--b)" fill-opacity=".19" stroke="var(--b)" stroke-width="2" /><text x="52.56" y="151.74" fill="var(--a)" font-size="13">A</text><text x="116.01" y="104.49" fill="var(--b)" font-size="13">B</text><rect x="99" y="81" width="54" height="54" fill="none" fill-opacity=".19" stroke="var(--ok)" stroke-width="2" stroke-dasharray="5 4"/><line x1="85.5" y1="121.5" x2="99" y2="121.5" stroke="var(--ok)" stroke-width="3"/></svg></div><div class="case-chart"><b>差集 A − B</b><svg role="img" aria-label="重叠：差集 A − B的平面图" viewBox="0 0 270 213"><title>差集 A − B（重叠），每格一厘米</title><line x1="18" y1="189" x2="18" y2="21" stroke="var(--line)"/><line x1="39" y1="189" x2="39" y2="21" stroke="var(--line)"/><line x1="60" y1="189" x2="60" y2="21" stroke="var(--line)"/><line x1="81" y1="189" x2="81" y2="21" stroke="var(--line)"/><line x1="102" y1="189" x2="102" y2="21" stroke="var(--line)"/><line x1="123" y1="189" x2="123" y2="21" stroke="var(--line)"/><line x1="144" y1="189" x2="144" y2="21" stroke="var(--line)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--line)"/><line x1="186" y1="189" x2="186" y2="21" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="21" stroke="var(--line)"/><line x1="228" y1="189" x2="228" y2="21" stroke="var(--line)"/><line x1="249" y1="189" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="189" x2="249" y2="189" stroke="var(--line)"/><line x1="18" y1="168" x2="249" y2="168" stroke="var(--line)"/><line x1="18" y1="147" x2="249" y2="147" stroke="var(--line)"/><line x1="18" y1="126" x2="249" y2="126" stroke="var(--line)"/><line x1="18" y1="105" x2="249" y2="105" stroke="var(--line)"/><line x1="18" y1="84" x2="249" y2="84" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--line)"/><line x1="18" y1="42" x2="249" y2="42" stroke="var(--line)"/><line x1="18" y1="21" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--muted)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--muted)"/><text x="251.1" y="66.36" fill="var(--text)" font-size="13">x</text><text x="167.73" y="21" fill="var(--text)" font-size="13">y</text><text x="166.68" y="74.97" fill="var(--text)" font-size="13">O</text><rect x="91.5" y="42" width="84" height="84" fill="var(--accent)" fill-opacity=".19" stroke="var(--accent)" stroke-width="2" /><circle cx="165" cy="63" r="3.4" fill="var(--heading)"/><line x1="165" y1="63" x2="175.5" y2="63" stroke="var(--ok)" stroke-width="3"/><circle cx="175.5" cy="63" r="3.4" fill="var(--ok)"/></svg></div></div><p>这次原点进了差集。差集右边在 x=0.5，上边在 y=1；到右边更近。EPA 会找到最近的出口 (0.5,0)，SAT 也会选同一条轴。固定 A，让 B 向右走 0.5 cm，便到了虚线位置。</p></div><div class="case-panel case-3"><p><b>B 的左下角 (3.8, 2.9) cm</b></p><div class="case-charts"><div class="case-chart"><b>场景里的 A、B</b><svg role="img" aria-label="下一帧：场景里的 A、B的平面图" viewBox="0 0 270 213"><title>场景里的 A、B（下一帧），每格一厘米</title><line x1="18" y1="189" x2="18" y2="27" stroke="var(--line)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--line)"/><line x1="72" y1="189" x2="72" y2="27" stroke="var(--line)"/><line x1="99" y1="189" x2="99" y2="27" stroke="var(--line)"/><line x1="126" y1="189" x2="126" y2="27" stroke="var(--line)"/><line x1="153" y1="189" x2="153" y2="27" stroke="var(--line)"/><line x1="180" y1="189" x2="180" y2="27" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="27" stroke="var(--line)"/><line x1="234" y1="189" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="189" x2="234" y2="189" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--line)"/><line x1="18" y1="135" x2="234" y2="135" stroke="var(--line)"/><line x1="18" y1="108" x2="234" y2="108" stroke="var(--line)"/><line x1="18" y1="81" x2="234" y2="81" stroke="var(--line)"/><line x1="18" y1="54" x2="234" y2="54" stroke="var(--line)"/><line x1="18" y1="27" x2="234" y2="27" stroke="var(--line)"/><line x1="18" y1="162" x2="234" y2="162" stroke="var(--muted)"/><line x1="45" y1="189" x2="45" y2="27" stroke="var(--muted)"/><text x="236.7" y="166.32" fill="var(--text)" font-size="13">x</text><text x="48.51" y="27" fill="var(--text)" font-size="13">y</text><text x="47.16" y="177.39" fill="var(--text)" font-size="13">O</text><rect x="153" y="27" width="54" height="54" fill="none" fill-opacity=".19" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><rect x="45" y="108" width="54" height="54" fill="var(--a)" fill-opacity=".19" stroke="var(--a)" stroke-width="2" /><rect x="147.6" y="29.7" width="54" height="54" fill="var(--b)" fill-opacity=".19" stroke="var(--b)" stroke-width="2" /><text x="52.56" y="151.74" fill="var(--a)" font-size="13">A</text><text x="178.11" y="53.19" fill="var(--b)" font-size="13">B</text><line x1="99" y1="108" x2="147.6" y2="83.7" stroke="var(--ok)" stroke-width="3"/><circle cx="99" cy="108" r="3.4" fill="var(--ok)"/><circle cx="147.6" cy="83.7" r="3.4" fill="var(--ok)"/></svg></div><div class="case-chart"><b>差集 A − B</b><svg role="img" aria-label="下一帧：差集 A − B的平面图" viewBox="0 0 270 213"><title>差集 A − B（下一帧），每格一厘米</title><line x1="18" y1="189" x2="18" y2="21" stroke="var(--line)"/><line x1="39" y1="189" x2="39" y2="21" stroke="var(--line)"/><line x1="60" y1="189" x2="60" y2="21" stroke="var(--line)"/><line x1="81" y1="189" x2="81" y2="21" stroke="var(--line)"/><line x1="102" y1="189" x2="102" y2="21" stroke="var(--line)"/><line x1="123" y1="189" x2="123" y2="21" stroke="var(--line)"/><line x1="144" y1="189" x2="144" y2="21" stroke="var(--line)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--line)"/><line x1="186" y1="189" x2="186" y2="21" stroke="var(--line)"/><line x1="207" y1="189" x2="207" y2="21" stroke="var(--line)"/><line x1="228" y1="189" x2="228" y2="21" stroke="var(--line)"/><line x1="249" y1="189" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="189" x2="249" y2="189" stroke="var(--line)"/><line x1="18" y1="168" x2="249" y2="168" stroke="var(--line)"/><line x1="18" y1="147" x2="249" y2="147" stroke="var(--line)"/><line x1="18" y1="126" x2="249" y2="126" stroke="var(--line)"/><line x1="18" y1="105" x2="249" y2="105" stroke="var(--line)"/><line x1="18" y1="84" x2="249" y2="84" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--line)"/><line x1="18" y1="42" x2="249" y2="42" stroke="var(--line)"/><line x1="18" y1="21" x2="249" y2="21" stroke="var(--line)"/><line x1="18" y1="63" x2="249" y2="63" stroke="var(--muted)"/><line x1="165" y1="189" x2="165" y2="21" stroke="var(--muted)"/><text x="251.1" y="66.36" fill="var(--text)" font-size="13">x</text><text x="167.73" y="21" fill="var(--text)" font-size="13">y</text><text x="166.68" y="74.97" fill="var(--text)" font-size="13">O</text><rect x="43.2" y="81.9" width="84" height="84" fill="var(--accent)" fill-opacity=".19" stroke="var(--accent)" stroke-width="2" /><circle cx="165" cy="63" r="3.4" fill="var(--heading)"/><line x1="165" y1="63" x2="127.2" y2="81.9" stroke="var(--ok)" stroke-width="3"/><circle cx="127.2" cy="81.9" r="3.4" fill="var(--ok)"/></svg></div></div><p>从第一幅的 B=(4,3) 出发，平移 (−0.2,−0.1) cm，不转动。缓存的分离法线从 A 指向 B，为 (2,1)/√5。间隙最多缩短 0.5/√5 ≈ 0.22 cm，所以本帧至少还隔着 2.01 cm。若接触容差是 0.1 cm，GSK 的运动界限检查就能跳过这次 GJK。</p></div></div></fieldset>
+<p>做题时先问：原点在差集外、边上，还是里面？在外面，用 GJK 找最近点；到了里面，用 EPA 找最近的边，或用 SAT 比较沿各条边法线的推出量。下一帧先拿上一步的距离和法线算一笔：如果连最乐观的靠近量都填不平那条缝，就省下一次完整查询。</p>
+<section class="problems" aria-label="本节的二维计算题" data-topic="summary">
+<p class="problem-label">二维练习</p>
+<details class="math-question">
+<summary>仍用这两个边长 2 cm 的方块。把 B 的左下角换成 (3,4) cm，A 到 B 的最近向量是多少？如果把横轴上的间隙直接当距离，会少算多少？</summary>
+<ol>
+<li>最近点分别是 A 的 (2,2) 与 B 的 (3,4)，从 A 指向 B 的向量为 (1,2)。</li>
+<li>最短距离为 √5 cm，横轴只量到 1 cm。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　少算 √5−1≈1.24 cm；真正的最近方向斜向右上。</p>
+</details>
+<details class="math-question">
+<summary>B 的左下角换成 (1.75,1.5) cm。两块都可以移动，A 的质量是 B 的三倍。先找最短推出方向，再按逆质量分摊平移量。</summary>
+<ol>
+<li>B 固定朝右移动需 2−1.75=0.25 cm，朝上需 2−1.5=0.5 cm，反方向都更远，故选 +x。</li>
+<li>逆质量比 A:B 为 1:3。A 朝左分担 1/4，B 朝右分担 3/4。</li>
+</ol>
+<p class="answer"><strong>答案</strong>　A 移 (−0.0625,0) cm，B 移 (0.1875,0) cm，相对分开 0.25 cm。</p>
+</details>
+</section>
+
+<p><a href="../home/#articles">返回文章归档</a></p>
 </article>
 </main>
 </div>
@@ -564,11 +1326,6 @@ function drawOrigin2D(g,p,occupied=[]){
   g.moveTo(p.x-7,p.y);g.lineTo(p.x+7,p.y);g.moveTo(p.x,p.y-7);g.lineTo(p.x,p.y+7);g.stroke();
   g.fillStyle=C.head;g.beginPath();g.arc(p.x,p.y,2,0,2*Math.PI);g.fill();
   drawOriginLabel(g,p,'原点 (0, 0)',occupied);g.restore();
-}
-function drawOrigin1D(g,x,top,bottom){
-  g.save();g.font='13px '+css('--sans');g.setLineDash([]);
-  g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();g.moveTo(x,top);g.lineTo(x,bottom);g.stroke();
-  drawOriginLabel(g,V(x,top),'原点 (0)');g.restore();
 }
 function hexA(c,a){const n=parseInt(c.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
 function dragB(cv,toWorld,onChange){
@@ -732,51 +1489,7 @@ function gjk(A,B,warmIds){
   window.addEventListener('resize',()=>{S.fit();draw()});draw();
 })();
 
-// ---------- Figure 2c: 1D, every pair ----------
-(function(){
-  const cv=document.getElementById('cP1'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('p1Out');
-  const A=[2,3,4,5],B=[4,5,6,7];let done=new Set(),hover=null,anim=null;
-  const L=()=>{const W=cv.width/S.dpr;const cell=Math.min(56,(W*0.42)/5),gx=24,gy=60;const rx=gx+cell*5+40;return {W,cell,gx,gy,rx,rw:W-rx-30}};
-  const numX=(v,lo,hi)=>{const l=L();return l.rx+((v-lo)/(hi-lo))*l.rw};
-  function axis(y,lo,hi,label){const l=L();g.strokeStyle=C.line;g.lineWidth=1;g.beginPath();g.moveTo(l.rx,y);g.lineTo(l.rx+l.rw,y);g.stroke();
-    g.font='12px '+css('--mono');g.fillStyle=C.muted;for(let v=lo;v<=hi;v++){const x=numX(v,lo,hi);g.fillRect(x,y-3,1,6);g.fillText((v<0?'−':'')+Math.abs(v),x-(v<0?8:3),y+18)}
-    g.font='13px '+css('--sans');g.fillStyle=C.text;g.fillText(label,l.rx,y-38)}
-  function draw(){
-    const l=L();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,l.W,S.h);
-    g.font='13px '+css('--sans');g.fillStyle=C.text;g.fillText('每一对 (a, b) 的 a − b',l.gx,24);
-    g.fillStyle=C.b;g.fillText('b →',l.gx+l.cell*0.2,l.gy-12+0);
-    B.forEach((b,j)=>{g.fillStyle=C.b;g.font='14px '+css('--mono');g.fillText(String(b),l.gx+l.cell*(j+1)+l.cell*0.4,l.gy+l.cell*0.6)});
-    A.forEach((a,i)=>{g.fillStyle=C.a;g.fillText(String(a),l.gx+l.cell*0.4,l.gy+l.cell*(i+1)+l.cell*0.6)});
-    g.fillStyle=C.a;g.font='13px '+css('--sans');g.fillText('a ↓',l.gx,l.gy+l.cell*0.25);
-    A.forEach((a,i)=>B.forEach((b,j)=>{const x=l.gx+l.cell*(j+1),y=l.gy+l.cell*(i+1),d=a-b,key=i+','+j;
-      const isH=hover&&hover[0]===i&&hover[1]===j;const shown=done.has(key)||isH;
-      g.fillStyle=d===0?(shown?hexA(C.bad,0.55):hexA(C.bad,0.15)):(shown?'rgba(232,232,228,0.10)':'rgba(232,232,228,0.03)');g.fillRect(x+2,y+2,l.cell-4,l.cell-4);
-      if(isH){g.strokeStyle=C.head;g.lineWidth=2;g.strokeRect(x+2,y+2,l.cell-4,l.cell-4)}
-      g.fillStyle=shown?C.head:C.muted;g.font='15px '+css('--mono');const t=(d<0?'−':'')+Math.abs(d);g.fillText(t,x+l.cell*0.5-g.measureText(t).width/2,y+l.cell*0.62)}));
-    // objects line
-    const y1=150,y2=330;axis(y1,0,9,'物体（世界里的位置）');
-    A.forEach(a=>{const x=numX(a,0,9);g.fillStyle=C.a;g.beginPath();g.arc(x,y1-8,6,0,7);g.fill()});
-    B.forEach(b=>{const x=numX(b,0,9);g.fillStyle=C.b;g.beginPath();g.arc(x,y1+8,6,0,7);g.fill()});
-    g.font='12px '+css('--sans');g.fillStyle=C.a;g.fillText('A',numX(2,0,9)-22,y1-4);g.fillStyle=C.b;g.fillText('B',numX(7,0,9)+12,y1+12);
-    axis(y2,-5,1,'A − B（差值的图）');
-    const x0=numX(0,-5,1);drawOrigin1D(g,x0,y2-28,y2+28);
-    const counts={};A.forEach((a,i)=>B.forEach((b,j)=>{const key=i+','+j;if(!done.has(key)&&!(hover&&hover[0]===i&&hover[1]===j))return;const d=a-b;counts[d]=(counts[d]||0)+1;const x=numX(d,-5,1);
-      g.fillStyle=d===0?C.bad:C.ok;g.beginPath();g.arc(x,y2-8-(counts[d]-1)*9,4.5,0,7);g.fill()}));
-    if(hover){const a=A[hover[0]],b=B[hover[1]],xa=numX(a,0,9),xb=numX(b,0,9);
-      g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();g.arc(xa,y1-8,9,0,7);g.stroke();g.beginPath();g.arc(xb,y1+8,9,0,7);g.stroke();
-      if(a!==b){g.strokeStyle=C.ok;g.lineWidth=2;g.beginPath();g.moveTo(xb,y1+30);g.lineTo(xa,y1+30);g.stroke();g.fillStyle=C.ok;g.fillText('b → a',(xa+xb)/2-16,y1+48)}
-      out.textContent=`这一对：a = ${a}（A 里的点），b = ${b}（B 里的点），a − b = ${a-b}。`+(a===b?'\na 和 b 是同一个位置 → 差为 0 → 落在原点上 → 这是一个公共点，所以 A 和 B 相交。':`\n差 ${a-b} 就是“从 b 走到 a 要走多远”（负数表示往左走）。不是 0，说明这两个点不是同一个位置。`);
-    }else out.textContent=`已配对 ${done.size} / 16 对。表格里有 2 格是 0：a = 4、b = 4 和 a = 5、b = 5，这两个位置 A、B 都有，所以相交。\n右下数轴上的点从 −5 到 1，盖住了 0。如果把 B 往右挪到没有公共点，就一格 0 都不会有，数轴上的点也盖不住 0。`;
-  }
-  cv.addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect(),l=L();const x=e.clientX-r.left,y=e.clientY-r.top;const j=Math.floor((x-l.gx)/l.cell)-1,i=Math.floor((y-l.gy)/l.cell)-1;
-    const h=(i>=0&&i<4&&j>=0&&j<4)?[i,j]:null;if(JSON.stringify(h)!==JSON.stringify(hover)){hover=h;if(h)done.add(h[0]+','+h[1]);draw()}});
-  cv.addEventListener('pointerleave',()=>{hover=null;draw()});
-  document.getElementById('p1All').onclick=()=>{clearInterval(anim);done.clear();let k=0;anim=setInterval(()=>{if(k>=16){clearInterval(anim);hover=null;draw();return}hover=[Math.floor(k/4),k%4];done.add(hover[0]+','+hover[1]);k++;draw()},350)};
-  document.getElementById('p1Clear').onclick=()=>{clearInterval(anim);done.clear();hover=null;draw()};
-  window.addEventListener('resize',()=>{S.fit();draw()});draw();
-})();
-
-// ---------- Figure 2d: 2D, drag a and b ----------
+// ---------- Figure 2a: 2D, drag a and b ----------
 (function(){
   const cv=document.getElementById('cP2'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('p2Out');
   const PA=[V(-1.6,-0.9),V(0.4,-1.4),V(1.7,-0.2),V(1.1,1.2),V(-0.7,1.4),V(-1.8,0.3)];
@@ -843,7 +1556,7 @@ function gjk(A,B,warmIds){
   window.addEventListener('resize',()=>{S.fit();draw()});draw();
 })();
 
-// ---------- Figure 2e: building the A - B outline ----------
+// ---------- Figure 2b: building the A - B outline ----------
 (function(){
   const cv=document.getElementById('cOut'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('oOut');
   const A=[V(-1.6,-0.9),V(0.4,-1.4),V(1.7,-0.2),V(1.1,1.2),V(-0.7,1.4),V(-1.8,0.3)];
@@ -914,38 +1627,7 @@ function gjk(A,B,warmIds){
   window.addEventListener('resize',()=>{S.fit();draw()});draw();
 })();
 
-// ---------- Figure 2a: 1D origin ----------
-(function(){
-  const cv=document.getElementById('cO1'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('o1Out');
-  const A=[2,5];let b0=5.5;const BL=3;
-  const view=()=>{const W=cv.width/S.dpr;return {W,x0:60,sc:(W-120)/22,orig:-9}};   // value range [-9, 13]
-  const X=v=>{const w=view();return w.x0+(v-w.orig)*w.sc};
-  function line(y,label){const w=view();g.strokeStyle=C.line;g.lineWidth=1;g.beginPath();g.moveTo(w.x0,y);g.lineTo(w.W-60,y);g.stroke();
-    g.fillStyle=C.muted;g.font='12px '+css('--mono');for(let v=-8;v<=12;v+=2){const x=X(v);g.fillRect(x,y-3,1,6);g.fillText((v<0?'−':'')+Math.abs(v),x-(v<0?8:3),y+18)}
-    g.font='13px '+css('--sans');g.fillStyle=C.text;g.fillText(label,8,y-10)}
-  function bar(lo,hi,y,col,h=10){g.fillStyle=col;g.fillRect(X(lo),y-h/2,X(hi)-X(lo),h)}
-  function draw(){
-    const w=view();g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,w.W,S.h);
-    const B=[b0,b0+BL];
-    line(55,'物体');bar(A[0],A[1],48,hexA(C.a,0.9));bar(B[0],B[1],62,hexA(C.b,0.9));
-    g.fillStyle=C.a;g.fillText('A',X(A[0])-14,52);g.fillStyle=C.b;g.fillText('B（拖我）',X(B[1])+6,66);
-    const ov=Math.min(A[1],B[1])-Math.max(A[0],B[0]);
-    if(ov>0)bar(Math.max(A[0],B[0]),Math.min(A[1],B[1]),55,hexA(C.bad,0.9),4);
-    const D=[A[0]-B[1],A[1]-B[0]];const has=D[0]<=0&&D[1]>=0;
-    line(175,'A − B');bar(D[0],D[1],175,has?hexA(C.bad,0.8):'rgba(172,173,168,0.75)',14);
-    const x0=X(0);drawOrigin1D(g,x0,140,205);
-    if(!has){const near=D[1]<0?D[1]:D[0];g.strokeStyle=C.ok;g.lineWidth=3;g.beginPath();g.moveTo(X(near),190);g.lineTo(x0,190);g.stroke()}
-    out.textContent=`A = [${A[0]}, ${A[1]}]   B = [${B[0].toFixed(1)}, ${B[1].toFixed(1)}]\nA − B = [Amin − Bmax, Amax − Bmin] = [${D[0].toFixed(1)}, ${D[1].toFixed(1)}]  → `+
-      (has?`包含 0：有 a = b 的点，A 和 B 重叠（重叠长度 ${ov.toFixed(1)}）`:`不含 0：离 0 最近的是 ${(D[1]<0?D[1]:D[0]).toFixed(1)}，两段之间的缝 = ${(-ov).toFixed(1)}`);
-  }
-  let drag=null;
-  cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();const v=view();const val=v.orig+(e.clientX-r.left-v.x0)/v.sc;if(val>b0-1&&val<b0+BL+1&&e.clientY-r.top<110){drag=val-b0;cv.setPointerCapture(e.pointerId);cv.classList.add('drag')}});
-  cv.addEventListener('pointermove',e=>{if(drag===null)return;const r=cv.getBoundingClientRect();const v=view();b0=Math.max(-8,Math.min(9,v.orig+(e.clientX-r.left-v.x0)/v.sc-drag));draw()});
-  const up=()=>{drag=null;cv.classList.remove('drag')};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
-  window.addEventListener('resize',()=>{S.fit();draw()});draw();
-})();
-
-// ---------- Figure 2b: 2D origin, with the witness pair ----------
+// ---------- Figure 2c: 2D origin, with the witness pair ----------
 (function(){
   const cv=document.getElementById('cO2'),g=cv.getContext('2d'),S=setup(cv),out=document.getElementById('o2Out');
   const view=()=>{const W=cv.width/S.dpr;const half=W/2;return {W,half,sc:Math.min(half/9.5,S.h/8)}};
@@ -1010,7 +1692,7 @@ function differenceHull(points) {
   return half(unique).concat(half(unique.slice().reverse()));
 }
 
-// Figure 2f uses the actual final GJK simplex from Figure 2.
+// Figure 2d uses the actual final GJK simplex from Figure 2.
 function epaWalk(A,B) {
   const tolerance = 1e-8, result = gjk(A,B,null);
   if (!result.inside) return {state:result.dist <= tolerance ? 'touch' : 'apart', distance:result.dist, closest:result.v, frames:[]};
@@ -1170,10 +1852,10 @@ function epaWalk(A,B) {
       (converged?'两把尺一样长，绿边已经贴到真正的边界。':'绿边外面还多出蓝色虚线那一截，长 '+gap.html+'。');
     if(phase==='expand') reading.innerHTML='把 '+a+' − '+b+' 得到的 W 连进白线。图中保留了刚才量过的两把尺，旧绿边改画成虚线。'+comparison+'下一轮要在新的白线上重新挑最近边。';
     if(phase==='done') reading.innerHTML='两把尺量到同一个地方，深度就是绿尺的 '+d.html+'。固定 A，沿 n = ('+fmt(edge.n.x)+', '+fmt(edge.n.y)+') 把 B 平移 '+d.html+'，它就到左边橙色虚线的位置。点“把 B 推到刚好接触”可以验算。两块都能动时，也可以各往相反方向挪半个绿尺。';
-    bulletReading.innerHTML='把图 2f 第 '+frame.round+' 轮的数代进去，<code>wdist = h − d</code>，用橙尺 '+h.html+' 减去绿尺 '+d.html+'，相差 '+gap.html+'（先相减，再保留两位小数）。'+
+    bulletReading.innerHTML='把图 2d 第 '+frame.round+' 轮的数代进去，<code>wdist = h − d</code>，用橙尺 '+h.html+' 减去绿尺 '+d.html+'，相差 '+gap.html+'（先相减，再保留两位小数）。'+
       (converged?'两线重合，循环收工。':'这段差值大于演示容差，走扩展这条分支。');
     const upper=measure('h',frame.upper);
-    boundsReading.innerHTML='看图 2f 的第 '+frame.round+' 轮。绿尺给出这一轮的下界 '+d.html+'；'+
+    boundsReading.innerHTML='看图 2d 的第 '+frame.round+' 轮。绿尺给出这一轮的下界 '+d.html+'；'+
       (frame.upper===frame.h?'这次的橙尺也是目前最短的，所以上界是 '+h.html+'。':'这次橙尺是 '+h.html+'，前面量过更短的支撑距离，所以上界沿用 '+upper.html+'。');
   }
 
@@ -1354,7 +2036,7 @@ function epaWalk(A,B) {
     document.getElementById('gPrev').disabled=k===0;
     document.getElementById('gStep').disabled=last;
     out.textContent=`第 ${Math.min(k,res.steps.length-1)+1} / ${res.steps.length} 步（共取了 ${res.iters} 次支撑点）：${st.note}\n`+
-      (st.inside?'单纯形包含原点 → A 与 B 相交。GJK 到这里只知道“相交”，图 2f 接着用 EPA 求深度和方向；我们的 GPU 版交给 SAT。':`当前 |v| = ${len(st.v).toFixed(3)}`)+
+      (st.inside?'单纯形包含原点 → A 与 B 相交。GJK 到这里只知道“相交”，图 2d 接着用 EPA 求深度和方向；我们的 GPU 版交给 SAT。':`当前 |v| = ${len(st.v).toFixed(3)}`)+
       (last&&!res.inside?`\n结果：两物体最近距离 = ${res.dist.toFixed(3)}，方向 = (${nrm(res.v).x.toFixed(2)}, ${nrm(res.v).y.toFixed(2)})。`:'');
   }
   document.getElementById('gPrev').onclick=()=>{k=Math.max(0,k-1);draw()};
