@@ -2116,10 +2116,40 @@ function epaWalk(A,B) {
   window.addEventListener('resize',()=>{S.fit();draw()});
 })();
 
-// TOC highlight
-const links=[...document.querySelectorAll('nav.toc a')];
-const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id))}}),{rootMargin:'-20% 0px -70% 0px'});
-document.querySelectorAll('h2[id],h3[id],figure[id]').forEach(h=>io.observe(h));
+// Mark the last linked heading or figure to reach the reading position.
+const tocItems = Array.from(document.querySelectorAll('nav.toc a'), link => ({
+  link,
+  target: document.getElementById(link.hash.slice(1))
+})).filter(item => item.target);
+let activeTocLink;
+let tocFrame = 0;
+function updateToc() {
+  tocFrame = 0;
+  const readingLine = document.querySelector('header.top').getBoundingClientRect().bottom + 24;
+  let active = tocItems[0]?.link;
+  let nearestTop = -Infinity;
+  for (const { link, target } of tocItems) {
+    const top = target.getBoundingClientRect().top;
+    if (top <= readingLine && top >= nearestTop) {
+      active = link;
+      nearestTop = top;
+    }
+  }
+  if (!active || active === activeTocLink) return;
+  activeTocLink?.classList.remove('on');
+  activeTocLink?.removeAttribute('aria-current');
+  active.classList.add('on');
+  active.setAttribute('aria-current', 'location');
+  activeTocLink = active;
+}
+function scheduleToc() {
+  if (!tocFrame) tocFrame = requestAnimationFrame(updateToc);
+}
+window.addEventListener('scroll', scheduleToc, { passive: true });
+window.addEventListener('resize', scheduleToc);
+document.addEventListener('toggle', scheduleToc, true);
+window.addEventListener('pageshow', scheduleToc);
+scheduleToc();
 </script>
 </body>
 </html>
