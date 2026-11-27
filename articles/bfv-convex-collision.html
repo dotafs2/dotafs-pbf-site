@@ -55,11 +55,10 @@ figure{margin:16px 0 22px;max-width:1100px}
 .epa-contact-examples span{display:block;margin-top:4px;color:var(--text);font-size:14px}
 .epa-measure{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
 .epa-d{color:var(--ok)}.epa-h,.epa-vertex-b{color:var(--b)}.epa-gap,.epa-vertex-a{color:var(--a)}
-#epa-how .epa-current::marker{color:var(--ok);font-weight:bold}
-#epa-how .epa-current b{color:var(--ok)}
-#epa-how .epa-pair{display:inline-block;inline-size:13ch;white-space:nowrap;vertical-align:baseline;font:0.94em/1.4 var(--mono)}
-#epaReading{min-block-size:3lh}
-#eOut{min-block-size:calc(2lh + 21px)}
+#epaReading{margin:0;padding:0 12px 12px;min-block-size:2lh}
+#eOut{font:600 15px/1.5 var(--sans);padding-bottom:4px}
+.epa-tools>summary{cursor:pointer;font:14px/1.5 var(--sans);color:var(--muted);padding:5px 12px}
+#eStep:enabled{border-color:var(--accent)}
 /* These figures share B and update above the EPA canvas while it is being dragged. */
 #o2Out,#gjkOut,#satOut{min-block-size:calc(3lh + 21px)}
 @media(max-width:1100px){#o2Out{min-block-size:calc(4lh + 21px)}}
@@ -70,8 +69,7 @@ figure{margin:16px 0 22px;max-width:1100px}
 }
 @media(max-width:360px){#o2Out{min-block-size:calc(9lh + 21px)}#satOut{min-block-size:calc(7lh + 21px)}}
 @media(max-width:799px){
-  #epaReading{min-block-size:6lh}
-  #eOut{min-block-size:calc(3lh + 21px)}
+  #epaReading{min-block-size:3lh}
 }
 .readout{font:13px/1.6 var(--mono);color:var(--text);padding:10px 12px;border-top:1px solid var(--line);white-space:pre-wrap}
 figcaption{color:var(--muted);font-size:14px;margin-top:8px}
@@ -153,7 +151,7 @@ summary:focus-visible,.case-radio:focus-visible+label{outline:2px solid var(--ac
   <a href="#outline" class="h3">A − B 的轮廓怎么来的</a>
   <a href="#gjk-demo" class="h3">图 2：一步一步走单纯形</a>
   <a href="#epa">EPA：相交后求深度</a>
-  <a href="#epa-demo" class="h3">图 2d：从白三角形往外找</a>
+  <a href="#epa-demo" class="h3">图 2d：从三角形到刚好接触</a>
   <a href="#epa-bullet" class="h3">拿图里的数读 Bullet</a>
   <a href="#epa-chaos" class="h3">对照 Chaos 和 Havok</a>
   <a href="#cmp">两者放在一起</a>
@@ -175,7 +173,7 @@ summary:focus-visible,.case-radio:focus-visible+label{outline:2px solid var(--ac
 <article>
 <h1>SAT、GJK 和 GSK</h1>
 <div class="date">DOTAFS · 2026-11-24 · 2026-11-27 更新 · 正文约 40 分钟 · 练习另计</div>
-<p>这篇讲 GPU 凸包后端窄相用到的三样东西。我们把凸包画成平面上的多边形，坐标、距离和推出方向都可以在图上量。图里蓝色是 A，橙色是 B，<b>拖动橙色的 B</b>，用滑条转它。图 1、图 2 和图 2d 共用同一个 B 的位置。在这几张图里，也可以用 Tab 选中画布，用方向键移动 B，用 Home 恢复初始姿态。</p>
+<p>这篇讲 GPU 凸包后端窄相用到的三样东西。我们把凸包画成平面上的多边形，坐标、距离和推出方向都可以在图上量。图里蓝色是 A，橙色是 B，<b>拖动橙色的 B</b>，用滑条转它。图 2d 起初摆好了一对相交的物体。动手拖动 B 后，图 1、图 2 和图 2d 会一起更新。在这几张图里，也可以用 Tab 选中画布，用方向键移动 B，用 Home 恢复初始姿态。</p>
 
 <p class="exercise-help">每节末尾有两道二维题。先在纸上算，再点题目看解析。<a href="#summary">文末用同一对正方形把四种算法连起来。</a> 想直接看引擎，可跳到<a href="#engine-physics">Havok 和 Chaos 的任务分发图</a>。</p>
 <h2 id="q">要回答的问题</h2>
@@ -522,102 +520,46 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 </details>
 </section>
 
-<h2 id="epa">EPA：已经相交了，B 要往哪边推，多远才刚好碰着？</h2>
-<p>把 B 稍稍推入 A。两块的最近距离已经是零，但要让它们刚好贴住，还得挪一段。现在到差集图里，从原点往各条边量，找最短的出口。</p>
+<h2 id="epa">白三角形圈住原点以后，EPA 怎么算 B 还要挪多远？</h2>
+<p id="epa-goal">P1、P2、P3 连成的白三角形圈住了原点。到这里，GJK 已经知道蓝色 A 和橙色 B 压在一起了。现在固定 A，让 B 保持朝向。<b>朝哪边挪 B，能用最短的距离让两块刚好贴住？</b></p>
+<p>看标着“差集”的那幅图，手机上是下面那幅。这里的坐标可以直接读成 B 的挪法。比如 a − b = (0.5, 0)，把 B 向右挪半厘米，B 上的 b 就和 A 上的 a 重合。原点 (0, 0) 表示 B 还没挪。只要位移的终点还在灰色区域里面，两块就还有重叠。走到灰边上，两块就刚好接触。我们要找的是<b>从原点到灰边最短的那根箭头</b>。图里提前画出了灰边，方便用眼睛核对。EPA 手里只有那个白三角形。</p>
+<ol id="epa-steps">
+<li><b>先量最近的白边。</b> 在图里的相交例子中，从原点朝左下走 0.52 cm，就碰到白三角形的一条边。看看那条边的外面，还有一片灰色。要是现在就把 B 这么挪，两块还压在一起。</li>
+<li><b>补上白边漏掉的那一块。</b> 顺着刚才那根垂直白边的箭头朝外看。和找 P1 时一样，从 A 和 B 各挑一个角相减，得到这个方向上最靠外的点 W。这次 W 落在白边外面。擦掉这条白边，把它的两头分别连到 W，白三角形就变成了四边形。画这些线时，实物图里的 B 一直停在原地。</li>
+<li><b>在新的白轮廓上，重新挑离原点最近的边。</b> 这次最近的可能是另一条边。重复刚才的动作，直到朝外找到的最远点也落在这条边所在的直线上。这时最近的白边已经贴上灰边，从原点垂直到它的箭头，就是 B 该挪的方向和距离。</li>
+</ol>
+<p>这个例子算到第三轮，箭头指向右上方。点“把 B 推到刚好接触”，B 会向右挪约 0.92 cm、向上挪约 0.14 cm，总共约 0.93 cm。看实物图，两块原来叠在一起的地方刚好松开，边上还碰着。</p>
+<figure id="epa-demo">
+<div class="stage">
+  <canvas id="cEpa" height="440" aria-label="EPA 的二维演示。实物图画出蓝色 A 和橙色 B。差集图用白线画出已找到的边，用灰色虚线画出完整边界。按下一步查看每次变化和读数。"></canvas>
+  <div class="bar">
+    <button id="ePrev">上一步</button><button id="eStep">下一步</button><button id="ePush" disabled>把 B 推到刚好接触</button>
+  </div>
+  <details class="epa-tools"><summary>换姿势、回看 GJK 或直接看结果</summary><div class="bar">
+    <button id="eExample">摆成相交的例子</button><button id="eReset">从 P1 开始</button><button id="eRun">直接看结果</button>
+    <label>旋转 B <input id="eRot" type="range" min="0" max="360" step="1" value="20" aria-valuetext="20 度"><span id="eRotValue" aria-hidden="true">20°</span></label>
+  </div></details>
+  <div class="readout" id="eOut" aria-live="polite"></div>
+  <p id="epaReading"></p>
+</div>
+<figcaption>图 2d · 白线连着 EPA 已经找到的点，灰虚线是完整的差集轮廓。上面的数值取自相交预设，拖动 B 后，图会按新位置重算。</figcaption>
+</figure>
 <section class="problems" aria-label="本节的二维计算题" data-topic="epa">
 <p class="problem-label">二维练习</p>
 <details class="math-question">
-<summary>平面差集的四个角是 (−2,−1)、(3,−1)、(3,2)、(−2,2)。原点要往哪个方向走，才能最快走到边界？</summary>
-<ol>
-<li>原点在矩形内。到左、右、下、上四条边的垂距依次为 2、3、1、2。</li>
-<li>在下边上的垂足是 (0,−1)，落在线段内部。</li>
-</ol>
-<p class="answer"><strong>答案</strong>　最近出口是 (0,−1)，距离为 1。</p>
+<summary>第一轮，最近的白边连接 P1 和 P2。新找到的 W 在它外面。把 W 补进去以后，白轮廓有几条边？这一步 B 实际挪了多少？</summary>
+<p>在纸上画出 P1、P2、P3，擦掉 P1 到 P2 的一条边，再画 P1 到 W、W 到 P2 两条边。原来的三条边减一加二，得到<b>四条边</b>。B 还在原处，位移是 <b>(0, 0)</b>。</p>
 </details>
 <details class="math-question">
-<summary>已知凸多边形 A−B 的唯一最近边经过 (1,0) 和 (0,1)，其余各边距原点都更远，原点在内部。固定 A，B 应沿哪个向量移动到刚好接触？</summary>
-<ol>
-<li>边的方程是 x+y=1，朝外的单位法线为 (1,1)/√2。</li>
-<li>边到原点的距离为 1/√2。用这个距离乘单位法线，得到最近边界点。</li>
-</ol>
-<p class="answer"><strong>答案</strong>　B 应平移 (0.5,0.5)，此时差集向相反方向移，原点落在边上。</p>
-</details>
-</section>
-
-<h3 id="epa-goal">右边的白三角形是怎么画出来的？</h3>
-<p>先看左图。沿着蓝色多边形走一圈，六个角依次叫 <span class="epa-vertex-a">A1 到 A6</span>；橙色的四个角依次叫 <span class="epa-vertex-b">B1 到 B4</span>。比如 A4 就是蓝色的第 4 个角。拖动或转动 B，编号跟着原来的角走。点“摆成相交的例子”，看这一轮用白圈标出了哪两个角。</p>
-<ol id="epa-how">
-<li><b>画第一个白点 P1。</b> 先挑一个方向。在左图，沿这个方向找 A 最靠前的顶点，再反过来找 B 的顶点。用 A 的坐标减 B 的坐标，把算出来的点画在右图，这就是 P1。<span class="epa-pair" id="epaPair1">P1 = ·· − ··</span></li>
-<li><b>画第二个白点 P2，把两个点连起来。</b> 从 P1 朝原点看，沿这个新方向再挑一对顶点，相减得到 P2。右图现在有一条白线，一头是 P1，另一头是 P2。<span class="epa-pair" id="epaPair2">P2 = ·· − ··</span></li>
-<li><b>画第三个白点 P3。</b> 在白线上找到离原点最近的地方。从那里朝原点看，再挑一对顶点，相减得到 P3。把 P3 和白线的两头连起来，白三角形就画出来了。<span class="epa-pair" id="epaPair3">P3 = ·· − ··</span></li>
-<li><b>看原点有没有被圈住。</b> 这个例子里，原点在白三角形里面。三个白点都在灰圈里，连起来的三角形也整个在灰圈里，所以原点一定在灰圈里，左边的 A 和 B 相交。GJK 把这三个点原样交给 EPA。如果换个位置，前三个点没圈住原点，GJK 会留下离原点最近的白点或白边，再找下一个点。</li>
-</ol>
-<figure id="epa-demo">
-<div class="stage">
-  <canvas id="cEpa" height="440" aria-label="左边蓝色六个角标为 A1 到 A6，橙色四个角标为 B1 到 B4。白圈标出选中的角，右边画两点相减得到的白点。按“下一步”可以从一个白点看到完整三角形，再看 EPA 量边。"></canvas>
-  <div class="bar">
-    <button id="eExample">摆成相交的例子</button><button id="ePrev" disabled>上一步</button><button id="eStep">下一步</button><button id="eRun">走完</button><button id="eReset">从头开始</button><button id="ePush" disabled>把 B 推到刚好接触</button>
-    <label>旋转 B <input id="eRot" type="range" min="0" max="360" step="1" value="20" aria-valuetext="20 度"><span id="eRotValue" aria-hidden="true">20°</span></label>
-  </div>
-  <div class="readout" id="eOut" aria-live="polite"></div>
-</div>
-<figcaption>图 2d 和图 2 用的是同一对物体。右边的灰圈是 24 个差点套上橡皮筋后的轮廓。白点 P1、P2、P3 是 GJK 从这些差点里挑出来的。图上 1 个坐标单位按 1 cm 读数。</figcaption>
-</figure>
-<p id="epaReading"></p>
-<section class="problems" aria-label="本节的二维计算题" data-topic="epa-goal">
-<p class="problem-label">二维练习</p>
-<details class="math-question">
-<summary>在方格纸上画出三角形 A，顶点为 (0,0)、(3,0)、(0,2)。三角形 B 的顶点为 (0,1)、(2,0)、(2,2)。搜索方向 d=(2,1)，差集 A−B 的第一个支撑点画在哪里？</summary>
-<ol>
-<li>A 的三个顶点与 d 点乘，依次得到 0、6、2，最靠前的是 (3,0)。</li>
-<li>B 的三个点与 d 点乘得到 1、4、6。沿 −d 最靠前的是点积最小的 (0,1)。</li>
-<li>取这对顶点的差，横坐标是 3−0，纵坐标是 0−1。</li>
-</ol>
-<p class="answer"><strong>答案</strong>　在差集图上标出 P=(3,−1)。</p>
-</details>
-<details class="math-question">
-<summary>GJK 找到三个差点 P=(2,0)、Q=(0,2)、R=(−1,−1)。能否找到三个和为 1 的正权重，使加权后的点恰好在原点？这个三角形可以交给 EPA 吗？</summary>
-<ol>
-<li>设三个权重为 a、b、c。要让横纵坐标同时为 0，需要 2a−c=0 且 2b−c=0。</li>
-<li>代入 a+b+c=1，得到 a=b=1/4，c=1/2。三个点不共线，三个权重也都大于零，所以原点严格位于三角形内部。</li>
-</ol>
-<p class="answer"><strong>答案</strong>　可以。P/4+Q/4+R/2=(0,0)，这三个点能作为二维 EPA 的起始多边形。</p>
-</details>
-</section>
-
-<h3 id="epa-steps">拿到白三角形以后，EPA 做哪四步？</h3>
-<ol>
-<li><b>挑一条边。</b> 从原点往三条白边分别垂直量一下，挑最近的那条。图里把它涂成绿色。</li>
-<li><b>朝边外面找一个点。</b> 顺着绿尺指的方向，再拿一个蓝顶点减一个橙顶点，得到 W。过 W 画一条和绿边平行的橙线。</li>
-<li><b>比两把尺。</b> 从原点量到绿边是绿尺，量到橙线是橙尺。橙尺更长，说明绿边外面还有点。把 W 连进白线，回到第 1 步。</li>
-<li><b>两把尺一样长，就知道怎么推了。</b> 固定蓝色 A，把橙色 B 沿绿尺的方向挪一个绿尺的长度。左边两块刚好碰着，右边灰圈的边也刚好经过原点。</li>
-</ol>
-<section class="problems" aria-label="本节的二维计算题" data-topic="epa-steps">
-<p class="problem-label">二维练习</p>
-<details class="math-question">
-<summary>EPA 的起始三角形有三个角 (−2,−1)、(2,−1)、(0,3)。哪条边离原点最近？若沿它的外法线查到支撑点 W=(1,−2)，这一轮该不该把 W 插进去？</summary>
-<ol>
-<li>底边在 y=−1 上，距原点 1。两条斜边所在直线为 2x+y=3、−2x+y=3，到原点的垂距都是 3/√5，约 1.34。</li>
-<li>底边的外法线是 n=(0,−1)。底边离原点 1，过 W 的支撑线离原点 n·W=2。</li>
-<li>两把尺相差 1。把 W 连到底边的两端，用两条新边替换底边后，才重新比较最近边。</li>
-</ol>
-<p class="answer"><strong>答案</strong>　选底边，插入 W。这一轮量到的 1 还不能当成最终穿透深度。</p>
-</details>
-<details class="math-question">
-<summary>差集 A−B 的当前最近边连接 P=(−1,2) 与 Q=(3,−1)，外法线朝右上。沿这个方向查支撑时又返回 P。固定 A，B 要平移多少才能刚好接触？</summary>
-<ol>
-<li>边方向 Q−P=(4,−3)，朝右上的单位法线是 n=(3/5,4/5)。</li>
-<li>n·P=n·Q=1。支撑查询也落在这条边上，当前边和真正的支撑线重合。</li>
-<li>把 B 沿 n 平移 1，整个差集会反向平移 n，边上的最近点随之来到原点。</li>
-</ol>
-<p class="answer"><strong>答案</strong>　B 的位移为 (3/5,4/5)，长度为 1。</p>
+<summary>算完时，从原点到灰边的最短箭头约为 (0.92, 0.14) cm。B 的中心原来在 (1.50, 0) cm。推到刚好接触时，中心在哪？</summary>
+<p>按箭头把 B 向右挪 0.92 cm、向上挪 0.14 cm。把这两个分量分别加在原坐标上，中心来到 <b>(2.42, 0.14) cm</b> 附近。它走过的直线距离是 √(0.92² + 0.14²)，约 <b>0.93 cm</b>。</p>
 </details>
 </section>
 
 <h3 id="epa-relative">为什么图里只推 B？两块都能动呢？</h3>
 <ol>
-<li><b>绿尺量的是两块之间要错开多少。</b> EPA 只看形状和位置。图里固定 A，让 B 沿绿尺走完整段，是为了让你看见它们刚好碰着的那一刻。</li>
-<li><b>两块都能动，也能凑出同一段距离。</b> 假设绿尺朝右，又只考虑平移。A 向左走半个绿尺，B 向右走半个绿尺，两块之间也正好错开一个绿尺。</li>
+<li><b>最后那根绿箭头给的是 B 相对 A 的位移。</b> 图里固定了 A，所以整段都由 B 来走。</li>
+<li><b>两块都能动，也能凑出同一段距离。</b> 假设要把 B 相对 A 向右挪 1 cm。A 向左挪半厘米，B 向右挪半厘米，也能刚好消掉这 1 cm 的重叠。</li>
 <li><b>质量不同时，轻的那块可以多挪一点。</b> 假设要一次消除这段重叠，不考虑转动，按质量的倒数来分。如果 A 比 B 重三倍，A 向左挪四分之一，B 向右挪四分之三。A 是固定墙时，就全由 B 挪。</li>
 <li><b>碰撞时的冲量先改速度。</b> 同一个接触点上，A 和 B 受到的冲量一样大、方向相反。质量小的那块，速度改得更多；撞偏了还会转。我们工程的 <code>SolveOne</code> 给 A 用 +P、给 B 用 −P，<code>PositionOne</code> 另外处理已经压进去的部分，每步可以只纠正一部分。两个函数都在工程的 <code>BFVGpuSimStep.usf</code> 里。</li>
 </ol>
@@ -674,7 +616,7 @@ return CONTACT, depth = minOverlap, contact normal = normal</code></pre>
 </div>
 <figcaption>白点标出接触点和 B 的质心。两次给 B 同样大的向右冲量，质心的速度变化一样。把箭头沿直线延长，经过质心时，这一下给 B 的转动力矩为零；从质心上方经过时，这一下还会带着 B 顺时针转。</figcaption>
 </figure>
-<p>有摩擦时，接触点还可能沿着表面受到摩擦冲量。工程里的 <code>ApplyImpulse</code> 把同一个冲量 <code>P</code> 用了两次：第 776 行用它改线速度，第 777 行用 <code>cross(r, P)</code> 改角速度。<code>r</code> 是从质心指到接触点的箭头。前面 EPA 的绿尺只演示把两块沿法线平移到刚好接触；真正碰撞后转多少，由接触求解器算。</p>
+<p>有摩擦时，接触点还可能沿着表面受到摩擦冲量。工程里的 <code>ApplyImpulse</code> 把同一个冲量 <code>P</code> 用了两次：第 776 行用它改线速度，第 777 行用 <code>cross(r, P)</code> 改角速度。<code>r</code> 是从质心指到接触点的箭头。前面 EPA 的绿箭头演示了沿法线平移多少能让两块刚好接触。真正碰撞后转多少，由接触求解器算。</p>
 <section class="problems" aria-label="本节的二维计算题" data-topic="epa-contact">
 <p class="problem-label">二维练习</p>
 <details class="math-question">
@@ -1328,22 +1270,22 @@ function drawOrigin2D(g,p,occupied=[]){
   drawOriginLabel(g,p,'原点 (0, 0)',occupied);g.restore();
 }
 function hexA(c,a){const n=parseInt(c.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
-function dragB(cv,toWorld,onChange){
+function dragB(cv,toWorld,onChange,pose=shared){
   cv.tabIndex=0;
   cv.classList.add('canvas-key');
   cv.addEventListener('keydown',event=>{
     const offsets={ArrowLeft:[-0.15,0],ArrowRight:[0.15,0],ArrowUp:[0,0.15],ArrowDown:[0,-0.15]};
     if(event.key==='Home'){
-      shared.bx=3.5;shared.by=0.9;setRotation(20);
+      pose.bx=3.5;pose.by=0.9;setRotation(20);
     }else if(Object.hasOwn(offsets,event.key)){
-      const [dx,dy]=offsets[event.key];shared.bx+=dx;shared.by+=dy;
+      const [dx,dy]=offsets[event.key];pose.bx+=dx;pose.by+=dy;
     }else return;
     event.preventDefault();onChange();
   });
   let drag=null;
   cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();const w=toWorld(e.clientX-r.left,e.clientY-r.top);if(!w)return;
-    if(len(sub(w,V(shared.bx,shared.by)))<1.6){drag=sub(V(shared.bx,shared.by),w);cv.setPointerCapture(e.pointerId);cv.classList.add('drag')}});
-  cv.addEventListener('pointermove',e=>{if(!drag)return;const r=cv.getBoundingClientRect();const w=toWorld(e.clientX-r.left,e.clientY-r.top,true);if(!w)return;shared.bx=w.x+drag.x;shared.by=w.y+drag.y;onChange()});
+    if(len(sub(w,V(pose.bx,pose.by)))<1.6){drag=sub(V(pose.bx,pose.by),w);cv.setPointerCapture(e.pointerId);cv.classList.add('drag')}});
+  cv.addEventListener('pointermove',e=>{if(!drag)return;const r=cv.getBoundingClientRect();const w=toWorld(e.clientX-r.left,e.clientY-r.top,true);if(!w)return;pose.bx=w.x+drag.x;pose.by=w.y+drag.y;onChange()});
   const up=()=>{drag=null;cv.classList.remove('drag')};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 }
 const listeners=[];const changed=reason=>listeners.forEach(f=>f(reason));
@@ -1722,13 +1664,15 @@ function epaWalk(A,B) {
     const hit=query(edge.n), h=dot(edge.n,hit.w);
     upper=Math.min(upper,h);
     const frame={poly,edge,hit,h,round,upper};
-    frames.push({...frame,phase:'find'},{...frame,phase:'support'});
+    if (round===1) frames.push({...frame,phase:'handoff'});
+    frames.push({...frame,phase:'find'});
     if (h-edge.d<=tolerance) {
       if (edge.d<=tolerance) return {state:'touch',frames:[]};
       frames.push({...frame,phase:'done'});
       return {state:'overlap',frames,supplemented,gjkSteps:result.steps};
     }
     // Only previously queried support points enter this hull.
+    frames.push({...frame,phase:'support'});
     poly=differenceHull([...poly,hit.w]);
     frames.push({...frame,poly,phase:'expand'});
   }
@@ -1740,22 +1684,11 @@ function epaWalk(A,B) {
   const cv=byId('cEpa'), g=cv.getContext('2d'), S=setup(cv), out=byId('eOut');
   const prev=byId('ePrev'), next=byId('eStep'), run=byId('eRun'), reset=byId('eReset'), push=byId('ePush');
   let A,B,outline,walk,k;
-  const guideRows=[...byId('epa-how').children];
-  const pairSlots=[1,2,3].map(i=>byId('epaPair'+i));
+  // Start this figure in overlap. Moving either shape then links the poses across figures.
+  const example={bx:1.5,by:0}, pose={...example};
   let seedStep=-1, sampled=[];
   function pairText(p){
     return '<span class="epa-vertex-a">A'+(p.ia+1)+'</span> − <span class="epa-vertex-b">B'+(p.ib+1)+'</span>';
-  }
-  function syncGuide(){
-    const lastShown=seedStep<0?sampled.length-1:seedStep;
-    pairSlots.forEach((node,i)=>{
-      const p=sampled[i];
-      const shown=p&&i<=lastShown;
-      const text='P'+(i+1)+' = '+(shown?'A'+(p.ia+1)+' − B'+(p.ib+1):'·· − ··');
-      if(node.textContent!==text) node.innerHTML='P'+(i+1)+' = '+(shown?pairText(p):'·· − ··');
-    });
-    const active=seedStep<0?(walk.frames.length&&k===0?3:-1):Math.min(seedStep,3);
-    guideRows.forEach((row,i)=>row.classList.toggle('epa-current',i===active));
   }
   function drawSeed(left,right){
     const step=walk.gjkSteps[seedStep], p=sampled[seedStep];
@@ -1787,7 +1720,7 @@ function epaWalk(A,B) {
   function placeLabel(label,color,anchor,side,bounds,occupied){
     const width=g.measureText(label).width+10, height=21;
     const overlaps=(a,b)=>a.x<b.x+b.w+3&&a.x+a.w+3>b.x&&a.y<b.y+b.h+3&&a.y+a.h+3>b.y;
-    // Try both sides of the measured segment, keeping the two labels and W distinct.
+    // Keep point names and measurements clear of each other and the origin.
     let best, score=Infinity;
     for(const offset of [17,33,51,70]) for(const sign of [1,-1]) for(const dx of [0,35,-35]){
       const cx=anchor.x+side.x*offset*sign+dx, cy=anchor.y+side.y*offset*sign;
@@ -1804,67 +1737,57 @@ function epaWalk(A,B) {
     g.fillStyle=css('--rail');g.fillRect(best.x,best.y,width,height);
     g.fillStyle=color;g.fillText(label,best.x+5,best.y+15);
   }
-  function drawVertexNumbers(left,v,selected){
-    const vertices=[];
+  function drawBodyLabels(left,selected){
     for(const [poly,name,color,index] of [[A,'A',C.a,selected?.ia],[B,'B',C.b,selected?.ib]]){
-      const center=mul(poly.reduce((sum,p)=>add(sum,p),V(0,0)),1/poly.length);
-      poly.forEach((p,i)=>{
-        const anchor=left(p);
-        if(anchor.x<0||anchor.x>v.w||anchor.y<0||anchor.y>v.h) return;
-        const outward=nrm(sub(anchor,left(center)));
-        vertices.push({anchor,outward,label:name+(i+1),color,chosen:i===index});
-      });
+      const center=mul(poly.reduce((sum,p)=>add(sum,p),origin),1/poly.length);
+      const at=left(center);
+      g.fillStyle=color;g.font='bold 15px '+css('--sans');g.fillText(name,at.x-5,at.y+15);
+      if(index===undefined) continue;
+      const point=left(poly[index]), outward=nrm(sub(point,at));
+      g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();g.arc(point.x,point.y,6,0,2*Math.PI);g.stroke();
+      g.font='13px '+css('--sans');
+      g.fillText(name+(index+1),point.x+outward.x*16-7,point.y+outward.y*16+4);
     }
-    const occupied=vertices.map(({anchor})=>({x:anchor.x-5,y:anchor.y-5,w:10,h:10}));
-    const bounds={x:3,y:27,w:v.w-6,h:v.h-30};
-    g.save();
-    g.beginPath();g.rect(0,0,v.w,v.h);g.clip();
-    for(const item of vertices){
-      mark(item.anchor,item.color);
-      if(item.chosen){
-        g.strokeStyle=C.head;g.lineWidth=2;g.beginPath();
-        g.arc(item.anchor.x,item.anchor.y,7,0,2*Math.PI);g.stroke();
-      }
-    }
-    // Give the chosen pair first pick of the available label positions.
-    vertices.sort((a,b)=>Number(b.chosen)-Number(a.chosen));
-    for(const item of vertices){
-      placeLabel(item.label,item.color,item.anchor,item.outward,bounds,occupied);
-    }
-    g.restore();
   }
   function explain(frame,d,h,gap){
-    const prefix='EPA 第 '+frame.round+' 轮 · ', phase=frame.phase, {edge,hit}=frame;
-    const a='A'+(hit.ia+1), b='B'+(hit.ib+1);
-    if(phase==='find'){
-      out.innerHTML=prefix+'量最近边。绿尺 d = '+d.html+'。';
-      reading.innerHTML=(frame.round===1?(walk.supplemented?'先把 GJK 留下的点或线段补成白色多边形。':'接过图 2 的白三角形。'):'上一轮把 W 加进来了，现在重新找最近边。')+
-        '从原点垂直量到绿边是 '+d.html+'。白线在灰圈里面，真实边界至少有这么远。点“下一步”，看看这条边外头还有没有点。';
-      bulletReading.innerHTML='图中选的绿边对应 <code>best</code>，<code>best-&gt;d</code> 对应绿尺 '+d.html+'。下一步沿法线取 W，才能算 <code>wdist</code>。';
-      boundsReading.innerHTML='这一轮先量到下界 '+d.html+'。沿法线取了 W，再用支撑平面的距离更新上界。';
+    const {phase,edge,hit}=frame;
+    const prefix='第 '+frame.round+' 轮 · ';
+    if(phase==='handoff'){
+      out.textContent=walk.supplemented?'从围住原点的白色多边形开始':'白三角形围住了原点，A 和 B 已经重叠';
+      reading.textContent=walk.supplemented?'GJK 留下的点或线段已补成白色多边形。点“下一步”，看原点离哪条白边最近。':'先让 A 和 B 待在原地。点“下一步”，从三条白边里挑出离原点最近的一条。';
+      bulletReading.textContent=boundsReading.textContent='图 2d 还停在起点。点“下一步”可看到第一条边的距离。';
       return;
     }
-    const delta=frame.h-edge.d, converged=delta<=1e-8;
-    out.innerHTML=prefix+({support:'沿法线取 W。',expand:'把 W 加进白色多边形。',done:'最近边贴到灰圈。'}[phase])+
-      '绿尺 d = '+d.html+'，橙尺 h = '+h.html+'，相差 '+gap.html+'。';
-    const comparison='从原点量到绿边是 '+d.html+'，顺着同一方向量到过 W 的橙色虚线是 '+h.html+'。';
-    if(phase==='support') reading.innerHTML='左边亮起来的是 '+a+' 和 '+b+'，两点相减就是右边的 W。'+comparison+
-      (converged?'两把尺一样长，绿边已经贴到真正的边界。':'绿边外面还多出蓝色虚线那一截，长 '+gap.html+'。');
-    if(phase==='expand') reading.innerHTML='把 '+a+' − '+b+' 得到的 W 连进白线。图中保留了刚才量过的两把尺，旧绿边改画成虚线。'+comparison+'下一轮要在新的白线上重新挑最近边。';
-    if(phase==='done') reading.innerHTML='两把尺量到同一个地方，深度就是绿尺的 '+d.html+'。固定 A，沿 n = ('+fmt(edge.n.x)+', '+fmt(edge.n.y)+') 把 B 平移 '+d.html+'，它就到左边橙色虚线的位置。点“把 B 推到刚好接触”可以验算。两块都能动时，也可以各往相反方向挪半个绿尺。';
-    bulletReading.innerHTML='把图 2d 第 '+frame.round+' 轮的数代进去，<code>wdist = h − d</code>，用橙尺 '+h.html+' 减去绿尺 '+d.html+'，相差 '+gap.html+'（先相减，再保留两位小数）。'+
-      (converged?'两线重合，循环收工。':'这段差值大于演示容差，走扩展这条分支。');
+    if(phase==='find'){
+      out.textContent=prefix+'选出离原点最近的白边';
+      reading.innerHTML='绿色箭头从原点垂直指向这条边，长 '+d.html+'。再沿它的方向查一次，看边外还能不能找到点。';
+      bulletReading.innerHTML='绿色箭头的长度就是 <code>best-&gt;d</code>，本轮为 '+d.html+'。';
+      boundsReading.innerHTML='本轮原点到白边的距离是 '+d.html+'，这是下界。';
+      return;
+    }
+    if(phase==='support'){
+      out.textContent=prefix+'在绿边外找到了 W';
+      reading.innerHTML=pairText(hit)+' 得到橙点 W。过 W 的橙色虚线与绿边平行，比绿边还往外 '+gap.html+'。白轮廓在这里少了一块。';
+    }else if(phase==='expand'){
+      out.textContent=prefix+'把 W 连进白轮廓';
+      reading.textContent='旧边画成了短虚线。两条经过 W 的新白边把缺的那块补上了。A 和 B 都留在原位，下一轮重新比较所有白边。';
+    }else{
+      const shift=mul(edge.n,edge.d);
+      out.textContent='最近的真实边找到了，B 最少要移动 '+d.text;
+      reading.innerHTML='沿绿箭头查到的最远点 W 就在这条线上。固定 A，B 按同一箭头移到橙色虚线处就刚好接触。位移约为 ('+fmt(shift.x)+', '+fmt(shift.y)+') cm。';
+    }
+    bulletReading.innerHTML='第 '+frame.round+' 轮，<code>best-&gt;d</code> 为 '+d.html+'，W 沿法线的投影为 '+h.html+'。相减得到 <code>wdist</code>，约 '+gap.html+'。';
     const upper=measure('h',frame.upper);
-    boundsReading.innerHTML='看图 2d 的第 '+frame.round+' 轮。绿尺给出这一轮的下界 '+d.html+'；'+
-      (frame.upper===frame.h?'这次的橙尺也是目前最短的，所以上界是 '+h.html+'。':'这次橙尺是 '+h.html+'，前面量过更短的支撑距离，所以上界沿用 '+upper.html+'。');
+    boundsReading.innerHTML='这一轮的下界是 '+d.html+'，已查过的支撑线中最近的一条给出上界 '+upper.html+'。';
   }
-
   function view(){
     const width=cv.width/S.dpr, stacked=width<620;
     const w=stacked?width:width/2, h=stacked?S.h/2:S.h;
-    const left=V(w*0.44,h*0.53), right=V((stacked?0:w)+w/2,(stacked?h:0)+h/2+13);
-    const sx=Math.max(2,...outline.map(p=>Math.abs(p.x))), sy=Math.max(2,...outline.map(p=>Math.abs(p.y)));
-    return {width,w,h,left,right,stacked,sl:Math.min(w/9.6,(h-50)/5.8),sr:Math.min((w-54)/(2*sx),(h-94)/(2*sy))};
+    const xs=outline.map(p=>p.x), ys=outline.map(p=>p.y);
+    const x0=Math.min(0,...xs), x1=Math.max(0,...xs), y0=Math.min(0,...ys), y1=Math.max(0,...ys);
+    const sr=Math.min((w-64)/Math.max(2,x1-x0),(h-104)/Math.max(2,y1-y0));
+    const right=V((stacked?0:w)+w/2-(x0+x1)*sr/2,(stacked?h:0)+h/2+16+(y0+y1)*sr/2);
+    return {width,w,h,left:V(w*0.44,h*0.53),right,stacked,sl:Math.min(w/8.2,(h-50)/5.8),sr};
   }
   function toWorld(x,y,force){
     const v=view();
@@ -1892,11 +1815,15 @@ function epaWalk(A,B) {
     const left=p=>pos(v.left,v.sl,p), right=p=>pos(v.right,v.sr,p);
     g.setTransform(S.dpr,0,0,S.dpr,0,0);g.clearRect(0,0,v.width,S.h);
     g.font='13px '+css('--sans');g.fillStyle=C.muted;
-    g.fillText('A 和 B（拖橙色的 B）',12,22);g.fillText('A − B（差值的图）',rightX+12,rightY+22);
+    g.fillText('实物 · A 和 B（可拖动 B）',12,22);g.fillText('差集 · A − B',rightX+12,rightY+22);
+    segment(V(rightX+12,rightY+42),V(rightX+29,rightY+42),C.head,2);
+    g.fillText('已找到的边',rightX+35,rightY+46);
+    segment(V(rightX+122,rightY+42),V(rightX+141,rightY+42),C.muted,1.5,[4,3]);
+    g.fillText('完整边界',rightX+147,rightY+46);
     if(v.stacked) segment(V(0,v.h),V(v.width,v.h),C.line);
     else segment(V(v.w,0),V(v.w,S.h),C.line);
     drawPoly(g,A,left,hexA(C.a,0.18),C.a);drawPoly(g,B,left,hexA(C.b,0.18),C.b);
-    g.setLineDash([5,4]);drawPoly(g,outline,right,hexA(C.mink,0.14),C.mink);g.setLineDash([]);
+    g.setLineDash([5,4]);drawPoly(g,outline,right,hexA(C.mink,0.09),C.muted,1.5);g.setLineDash([]);
     const o=right(origin);
     const frame=walk.frames[k];
     const last=k===walk.frames.length-1;
@@ -1905,43 +1832,50 @@ function epaWalk(A,B) {
     next.disabled=run.disabled=!frame||(!assembling&&last);
     reset.disabled=!sampled.length||seedStep===0;
     push.disabled=assembling||!frame||frame.phase!=='done';
-    syncGuide();
-    const bounds={x:rightX+6,y:rightY+46,w:v.w-12,h:v.h-53};
+    const bounds={x:rightX+6,y:rightY+49,w:v.w-12,h:v.h-56};
     const occupied=[{x:o.x-6,y:o.y-6,w:12,h:12}];
     if(assembling) drawSeed(left,right);
     else if(frame){
       const {edge,hit,h,phase}=frame;
       const foot=mul(edge.n,edge.d), tip=mul(edge.n,h), pf=right(foot), pt=right(tip);
       const d=measure('d',edge.d), height=measure('h',h), gap=measure('gap',h-edge.d);
-      const side=V(edge.n.y,edge.n.x), offset=mul(side,10);
+      const side=V(edge.n.y,edge.n.x);
       drawPoly(g,frame.poly,right,hexA(C.head,0.07),C.head);
       frame.poly.forEach(p=>mark(right(p),C.head));
-      segment(right(edge.a),right(edge.b),C.ok,phase==='expand'?2:4,phase==='expand'?[3,4]:[]);
-      arrow(o,pf,d.color);
-      if(phase!=='find'){
-        const w=right(hit.w);
-        occupied.push({x:w.x-5,y:w.y-23,w:26,h:30});
+      if(phase==='expand'){
+        g.beginPath();
+        const [a,w,b]=[edge.a,hit.w,edge.b].map(right);
+        g.moveTo(a.x,a.y);g.lineTo(w.x,w.y);g.lineTo(b.x,b.y);g.closePath();
+        g.fillStyle=hexA(C.b,0.16);g.fill();
+        segment(a,b,C.ok,1.5,[3,4]);
+      }
+      if(phase==='find'||phase==='support'||phase==='done'){
+        segment(right(edge.a),right(edge.b),C.ok,4);
+        arrow(o,pf,d.color);
+      }
+      if(phase==='support'){
         const tangent=V(-edge.n.y,edge.n.x), along=dot(sub(hit.w,tip),tangent);
         segment(right(add(tip,mul(tangent,Math.min(along,0)-0.35))),right(add(tip,mul(tangent,Math.max(along,0)+0.35))),height.color,1.5,[4,4]);
-        // Offset the full-length orange ruler sideways so both lengths remain visible when d = h.
-        const from=add(o,offset), to=add(pt,offset);
-        segment(o,from,height.color);segment(pt,to,height.color);arrow(from,to,height.color);
-        segment(pf,pt,gap.color,2,[3,3]);mark(w,C.b,'W');
-        g.fillStyle=gap.color;g.fillText('两尺相差 '+gap.text,rightX+12,rightY+42);
+        segment(pf,pt,height.color,2,[3,3]);
+        placeLabel('边外 '+gap.text,height.color,mul(add(pf,pt),0.5),side,bounds,occupied);
+      }
+      if(phase==='support'||phase==='expand'||phase==='done'){
+        const w=right(hit.w);
+        mark(w,C.b);
+        placeLabel('W',C.b,w,nrm(sub(w,o)),bounds,occupied);
       }
       if(phase==='done'){
         g.setLineDash([5,4]);drawPoly(g,B.map(p=>add(p,foot)),left,null,C.b,1.5);g.setLineDash([]);
-        const center=V(shared.bx,shared.by);arrow(left(center),left(add(center,foot)),d.color);
+        const center=V(pose.bx,pose.by);arrow(left(center),left(add(center,foot)),d.color);
       }
-      if(frame.round===1&&phase!=='expand'&&!walk.supplemented){
+      if(frame.round===1&&(phase==='handoff'||phase==='find')&&!walk.supplemented){
         const center=mul(frame.poly.reduce((sum,p)=>add(sum,p),origin),1/frame.poly.length);
         frame.poly.forEach(p=>{
           const index=sampled.findIndex(s=>len(sub(s.w,p))<1e-9);
           if(index>=0) placeLabel('P'+(index+1),C.head,right(p),nrm(sub(right(p),right(center))),bounds,occupied);
         });
       }
-      placeLabel('d = '+d.text,d.color,mul(add(o,pf),0.5),mul(side,-1),bounds,occupied);
-      if(phase!=='find') placeLabel('h = '+height.text,height.color,add(mul(add(o,pt),0.5),offset),side,bounds,occupied);
+      if(phase==='find'||phase==='done') placeLabel(d.text,d.color,mul(add(o,pf),0.5),mul(side,-1),bounds,occupied);
       explain(frame,d,height,gap);
     } else {
       const touching=walk.state==='touch';
@@ -1952,23 +1886,23 @@ function epaWalk(A,B) {
         placeLabel((touching?'深度 ':'间距 ')+m.text,m.color,mul(add(o,end),0.5),V(0,-1),bounds,occupied);
         const note=touching?'刚好接触，穿透深度是 '+m.html+'。':'两块还隔着 '+m.html+'。';
         out.innerHTML=note;
-        reading.innerHTML=note+(touching?'灰圈刚好经过原点。':'原点在灰圈外，图上的箭头量的是间距。')+'点“摆成相交的例子”，或把橙色的 B 拖进 A，再看 EPA 怎样挑边。';
+        reading.textContent=touching?'看灰色虚线，它现在刚好经过原点。实物图里两块也刚好挨着。':'原点在灰色虚线外。把橙色的 B 拖进 A，就能看 EPA 怎样找最近边。';
       } else {
         out.textContent='这次迭代没有收敛。';reading.textContent='试着拖动 B 换个位置。';
       }
       bulletReading.textContent='图中出现重叠时，这里会代入本轮的尺长。';
       boundsReading.textContent='图中出现重叠时，这里会列出对应的上下界。';
     }
-    const selected=assembling?sampled[seedStep]:(frame&&frame.phase!=='find'?frame.hit:null);
-    drawVertexNumbers(left,v,selected);
+    const selected=assembling?sampled[seedStep]:(frame?.phase==='support'?frame.hit:null);
+    drawBodyLabels(left,selected);
     drawOrigin2D(g,o,occupied);
   }
   function recompute(reason){
     const wasDone=walk?.frames[k]?.phase==='done';
-    A=polyA();B=polyB();walk=epaWalk(A,B);
+    A=polyA();B=world(B0,pose.bx,pose.by,shared.bt);walk=epaWalk(A,B);
     sampled=(walk.gjkSteps||[]).map(step=>step.w||step.simplex[0]);
     if(reason==='rotation' && walk.frames.length){
-      seedStep=Math.min(seedStep,sampled.length-1);
+      seedStep=Math.min(seedStep,lastReplayStep());
       k=wasDone?walk.frames.length-1:Math.min(k,walk.frames.length-1);
     }else{
       k=0;seedStep=-1;
@@ -1977,18 +1911,19 @@ function epaWalk(A,B) {
     outline=differenceHull(A.flatMap(a=>B.map(b=>sub(a,b))));
     draw();
   }
-  byId('eExample').onclick=()=>{
-    shared.bx=1.5;shared.by=0;setRotation(20);changed();
-    seedStep=0;draw();
-  };
+  // In ordinary runs the handoff frame already shows the last GJK triangle.
+  function lastReplayStep(){return sampled.length-(walk.supplemented?1:2)}
+  function publishPosition(){Object.assign(shared,pose)}
+  function moveB(){publishPosition();changed()}
+  byId('eExample').onclick=()=>{Object.assign(pose,example);setRotation(20);moveB()};
   prev.onclick=()=>{
     if(seedStep>0) seedStep--;
     else if(k>0) k--;
-    else seedStep=sampled.length-1;
+    else seedStep=lastReplayStep();
     draw();
   };
   next.onclick=()=>{
-    if(seedStep>=0) seedStep=seedStep+1<sampled.length?seedStep+1:-1;
+    if(seedStep>=0) seedStep=seedStep<lastReplayStep()?seedStep+1:-1;
     else if(k+1<walk.frames.length) k++;
     draw();
   };
@@ -1998,10 +1933,12 @@ function epaWalk(A,B) {
     const frame=walk.frames[k];
     if(!frame||frame.phase!=='done') return;
     const shift=mul(frame.edge.n,frame.edge.d);
-    shared.bx+=shift.x;shared.by+=shift.y;changed();
+    pose.bx+=shift.x;pose.by+=shift.y;moveB();
   };
-  dragB(cv,toWorld,changed);
-  listeners.push(recompute);window.addEventListener('resize',()=>{S.fit();draw()});recompute();
+  byId('eRot').addEventListener('input',publishPosition,true);
+  dragB(cv,toWorld,moveB,pose);
+  listeners.push(reason=>{pose.bx=shared.bx;pose.by=shared.by;recompute(reason)});
+  window.addEventListener('resize',()=>{S.fit();draw()});recompute();
 })();
 
 // ---------- Figure 2: GJK ----------
